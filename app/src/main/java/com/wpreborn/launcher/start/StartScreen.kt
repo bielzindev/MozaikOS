@@ -187,7 +187,8 @@ fun StartScreen(
             }
         }
 
-        val contentHeight = geo.y(rows) + topPad + 140.dp
+        // At least the screen height, so pressing and holding below the last tile is caught too.
+        val contentHeight = maxOf(geo.y(rows) + topPad + 140.dp, maxHeight)
         androidx.compose.runtime.CompositionLocalProvider(LocalTurnstile provides state.turnstile) {
             Box(
                 Modifier

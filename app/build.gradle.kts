@@ -26,9 +26,11 @@ android {
         create("zunex") {
             if (zunexKeystore != null) {
                 storeFile = zunexKeystore
-                storePassword = System.getenv("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
-                keyAlias = System.getenv("ZUNEX_KEY_ALIAS") ?: "zunex"
-                keyPassword = System.getenv("ZUNEX_KEY_PASSWORD") ?: System.getenv("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
+                // A missing secret reaches the build as an empty variable: treat it as unset.
+                fun env(name: String) = System.getenv(name)?.takeIf { it.isNotBlank() }
+                storePassword = env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
+                keyAlias = env("ZUNEX_KEY_ALIAS") ?: "zunex"
+                keyPassword = env("ZUNEX_KEY_PASSWORD") ?: env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
             } else {
                 initWith(getByName("debug"))
             }

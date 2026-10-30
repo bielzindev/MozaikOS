@@ -6,8 +6,8 @@ import android.content.pm.PackageManager
 import com.wpreborn.data.prefs.SettingsRepository
 
 /**
- * The phone's own Phone, Contacts and Calendar apps. With "use the phone's apps" on (the
- * default) the ZUNEX tiles keep their live content but open these, so calls, contacts and
+ * The phone's own Phone, Contacts and Calendar apps. With "use the phone's apps" on (off by
+ * default: ZUNEX apps come first) the ZUNEX tiles keep their live content but open these, so calls, contacts and
  * events are handled by the apps the user already trusts.
  */
 object SystemApps {

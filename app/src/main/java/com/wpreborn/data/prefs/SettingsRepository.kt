@@ -36,9 +36,9 @@ data class WpSettings(
     /** Without a chosen picture, cycle the latest photos on the lock screen. */
     val lockPhotos: Boolean = true,
     /** Replace the Android status bar by the Windows Phone one inside our screens. */
-    val wpStatusBar: Boolean = false,
-    /** Phone, People and Calendar tiles open the phone's own apps instead of the ZUNEX ones. */
-    val systemApps: Boolean = true,
+    val wpStatusBar: Boolean = true,
+    /** Optional: Phone, People and Calendar tiles open the phone's own apps instead of the ZUNEX ones. */
+    val systemApps: Boolean = false,
     /** Draw third-party icons on accent-colored squares in the app list. */
     val iconsOnAccent: Boolean = true,
     /** Metro icon pack (white glyphs) instead of the original Android icons. */
@@ -97,8 +97,8 @@ class SettingsRepository private constructor(private val context: Context) {
         lockEnabled = this[LOCK_ENABLED] ?: false,
         lockShowNotifications = this[LOCK_NOTIF] ?: true,
         lockPhotos = this[LOCK_PHOTOS] ?: true,
-        wpStatusBar = this[WP_STATUS] ?: false,
-        systemApps = this[SYSTEM_APPS] ?: true,
+        wpStatusBar = this[WP_STATUS] ?: true,
+        systemApps = this[SYSTEM_APPS] ?: false,
         iconsOnAccent = this[ICONS_ACCENT] ?: true,
         metroIcons = this[METRO_ICONS] ?: true,
         brandColors = this[BRAND_COLORS] ?: true,

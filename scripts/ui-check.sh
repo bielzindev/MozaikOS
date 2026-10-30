@@ -61,7 +61,7 @@ tap_text() {
     echo "text not found: $1"
   fi
 }
-# zunex_own: open the ZUNEX screens even though Phone/People/Calendar prefer the phone's apps.
+# zunex_own: always open the ZUNEX screens, even if the phone's apps were chosen in Settings.
 start() { adb shell am start -W -n "$PKG/$1" --ez zunex_own true >/dev/null; }
 
 seed_data
@@ -89,15 +89,6 @@ adb shell input keyevent KEYCODE_BACK
 # Volume flyout
 adb shell input keyevent KEYCODE_VOLUME_UP
 shot 06-volume 1
-
-# By default the Phone and Calendar tiles hand over to the phone's own apps.
-adb shell am start -W -n "$PKG/com.wpreborn.apps.phone.PhoneActivity" >/dev/null
-shot 08-phone-system 4
-adb shell input keyevent KEYCODE_HOME
-adb shell am start -W -n "$PKG/com.wpreborn.apps.calendar.CalendarActivity" >/dev/null
-shot 09-calendar-system 4
-adb shell input keyevent KEYCODE_HOME
-sleep 1
 
 # Built-in apps: first page, then swipe to the second pivot item
 for app in phone.PhoneActivity messages.MessagingActivity music.MusicActivity people.PeopleActivity \

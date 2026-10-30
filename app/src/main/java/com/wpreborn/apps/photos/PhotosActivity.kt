@@ -228,6 +228,7 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
                                     null,
                                 ),
                             )
+                            }
                         })
                         if (Build.VERSION.SDK_INT >= 30) {
                             add(AppBarButton(WpIcons.Delete, stringResource(R.string.delete)) {

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lite edition: strips the permissions and components that Play Protect flags most. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.READ_SMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.SEND_SMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_SMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_MMS" tools:node="remove" />
+    <uses-permission android:name="android.permission.RECEIVE_WAP_PUSH" tools:node="remove" />
+    <uses-permission android:name="android.permission.READ_CALL_LOG" tools:node="remove" />
+    <uses-permission android:name="android.permission.WRITE_CALL_LOG" tools:node="remove" />
+    <uses-permission android:name="android.permission.CALL_PHONE" tools:node="remove" />
+
+    <application>
+        <!-- Messaging opens the Android messaging app; no sms:/smsto: handling. -->
+        <activity
+            android:name="com.wpreborn.apps.messages.MessagingActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.messaging"
+            android:icon="@mipmap/ic_messaging"
+            android:label="@string/app_messaging"
+            tools:node="replace">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <receiver android:name="com.wpreborn.services.sms.SmsDeliverReceiver" tools:node="remove" />
+        <receiver android:name="com.wpreborn.services.sms.MmsReceiver" tools:node="remove" />
+        <receiver android:name="com.wpreborn.services.sms.SmsSentReceiver" tools:node="remove" />
+        <service android:name="com.wpreborn.services.sms.HeadlessSmsSendService" tools:node="remove" />
+    </application>
+</manifest>

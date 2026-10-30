@@ -234,4 +234,6 @@
         <item quantity="many">%d músicas</item>
         <item quantity="other">%d músicas</item>
     </plurals>
+    <string name="phone_lite_history">Na versão leve, o histórico de chamadas fica no app Telefone do Android.</string>
+    <string name="phone_open_history">abrir histórico de chamadas</string>
 </resources>

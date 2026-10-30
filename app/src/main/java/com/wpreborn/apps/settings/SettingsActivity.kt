@@ -168,9 +168,16 @@ private fun SettingsHome(go: (SettingsPage) -> Unit) {
         Entry(stringResource(R.string.set_about), Build.MODEL) { go(SettingsPage.About) },
     )
     val apps = listOf(
-        Entry(stringResource(R.string.app_messaging), if (smsDefault) stringResource(R.string.set_default_app) else stringResource(R.string.set_not_default_app)) {
-            SmsRepository(context).requestDefaultIntent()?.let { (context as? android.app.Activity)?.startActivityForResult(it, 3) }
-                ?: context.open(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+        Entry(
+            stringResource(R.string.app_messaging),
+            if (com.wpreborn.BuildConfig.LITE) null else if (smsDefault) stringResource(R.string.set_default_app) else stringResource(R.string.set_not_default_app),
+        ) {
+            if (com.wpreborn.BuildConfig.LITE) {
+                com.wpreborn.apps.messages.MessagingActivity.openSystemMessaging(context, null)
+            } else {
+                SmsRepository(context).requestDefaultIntent()?.let { (context as? android.app.Activity)?.startActivityForResult(it, 3) }
+                    ?: context.open(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)
+            }
         },
         Entry(stringResource(R.string.app_phone), null) {
             context.startActivity(Intent(android.telecom.TelecomManager.ACTION_SHOW_CALL_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))

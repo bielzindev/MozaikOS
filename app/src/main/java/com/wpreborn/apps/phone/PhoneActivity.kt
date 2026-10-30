@@ -129,6 +129,10 @@ class PhoneActivity : WpActivity() {
         }
 
         fun text(context: Context, number: String) {
+            if (com.wpreborn.BuildConfig.LITE) {
+                MessagingActivity.openSystemMessaging(context, number)
+                return
+            }
             context.startActivity(
                 Intent(context, MessagingActivity::class.java)
                     .putExtra(MessagingActivity.EXTRA_ADDRESS, number)
@@ -165,7 +169,9 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
             modifier = Modifier.weight(1f),
         ) { index ->
             when (index) {
-                0 -> PermissionGate(logPerm, stringResource(R.string.perm_call_log), Modifier.padding(start = 20.dp)) {
+                0 -> if (com.wpreborn.BuildConfig.LITE) {
+                    LiteHistory()
+                } else PermissionGate(logPerm, stringResource(R.string.perm_call_log), Modifier.padding(start = 20.dp)) {
                     val list = calls
                     if (list != null && list.isEmpty()) {
                         CenteredMessage(stringResource(R.string.phone_no_history), Modifier.padding(start = 20.dp))
@@ -194,12 +200,31 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
                 },
             ),
             menuItems = buildList {
-                if (!callPerm.granted) add(AppBarMenuItem(context.getString(R.string.phone_allow_direct_calls)) { callPerm.request() })
+                if (!callPerm.granted && !com.wpreborn.BuildConfig.LITE) add(AppBarMenuItem(context.getString(R.string.phone_allow_direct_calls)) { callPerm.request() })
                 add(AppBarMenuItem(context.getString(R.string.phone_call_settings)) {
                     context.startActivity(Intent(android.telecom.TelecomManager.ACTION_SHOW_CALL_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 })
             },
         )
+    }
+}
+
+/** Lite edition: no call log permission, so the history stays in the Android Phone app. */
+@Composable
+private fun LiteHistory() {
+    val context = LocalContext.current
+    Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 8.dp)) {
+        WpText(stringResource(R.string.phone_lite_history), style = WpType.Large, color = Wp.palette.subtle)
+        Spacer(Modifier.height(16.dp))
+        com.wpreborn.core.ui.WpButton(stringResource(R.string.phone_open_history)) {
+            try {
+                context.startActivity(
+                    Intent(Intent.ACTION_VIEW).setType(android.provider.CallLog.Calls.CONTENT_TYPE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            } catch (_: Exception) {
+                context.startActivity(Intent(Intent.ACTION_DIAL).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
     }
 }
 

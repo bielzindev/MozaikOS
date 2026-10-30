@@ -38,15 +38,15 @@ jobs:
         with:
           name: windows-phone-reborn-apk
           path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+            app/build/outputs/apk/*/debug/*.apk
+            app/build/outputs/apk/*/release/*.apk
           if-no-files-found: error
 
       - name: Rename APKs
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/release/app-release.apk dist/WindowsPhoneReborn.apk
-          cp app/build/outputs/apk/debug/app-debug.apk dist/WindowsPhoneReborn-debug.apk
+          cp app/build/outputs/apk/full/release/app-full-release.apk dist/WindowsPhoneReborn.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk dist/WindowsPhoneReborn-Lite.apk
 
       - name: Publish release with the APK
         if: github.event_name == 'push'
@@ -57,8 +57,10 @@ jobs:
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            Baixe **WindowsPhoneReborn.apk** abaixo e instale no Android (permita "instalar apps desconhecidos").
-            Depois, defina como app de tela inicial padrão.
+            - **WindowsPhoneReborn-Lite.apk**: versão leve, sem permissões de SMS, registro de chamadas e chamada direta (menos bloqueios do Play Protect). Mensagens e o histórico de chamadas abrem os apps do Android.
+            - **WindowsPhoneReborn.apk**: versão completa (Mensagens próprio, app de SMS padrão, histórico de chamadas).
+
+            Instale no Android (permita "instalar apps desconhecidos") e defina como app de tela inicial padrão.
           files: |
+            dist/WindowsPhoneReborn-Lite.apk
             dist/WindowsPhoneReborn.apk
-            dist/WindowsPhoneReborn-debug.apk

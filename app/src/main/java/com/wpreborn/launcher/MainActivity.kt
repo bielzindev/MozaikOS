@@ -112,8 +112,17 @@ class MainActivity : ComponentActivity() {
             else -> external
         }
 
+        // Lite edition: Phone/Messaging counters come from the system apps' notifications.
+        val liveData = if (com.wpreborn.BuildConfig.LITE) {
+            val sms = android.provider.Telephony.Sms.getDefaultSmsPackage(context)
+            val dialer = context.getSystemService(android.telecom.TelecomManager::class.java)?.defaultDialerPackage
+            live.copy(unreadSms = counts[sms] ?: 0, missedCalls = counts[dialer] ?: 0)
+        } else {
+            live
+        }
+
         fun inputsFor(tile: TileSpec, app: AppEntry?) = TileInputs(
-            live = live,
+            live = liveData,
             notificationCount = if (app?.builtIn == null) counts[app?.packageName] ?: 0 else 0,
             latestNotification = if (app?.builtIn == null) latest[app?.packageName] else null,
             nowPlaying = nowPlaying,

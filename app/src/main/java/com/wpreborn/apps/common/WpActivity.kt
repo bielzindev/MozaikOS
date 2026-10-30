@@ -52,8 +52,15 @@ abstract class WpActivity : ComponentActivity() {
     /** Some apps (the photo viewer) want the plain page without the status bar. */
     protected open val showStatusBar: Boolean get() = true
 
+    /** Return true to hand the request over to another app and finish immediately. */
+    protected open fun redirect(): Boolean = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (redirect()) {
+            finish()
+            return
+        }
         setupWindow(this)
         disableSystemTransition(opening = true)
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {

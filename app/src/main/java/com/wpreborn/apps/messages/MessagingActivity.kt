@@ -91,6 +91,13 @@ private sealed interface MsgPage {
  */
 class MessagingActivity : WpActivity() {
 
+    /** The lite edition has no SMS permissions: open the Android messaging app instead. */
+    override fun redirect(): Boolean {
+        if (!com.wpreborn.BuildConfig.LITE) return false
+        openSystemMessaging(this, intent?.getStringExtra(EXTRA_ADDRESS))
+        return true
+    }
+
     @Composable
     override fun Content() {
         val start = remember { startPage(intent) }
@@ -128,6 +135,18 @@ class MessagingActivity : WpActivity() {
     }
 
     companion object {
+        fun openSystemMessaging(context: android.content.Context, address: String?) {
+            val intent = if (!address.isNullOrBlank()) {
+                Intent(Intent.ACTION_SENDTO, android.net.Uri.parse("smsto:" + android.net.Uri.encode(address)))
+            } else {
+                Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MESSAGING)
+            }
+            try {
+                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            } catch (_: Exception) {
+            }
+        }
+
         const val EXTRA_THREAD_ID = "thread_id"
         const val EXTRA_ADDRESS = "address"
     }

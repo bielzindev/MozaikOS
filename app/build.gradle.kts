@@ -16,6 +16,22 @@ android {
         versionName = "0.1.0"
     }
 
+    flavorDimensions += "edition"
+    productFlavors {
+        create("full") {
+            dimension = "edition"
+            buildConfigField("boolean", "LITE", "false")
+        }
+        // No SMS / call log / direct-call permissions: Play Protect friendly. Messaging and the
+        // call history hand over to the Android apps instead.
+        create("lite") {
+            dimension = "edition"
+            applicationIdSuffix = ".lite"
+            versionNameSuffix = "-lite"
+            buildConfigField("boolean", "LITE", "true")
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

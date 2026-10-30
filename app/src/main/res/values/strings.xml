@@ -233,4 +233,6 @@
         <item quantity="one">%d song</item>
         <item quantity="other">%d songs</item>
     </plurals>
+    <string name="phone_lite_history">Call history is kept by the Android Phone app in the lite edition.</string>
+    <string name="phone_open_history">open call history</string>
 </resources>

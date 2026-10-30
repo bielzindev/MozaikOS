@@ -14,6 +14,37 @@ adb install -r -g "$APK" || { echo "INSTALL FAILED"; exit 0; }
 adb shell appops set $PKG SYSTEM_ALERT_WINDOW allow || true
 adb shell cmd package set-home-activity $PKG/com.wpreborn.launcher.MainActivity || true
 
+seed_data() {
+  adb root >/dev/null 2>&1; sleep 3; adb wait-for-device
+  # Contacts
+  for spec in "Ana Souza|+5511988887777|1" "Bruno Lima|+5521977776666|0" "Carla Dias|+5531966665555|1" "Diego Alves|+5541955554444|0"; do
+    IFS='|' read -r name phone star <<< "$spec"
+    adb shell "content insert --uri content://com.android.contacts/raw_contacts --bind account_type:n: --bind account_name:n: --bind starred:i:$star"
+    id=$(adb shell "content query --uri content://com.android.contacts/raw_contacts --projection _id" | tail -1 | grep -oE '_id=[0-9]+' | cut -d= -f2)
+    adb shell "content insert --uri content://com.android.contacts/data --bind raw_contact_id:i:$id --bind mimetype:s:vnd.android.cursor.item/name --bind data1:s:'$name'"
+    adb shell "content insert --uri content://com.android.contacts/data --bind raw_contact_id:i:$id --bind mimetype:s:vnd.android.cursor.item/phone_v2 --bind data1:s:'$phone' --bind data2:i:2"
+  done
+  # Incoming SMS through the emulator modem (delivered like a real SMS)
+  adb emu sms send 11988887777 "Oi! Tudo bem? Viu o novo Lumia?" || true
+  adb emu sms send 21977776666 "Reuniao amanha as 10h" || true
+  sleep 2
+  adb emu sms send 11988887777 "Me liga quando puder" || true
+  # Call log
+  now=$(date +%s)000
+  adb shell "content insert --uri content://call_log/calls --bind number:s:+5511988887777 --bind type:i:3 --bind date:l:$now --bind duration:i:0 --bind new:i:1" || true
+  adb shell "content insert --uri content://call_log/calls --bind number:s:+5521977776666 --bind type:i:2 --bind date:l:$now --bind duration:i:75 --bind new:i:0" || true
+  # Media
+  adb shell mkdir -p /sdcard/Music /sdcard/DCIM/Camera
+  for f in testmedia/*.mp3; do adb push "$f" /sdcard/Music/ >/dev/null; done
+  for f in testmedia/*.jpg; do adb push "$f" /sdcard/DCIM/Camera/ >/dev/null; done
+  for f in $(adb shell ls /sdcard/Music/*.mp3 /sdcard/DCIM/Camera/*.jpg); do
+    adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d "file://$f" >/dev/null
+  done
+  adb shell content call --uri content://media --method scan_volume --arg external_primary >/dev/null 2>&1 || true
+  sleep 5
+  echo "seeded:"; adb shell content query --uri content://media/external/audio/media --projection title:artist | head
+}
+
 shot() { sleep "${2:-3}"; adb exec-out screencap -p > "$OUT/$1.png"; echo "shot $1"; }
 swipe_left() { adb shell input swipe 900 1100 150 1100 250; }
 swipe_up() { adb shell input swipe 540 1700 540 600 300; }
@@ -31,6 +62,9 @@ tap_text() {
   fi
 }
 start() { adb shell am start -W -n "$PKG/$1" >/dev/null; }
+
+seed_data
+adb shell am force-stop $PKG
 
 # Launcher
 adb shell input keyevent KEYCODE_HOME
@@ -88,6 +122,42 @@ start com.wpreborn.apps.phone.PhoneActivity
 sleep 3
 tap_text "keypad"
 shot 23-phone-keypad 3
+
+# Real-data flows
+start com.wpreborn.apps.people.PeopleActivity
+sleep 3
+tap_text "Ana Souza"
+shot 40-people-profile 3
+adb shell input keyevent KEYCODE_HOME
+
+start com.wpreborn.apps.messages.MessagingActivity
+sleep 4
+shot 41-messages-threads 1
+adb shell input tap 540 520
+shot 42-messages-conversation 3
+adb shell input keyevent KEYCODE_HOME
+
+start com.wpreborn.apps.music.MusicActivity
+sleep 4
+swipe_left; sleep 1
+shot 43-music-albums 2
+swipe_left; sleep 1
+shot 44-music-songs 2
+tap_text "Lumia Song"
+shot 45-music-now-playing 4
+adb shell dumpsys media_session | grep -iE "state=|description" | head -5 > "$OUT/media_session.txt"
+adb shell input keyevent KEYCODE_HOME
+
+start com.wpreborn.apps.photos.PhotosActivity
+sleep 4
+shot 46-photos-collection 1
+swipe_left
+shot 47-photos-albums 2
+swipe_left; sleep 1
+adb shell input tap 150 520
+shot 48-photos-viewer 3
+adb shell input keyevent KEYCODE_HOME
+shot 49-start-live-tiles 6
 
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true

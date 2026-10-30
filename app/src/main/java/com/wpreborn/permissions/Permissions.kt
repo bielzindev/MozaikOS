@@ -39,16 +39,32 @@ object Perms {
     val CONTACTS = arrayOf(Manifest.permission.READ_CONTACTS)
     val CALL_LOG = arrayOf(Manifest.permission.READ_CALL_LOG)
     val CALL = arrayOf(Manifest.permission.CALL_PHONE)
-    val SMS = arrayOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS, Manifest.permission.READ_CONTACTS)
+    // Contacts are optional for Messaging (names/photos); they must not block the SMS list.
+    val SMS = arrayOf(Manifest.permission.READ_SMS, Manifest.permission.SEND_SMS)
     val CALENDAR = arrayOf(Manifest.permission.READ_CALENDAR)
     val AUDIO = if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.READ_MEDIA_AUDIO) else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
-    val IMAGES = if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.READ_MEDIA_IMAGES) else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    val IMAGES = when {
+        // Android 14+: the user may grant access to selected photos only; that still counts.
+        Build.VERSION.SDK_INT >= 34 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+        Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
+        else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+    }
     val NOTIFICATIONS = if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.POST_NOTIFICATIONS) else emptyArray()
     val BLUETOOTH = if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_CONNECT) else emptyArray()
 }
 
-fun Context.hasPermissions(perms: Array<String>): Boolean =
-    perms.all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+fun Context.hasPermissions(perms: Array<String>): Boolean {
+    fun granted(p: String) = ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+    val partial = Build.VERSION.SDK_INT >= 34 && granted(Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED)
+    return perms.all { p ->
+        when (p) {
+            // Requested together with READ_MEDIA_IMAGES; never required on its own.
+            Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED -> true
+            Manifest.permission.READ_MEDIA_IMAGES -> granted(p) || partial
+            else -> granted(p)
+        }
+    }
+}
 
 fun Context.canWriteSettings(): Boolean = Settings.System.canWrite(this)
 

@@ -27,6 +27,29 @@ jobs:
           chmod +x gradlew
           ./gradlew --no-daemon assembleFullDebug
 
+      - name: Generate test media (songs with tags and cover art, photos)
+        run: |
+          sudo apt-get install -y -qq ffmpeg >/dev/null 2>&1 || true
+          mkdir -p testmedia
+          ffmpeg -loglevel error -f lavfi -i color=c=0x0050EF:s=400x400 -frames:v 1 testmedia/cover1.png
+          ffmpeg -loglevel error -f lavfi -i color=c=0xD80073:s=400x400 -frames:v 1 testmedia/cover2.png
+          i=0
+          for spec in "Lumia Song|Nokia Band|Windows Phone Hits|cover1|1" "Metro Light|Nokia Band|Windows Phone Hits|cover1|2" \
+                      "Live Tiles|Segoe Orchestra|Panorama|cover2|1" "Turnstile|Segoe Orchestra|Panorama|cover2|2"; do
+            IFS='|' read -r title artist album cover track <<< "$spec"
+            i=$((i+1))
+            ffmpeg -loglevel error -f lavfi -i "sine=frequency=$((300+i*80)):duration=30" -i "testmedia/$cover.png" \
+              -map 0:a -map 1:v -c:a libmp3lame -q:a 6 -c:v mjpeg -id3v2_version 3 -disposition:v attached_pic \
+              -metadata title="$title" -metadata artist="$artist" -metadata album="$album" -metadata track="$track" \
+              "testmedia/song$i.mp3"
+          done
+          j=0
+          for src in testsrc mandelbrot smptebars rgbtestsrc testsrc2 life; do
+            j=$((j+1))
+            ffmpeg -loglevel error -f lavfi -i "$src=size=1200x900" -frames:v 1 "testmedia/IMG_2026103$j.jpg"
+          done
+          ls -la testmedia
+
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

@@ -36,17 +36,12 @@ jobs:
       - name: Run on emulator
         uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 33
-          target: aosp_atd
+          api-level: 30
+          target: default
           arch: x86_64
-          profile: pixel_5
-          cores: 4
-          ram-size: 4096M
-          disk-size: 4096M
+          profile: pixel_4
           emulator-boot-timeout: 900
-          force-avd-creation: true
           disable-animations: false
-          emulator-options: -no-window -no-snapshot -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -camera-front none
           script: bash scripts/ui-check.sh
 
       - name: Publish screenshots to the ci-screenshots branch

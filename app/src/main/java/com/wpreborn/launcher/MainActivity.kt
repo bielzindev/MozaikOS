@@ -112,6 +112,11 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // System apps that duplicate ZUNEX apps are hidden from the list unless shown in settings.
+        val duplicates = remember(apps) { vm.appRepo.duplicatePackages() }
+        val listedApps = remember(apps, duplicates, settings.showDuplicates) {
+            if (settings.showDuplicates) apps else apps.filter { it.builtIn != null || it.packageName !in duplicates }
+        }
         // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
         val appsByKey = remember(apps) { apps.associateBy { it.key } }
         val counts = remember(notifications) { notifications.groupingBy { it.packageName }.eachCount() }
@@ -162,7 +167,7 @@ class MainActivity : ComponentActivity() {
                 } else {
                     Box(Modifier.fillMaxSize().turnstile(appsTurnstile)) {
                         AllAppsScreen(
-                            apps = apps,
+                            apps = listedApps,
                             isPinned = vm::isPinned,
                             onLaunch = { launchFromList(it) },
                             onPin = { app ->

@@ -290,4 +290,6 @@
     <string name="kb_number_row">Linha de números</string>
     <string name="kb_sound">Sons das teclas</string>
     <string name="kb_vibrate">Vibrar ao tocar</string>
+    <string name="set_show_duplicates">Mostrar apps do sistema que o ZUNEX substitui (telefone, mensagens, música, calendário, contatos, galeria, configurações)</string>
+    <string name="set_brand_colors">Cores dos apps nos blocos</string>
 </resources>

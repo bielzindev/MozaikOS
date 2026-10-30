@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.TextUnitType
+import androidx.compose.ui.unit.dp
 import com.wpreborn.core.icons.MetroIconPack
 import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
@@ -52,25 +53,32 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
     val repo = remember { AppRepository.get(context) }
     val px = with(LocalDensity.current) { size.roundToPx() }
     if (metro) {
-        val bmp by produceState<ImageBitmap?>(null, app.key, px) {
-            value = repo.metroIcon(app, px)?.asImageBitmap()
+        // Not in the pack: the app's own logo, without the round mask.
+        val brand by produceState(repo.cachedBrandIcon(app, px), app.key, px) {
+            if (value == null) value = repo.brandIcon(app, px)
         }
-        val image = bmp
-        if (image != null) {
-            Image(image, null, modifier.size(size), colorFilter = ColorFilter.tint(tint))
-        } else {
-            Box(modifier.size(size), contentAlignment = Alignment.Center) {
-                WpText(
-                    app.label.trim().take(1).uppercase(),
-                    style = WpType.Header.copy(fontSize = TextUnit(size.value * 0.8f, TextUnitType.Sp), lineHeight = TextUnit(size.value * 0.9f, TextUnitType.Sp)),
-                    color = tint,
-                )
-            }
-        }
+        brand?.let { Image(it.logo.asImageBitmap(), null, modifier.size(size)) }
         return
     }
     val icon by produceState<ImageBitmap?>(repo.cachedIcon(app, px)?.asImageBitmap(), app.key, px) {
         if (value == null) value = repo.icon(app, px)?.asImageBitmap()
     }
     icon?.let { Image(it, null, modifier.size(size)) }
+}
+
+/**
+ * Tile colour for an app in the Metro style: its brand colour (the background of its
+ * adaptive icon), or null to use the accent. Apps drawn with a ZUNEX glyph keep the accent.
+ */
+@Composable
+fun rememberBrandColor(app: AppEntry?): Color? {
+    if (app == null || app.builtIn != null || !Wp.settings.metroIcons || !Wp.settings.brandColors) return null
+    if (remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null) return null
+    val context = LocalContext.current
+    val repo = remember { AppRepository.get(context) }
+    val px = with(LocalDensity.current) { 48.dp.roundToPx() }
+    val brand by produceState(repo.cachedBrandIcon(app, px), app.key) {
+        if (value == null) value = repo.brandIcon(app, px)
+    }
+    return brand?.color?.let { Color(it) }
 }

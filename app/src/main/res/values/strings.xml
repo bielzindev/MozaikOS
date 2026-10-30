@@ -289,4 +289,6 @@
     <string name="kb_number_row">Number row</string>
     <string name="kb_sound">Key sounds</string>
     <string name="kb_vibrate">Vibrate on keypress</string>
+    <string name="set_show_duplicates">Show system apps that ZUNEX replaces (phone, messages, music, calendar, contacts, gallery, settings)</string>
+    <string name="set_brand_colors">App colors on tiles</string>
 </resources>

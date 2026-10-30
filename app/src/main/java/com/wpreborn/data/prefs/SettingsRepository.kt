@@ -41,6 +41,10 @@ data class WpSettings(
     val iconsOnAccent: Boolean = true,
     /** Metro icon pack (white glyphs) instead of the original Android icons. */
     val metroIcons: Boolean = true,
+    /** Tiles of apps without a custom colour take the app's brand colour (Metro icon style). */
+    val brandColors: Boolean = true,
+    /** Show system apps that duplicate a ZUNEX app (dialer, messages, music...) in the app list. */
+    val showDuplicates: Boolean = false,
     val liveTiles: Boolean = true,
     val firstRunDone: Boolean = false,
 )
@@ -76,6 +80,8 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setWpStatusBar(value: Boolean) = update { it[WP_STATUS] = value }
     fun setIconsOnAccent(value: Boolean) = update { it[ICONS_ACCENT] = value }
     fun setMetroIcons(value: Boolean) = update { it[METRO_ICONS] = value }
+    fun setBrandColors(value: Boolean) = update { it[BRAND_COLORS] = value }
+    fun setShowDuplicates(value: Boolean) = update { it[SHOW_DUPLICATES] = value }
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
@@ -91,6 +97,8 @@ class SettingsRepository private constructor(private val context: Context) {
         wpStatusBar = this[WP_STATUS] ?: true,
         iconsOnAccent = this[ICONS_ACCENT] ?: true,
         metroIcons = this[METRO_ICONS] ?: true,
+        brandColors = this[BRAND_COLORS] ?: true,
+        showDuplicates = this[SHOW_DUPLICATES] ?: false,
         liveTiles = this[LIVE_TILES] ?: true,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
@@ -107,6 +115,8 @@ class SettingsRepository private constructor(private val context: Context) {
         private val WP_STATUS = booleanPreferencesKey("wp_status_bar")
         private val ICONS_ACCENT = booleanPreferencesKey("icons_on_accent")
         private val METRO_ICONS = booleanPreferencesKey("metro_icons")
+        private val BRAND_COLORS = booleanPreferencesKey("brand_colors")
+        private val SHOW_DUPLICATES = booleanPreferencesKey("show_duplicates")
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 

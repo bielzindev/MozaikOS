@@ -295,7 +295,7 @@ fun StartScreen(
                         val h = geo.h(tile.size)
                         // Tiles fly out/in from the top-left corner towards the bottom-right.
                         val feather = ((pl.y / 2) + (pl.x / 2)).coerceAtMost(7)
-                        val tileColor = tile.color?.color ?: Wp.accent
+                        val tileColor = tile.color?.color ?: rememberBrandColor(app) ?: Wp.accent
                         Box(
                             Modifier
                                 .offset { pos }

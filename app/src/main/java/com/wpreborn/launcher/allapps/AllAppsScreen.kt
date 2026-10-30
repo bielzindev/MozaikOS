@@ -235,7 +235,7 @@ private fun AppRow(app: AppEntry, repo: AppRepository, modifier: Modifier, onCli
         Box(
             Modifier
                 .size(48.dp)
-                .then(if (onAccent) Modifier.background(Wp.accent) else Modifier),
+                .then(if (onAccent) Modifier.background(com.wpreborn.launcher.start.rememberBrandColor(app) ?: Wp.accent) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
             com.wpreborn.launcher.start.AppIcon(app, if (metro) 28.dp else if (onAccent) 36.dp else 46.dp)

@@ -113,6 +113,10 @@ fun PersonalizeScreen(turnstile: TurnstileState, onClose: () -> Unit) {
         }
 
         Spacer(Modifier.height(8.dp))
+        if (settings.metroIcons) {
+            WpToggle(stringResource(R.string.set_brand_colors), settings.brandColors, onText = on, offText = off) { repo.setBrandColors(it) }
+        }
+        WpToggle(stringResource(R.string.set_show_duplicates), settings.showDuplicates, onText = on, offText = off) { repo.setShowDuplicates(it) }
         WpToggle(stringResource(R.string.set_more_tiles), settings.moreTiles, onText = on, offText = off) { repo.setMoreTiles(it) }
         WpToggle(stringResource(R.string.set_live_tiles), settings.liveTiles, onText = on, offText = off) { repo.setLiveTiles(it) }
         if (!settings.metroIcons) {

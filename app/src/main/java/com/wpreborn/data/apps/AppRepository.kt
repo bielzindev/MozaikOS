@@ -119,52 +119,96 @@ class AppRepository private constructor(private val context: Context) {
 
     fun cachedIcon(entry: AppEntry, sizePx: Int): Bitmap? = iconCache.get("${entry.key}@$sizePx")
 
+    /** An app's own artwork prepared for a Metro tile: the logo without its mask, plus its brand colour. */
+    data class BrandIcon(val logo: Bitmap, val color: Int?)
+
+    private val brandCache = object : LruCache<String, BrandIcon>(200) {}
+
+    fun cachedBrandIcon(entry: AppEntry, sizePx: Int): BrandIcon? = brandCache.get("${entry.key}@$sizePx")
+
     /**
-     * A white, single-colour version of the app's own icon for the Metro style: the themed
-     * (monochrome) layer apps provide on Android 13+, or else the silhouette of the adaptive
-     * icon foreground. Returns null when that would just be a blob (full-bleed artwork).
+     * Turns an Android icon into Metro artwork. Adaptive icons give their foreground layer
+     * (the logo, in its own colours, without the round/squircle mask) and the colour of their
+     * background layer, which becomes the tile colour like Windows Phone app tiles. Legacy
+     * icons are used as they are. Near-white backgrounds yield no colour (the accent is used).
      */
-    suspend fun metroIcon(entry: AppEntry, sizePx: Int): Bitmap? {
+    suspend fun brandIcon(entry: AppEntry, sizePx: Int): BrandIcon? {
         if (entry.builtIn != null) return null
-        val cacheKey = "${entry.key}@$sizePx#metro"
-        iconCache.get(cacheKey)?.let { return it.takeIf { b -> b.width > 1 } }
+        val cacheKey = "${entry.key}@$sizePx"
+        brandCache.get(cacheKey)?.let { return it }
         return withContext(Dispatchers.IO) {
-            val result = try {
+            try {
                 val info = launcherApps.resolveActivity(Intent().setComponent(entry.component), entry.user ?: Process.myUserHandle())
-                val drawable = info?.getIcon(context.resources.displayMetrics.densityDpi)
-                if (drawable is android.graphics.drawable.AdaptiveIconDrawable) {
-                    val layer = (if (android.os.Build.VERSION.SDK_INT >= 33) drawable.monochrome else null) ?: drawable.foreground
-                    silhouette(layer, sizePx, strict = layer === drawable.foreground)
+                val drawable = info?.getIcon(context.resources.displayMetrics.densityDpi) ?: return@withContext null
+                val result = if (drawable is android.graphics.drawable.AdaptiveIconDrawable && drawable.foreground != null) {
+                    val logo = renderSafeZone(drawable.foreground, sizePx)
+                    BrandIcon(logo, drawable.background?.let { averageColor(it) }?.takeIf { !isNearWhite(it) })
                 } else {
-                    null
+                    BrandIcon(drawable.toBitmap(sizePx, sizePx), null)
                 }
+                brandCache.put(cacheKey, result)
+                result
             } catch (_: Exception) {
                 null
             }
-            // Cache misses too (as a 1x1 marker) so we do not decode again.
-            iconCache.put(cacheKey, result ?: Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8))
-            result
         }
     }
 
-    /** Renders the layer's safe zone (the inner 72/108) and turns every opaque pixel white. */
-    private fun silhouette(layer: android.graphics.drawable.Drawable?, sizePx: Int, strict: Boolean): Bitmap? {
-        layer ?: return null
+    /** Draws the inner 72/108 of an adaptive layer (where the logo lives) at [sizePx]. */
+    private fun renderSafeZone(layer: android.graphics.drawable.Drawable, sizePx: Int): Bitmap {
         val full = (sizePx * 108f / 72f).toInt()
         val inset = (full - sizePx) / 2
         val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
         val canvas = android.graphics.Canvas(bmp)
         canvas.translate(-inset.toFloat(), -inset.toFloat())
         layer.setBounds(0, 0, full, full)
-        layer.colorFilter = android.graphics.PorterDuffColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
         layer.draw(canvas)
-        layer.colorFilter = null
-        // Reject solid backgrounds that would become a white square.
-        val pixels = IntArray(sizePx * sizePx)
-        bmp.getPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx)
-        val opaque = pixels.count { (it ushr 24) > 128 }.toFloat() / pixels.size
-        val maxCoverage = if (strict) 0.5f else 0.8f
-        return if (opaque < 0.03f || opaque > maxCoverage) null else bmp
+        return bmp
+    }
+
+    private fun averageColor(layer: android.graphics.drawable.Drawable): Int? {
+        val bmp = Bitmap.createBitmap(12, 12, Bitmap.Config.ARGB_8888)
+        layer.setBounds(0, 0, 12, 12)
+        layer.draw(android.graphics.Canvas(bmp))
+        var r = 0L; var g = 0L; var b = 0L; var n = 0
+        val pixels = IntArray(144)
+        bmp.getPixels(pixels, 0, 12, 0, 0, 12, 12)
+        for (p in pixels) {
+            if ((p ushr 24) < 128) continue
+            r += (p shr 16) and 0xFF; g += (p shr 8) and 0xFF; b += p and 0xFF; n++
+        }
+        if (n == 0) return null
+        return android.graphics.Color.rgb((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
+    }
+
+    private fun isNearWhite(c: Int): Boolean {
+        val r = android.graphics.Color.red(c); val g = android.graphics.Color.green(c); val b = android.graphics.Color.blue(c)
+        return (0.299 * r + 0.587 * g + 0.114 * b) > 225
+    }
+
+    /**
+     * System apps that duplicate a ZUNEX app (dialer, messaging, music, calendar, contacts,
+     * gallery, Android Settings). They are hidden from the app list unless the user shows them.
+     */
+    fun duplicatePackages(): Set<String> {
+        val pm = context.packageManager
+        val result = HashSet<String>()
+        fun add(intent: Intent) {
+            try {
+                pm.queryIntentActivities(intent, 0).forEach { ri ->
+                    val ai = ri.activityInfo.applicationInfo
+                    if (ai.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM != 0 && ai.packageName != context.packageName) result += ai.packageName
+                }
+            } catch (_: Exception) {
+            }
+        }
+        add(Intent(Intent.ACTION_DIAL))
+        listOf(
+            Intent.CATEGORY_APP_MESSAGING, Intent.CATEGORY_APP_MUSIC, Intent.CATEGORY_APP_CALENDAR,
+            Intent.CATEGORY_APP_CONTACTS, Intent.CATEGORY_APP_GALLERY,
+        ).forEach { add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, it)) }
+        add(Intent(android.provider.Settings.ACTION_SETTINGS))
+        return result
     }
 
     fun launch(entry: AppEntry, bounds: Rect? = null, options: android.os.Bundle? = null) {

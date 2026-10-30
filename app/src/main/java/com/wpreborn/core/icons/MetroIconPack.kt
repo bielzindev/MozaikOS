@@ -1,6 +1,5 @@
 package com.wpreborn.core.icons
 
-import android.content.pm.ApplicationInfo
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.SolidColor
@@ -18,23 +17,15 @@ import androidx.compose.ui.unit.dp
  */
 object MetroIconPack {
 
-    /** Returns the Metro glyph for an app, or null when the pack has nothing for it. */
+    /**
+     * Returns the Metro glyph for an app listed in the pack, or null. Only exact packages are
+     * matched: other apps keep their own artwork (see AppIcon), so different apps never end
+     * up with the same generic glyph.
+     */
+    @Suppress("UNUSED_PARAMETER")
     fun glyphFor(packageName: String, label: String, category: Int): ImageVector? {
         val pkg = packageName.lowercase()
-        val name = label.lowercase()
-        byPackage.entries.firstOrNull { (prefix, _) -> pkg == prefix || pkg.startsWith("$prefix.") }?.let { return it.value }
-        byKeyword.firstOrNull { (words, _) -> words.any { pkg.contains(it) || name.contains(it) } }?.let { return it.second }
-        return when (category) {
-            ApplicationInfo.CATEGORY_GAME -> Glyphs.Gamepad
-            ApplicationInfo.CATEGORY_AUDIO -> WpIcons.MusicNote
-            ApplicationInfo.CATEGORY_VIDEO -> Glyphs.Video
-            ApplicationInfo.CATEGORY_IMAGE -> WpIcons.Photos
-            ApplicationInfo.CATEGORY_SOCIAL -> Glyphs.Social
-            ApplicationInfo.CATEGORY_NEWS -> Glyphs.News
-            ApplicationInfo.CATEGORY_MAPS -> Glyphs.MapPin
-            ApplicationInfo.CATEGORY_PRODUCTIVITY -> Glyphs.Document
-            else -> null
-        }
+        return byPackage.entries.firstOrNull { (prefix, _) -> pkg == prefix.lowercase() || pkg.startsWith(prefix.lowercase() + ".") }?.value
     }
 
     private val byPackage: Map<String, ImageVector> = mapOf(
@@ -96,32 +87,6 @@ object MetroIconPack {
         "br.gov.meugovbr" to Glyphs.Shield, "br.gov.serpro.cnhe" to Glyphs.Car,
         // TVs and remotes
         "com.hisense.vidaa.remote" to Glyphs.Tv, "com.samsung.android.oneconnect" to Glyphs.Home, "com.google.android.apps.chromecast.app" to Glyphs.Tv,
-    )
-
-    private val byKeyword: List<Pair<List<String>, ImageVector>> = listOf(
-        listOf("browser", "navegador") to WpIcons.Globe,
-        listOf("mail", "email") to WpIcons.Mail,
-        listOf("camera", "câmera", "camara") to WpIcons.Camera,
-        listOf("gallery", "galeria", "photo", "foto") to WpIcons.Photos,
-        listOf("music", "música", "musica", "radio", "rádio") to WpIcons.Music,
-        listOf("video", "vídeo", "player", "tv", "stream") to Glyphs.Video,
-        listOf("chat", "messenger", "message", "mensag") to Glyphs.Chat,
-        listOf("map", "mapa", "gps", "nav") to Glyphs.MapPin,
-        listOf("weather", "clima", "tempo") to Glyphs.Weather,
-        listOf("news", "notícia", "noticia", "jornal") to Glyphs.News,
-        listOf("bank", "banco", "pay", "wallet", "carteira") to Glyphs.Wallet,
-        listOf("shop", "store", "loja", "market", "compra") to Glyphs.Bag,
-        listOf("food", "delivery", "comida") to Glyphs.Food,
-        listOf("taxi", "ride", "car", "carro", "uber") to Glyphs.Car,
-        listOf("note", "nota", "memo") to Glyphs.Note,
-        listOf("file", "arquivo", "manager") to WpIcons.Folder,
-        listOf("clock", "relógio", "relogio", "alarm") to WpIcons.Alarm,
-        listOf("calc") to Glyphs.Calculator,
-        listOf("health", "saúde", "saude", "fit") to Glyphs.Heart,
-        listOf("book", "livro", "read", "kindle") to Glyphs.Book,
-        listOf("game", "jogo") to Glyphs.Gamepad,
-        listOf("remote", "controle") to Glyphs.Tv,
-        listOf("vpn", "security", "segur", "gov") to Glyphs.Shield,
     )
 }
 

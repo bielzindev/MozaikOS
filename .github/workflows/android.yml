@@ -22,7 +22,12 @@ jobs:
       - name: Build debug and release APKs
         run: |
           chmod +x gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug assembleRelease
+          set -o pipefail
+          ./gradlew --no-daemon --continue assembleDebug assembleRelease 2>&1 | tee build.log
+
+      - name: Show compiler errors
+        if: failure()
+        run: grep -E "^e: |^w: .*error|ERROR:|error:|What went wrong" -A3 build.log | head -300
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4

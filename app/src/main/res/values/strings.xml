@@ -291,6 +291,4 @@
     <string name="kb_vibrate">Vibrate on keypress</string>
     <string name="set_show_duplicates">Show system apps that ZUNEX replaces (phone, messages, music, calendar, contacts, gallery, settings)</string>
     <string name="set_brand_colors">App colors on tiles</string>
-    <string name="set_system_apps">Use the phone\'s own Phone, People and Calendar apps</string>
-    <string name="set_system_apps_hint">The ZUNEX tiles keep showing missed calls, contacts and your next event, but open the apps of your phone.</string>
 </resources>

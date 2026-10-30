@@ -1,6 +1,5 @@
 package com.wpreborn.apps.people
 
-import com.wpreborn.data.apps.SystemApps
 import android.content.Intent
 import android.net.Uri
 import android.provider.ContactsContract
@@ -80,8 +79,6 @@ private fun groupOf(name: String): String {
 
 /** People: the contact list with letter groups and jump list, favorites, search and profiles. */
 class PeopleActivity : WpActivity() {
-
-    override fun redirect(): Boolean = SystemApps.preferred(this) && SystemApps.open(this, SystemApps.Kind.Contacts)
 
     @Composable
     override fun Content() {

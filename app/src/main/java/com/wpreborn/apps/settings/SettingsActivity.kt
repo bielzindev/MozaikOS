@@ -279,10 +279,6 @@ private fun StartThemePage(onAccent: () -> Unit) {
         WpToggle(stringResource(R.string.set_wp_status_bar), settings.wpStatusBar, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setWpStatusBar(it)
         }
-        WpToggle(stringResource(R.string.set_system_apps), settings.systemApps, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
-            repo.setSystemApps(it)
-        }
-        WpText(stringResource(R.string.set_system_apps_hint), style = WpType.Small, color = Wp.palette.subtle)
         Spacer(Modifier.height(16.dp))
         WpText(stringResource(R.string.set_start_background), style = WpType.Subtle, color = Wp.palette.subtle)
         WpText(stringResource(R.string.set_start_background_hint), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(vertical = 4.dp))

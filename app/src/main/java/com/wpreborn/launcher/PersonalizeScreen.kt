@@ -116,7 +116,6 @@ fun PersonalizeScreen(turnstile: TurnstileState, onClose: () -> Unit) {
         if (settings.metroIcons) {
             WpToggle(stringResource(R.string.set_brand_colors), settings.brandColors, onText = on, offText = off) { repo.setBrandColors(it) }
         }
-        WpToggle(stringResource(R.string.set_system_apps), settings.systemApps, onText = on, offText = off) { repo.setSystemApps(it) }
         WpToggle(stringResource(R.string.set_wp_status_bar), settings.wpStatusBar, onText = on, offText = off) { repo.setWpStatusBar(it) }
         WpToggle(stringResource(R.string.set_show_duplicates), settings.showDuplicates, onText = on, offText = off) { repo.setShowDuplicates(it) }
         WpToggle(stringResource(R.string.set_more_tiles), settings.moreTiles, onText = on, offText = off) { repo.setMoreTiles(it) }

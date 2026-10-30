@@ -22,7 +22,20 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
+      - name: Signing key
+        env:
+          KEYSTORE_B64: ${{ secrets.ZUNEX_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/zunex.jks"
+            echo "ZUNEX_KEYSTORE=$RUNNER_TEMP/zunex.jks" >> "$GITHUB_ENV"
+          else
+            echo "::warning::ZUNEX_KEYSTORE_BASE64 secret missing: APKs signed with a throwaway debug key (updates will conflict)"
+          fi
+
       - name: Build debug and release APKs
+        env:
+          ZUNEX_KEYSTORE_PASSWORD: ${{ secrets.ZUNEX_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           set -o pipefail

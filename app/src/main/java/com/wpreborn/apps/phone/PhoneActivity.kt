@@ -1,6 +1,5 @@
 package com.wpreborn.apps.phone
 
-import com.wpreborn.data.apps.SystemApps
 import android.annotation.SuppressLint
 import android.content.Context
 import android.content.Intent
@@ -95,9 +94,6 @@ private sealed interface PhonePage {
  * the in-call experience, emergency calls and carrier features stay intact.
  */
 class PhoneActivity : WpActivity() {
-
-    override fun redirect(): Boolean =
-        SystemApps.preferred(this) && SystemApps.open(this, SystemApps.Kind.Dialer, intent?.data?.takeIf { it.scheme == "tel" })
 
     @Composable
     override fun Content() {

@@ -12,8 +12,27 @@ android {
         applicationId = "com.wpreborn.launcher"
         minSdk = 29
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        // Every CI build gets a higher number, so a new APK installs over the previous one.
+        val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
+        versionCode = build
+        versionName = "0.1.$build"
+    }
+
+    // One fixed key for every build: Android only accepts an update signed with the same key as
+    // the installed app, and the default debug key changes on every CI runner. The key is not in
+    // the repository; CI writes it from the ZUNEX_KEYSTORE_BASE64 secret to $ZUNEX_KEYSTORE.
+    val zunexKeystore = System.getenv("ZUNEX_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
+    signingConfigs {
+        create("zunex") {
+            if (zunexKeystore != null) {
+                storeFile = zunexKeystore
+                storePassword = System.getenv("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
+                keyAlias = System.getenv("ZUNEX_KEY_ALIAS") ?: "zunex"
+                keyPassword = System.getenv("ZUNEX_KEY_PASSWORD") ?: System.getenv("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
+            } else {
+                initWith(getByName("debug"))
+            }
+        }
     }
 
     flavorDimensions += "edition"
@@ -33,11 +52,14 @@ android {
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("zunex")
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("zunex")
         }
     }
     compileOptions {

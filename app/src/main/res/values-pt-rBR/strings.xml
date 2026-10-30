@@ -292,6 +292,4 @@
     <string name="kb_vibrate">Vibrar ao tocar</string>
     <string name="set_show_duplicates">Mostrar apps do sistema que o ZUNEX substitui (telefone, mensagens, música, calendário, contatos, galeria, configurações)</string>
     <string name="set_brand_colors">Cores dos apps nos blocos</string>
-    <string name="set_system_apps">Usar os apps do celular para Telefone, Pessoas e Calendário</string>
-    <string name="set_system_apps_hint">Os blocos do ZUNEX continuam mostrando chamadas perdidas, contatos e o próximo compromisso, mas abrem os apps do seu celular.</string>
 </resources>

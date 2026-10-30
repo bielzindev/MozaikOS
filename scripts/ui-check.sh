@@ -61,8 +61,7 @@ tap_text() {
     echo "text not found: $1"
   fi
 }
-# zunex_own: always open the ZUNEX screens, even if the phone's apps were chosen in Settings.
-start() { adb shell am start -W -n "$PKG/$1" --ez zunex_own true >/dev/null; }
+start() { adb shell am start -W -n "$PKG/$1" >/dev/null; }
 
 seed_data
 adb shell am force-stop $PKG

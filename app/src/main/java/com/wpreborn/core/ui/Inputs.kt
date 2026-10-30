@@ -100,6 +100,7 @@ fun WpSlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = 
     ) {
         val widthPx = with(density) { maxWidth.toPx() }
         val v = value.coerceIn(0f, 1f)
+        val trackWidth = maxWidth
         Box(
             Modifier
                 .fillMaxWidth()
@@ -119,7 +120,7 @@ fun WpSlider(value: Float, onValueChange: (Float) -> Unit, modifier: Modifier = 
             Box(Modifier.fillMaxWidth(v.coerceAtLeast(0.001f)).height(6.dp).background(Wp.accent))
             Box(
                 Modifier
-                    .offset(x = maxWidth * v - 6.dp)
+                    .offset(x = trackWidth * v - 6.dp)
                     .width(12.dp)
                     .height(26.dp)
                     .background(Wp.palette.foreground),

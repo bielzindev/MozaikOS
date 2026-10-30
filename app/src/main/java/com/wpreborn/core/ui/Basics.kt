@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -73,7 +74,7 @@ fun Modifier.wpClickable(enabled: Boolean = true, tilt: Boolean = true, onClick:
         .then(Modifier.clickableNoIndication(enabled, onClick))
 
 private fun Modifier.clickableNoIndication(enabled: Boolean, onClick: () -> Unit): Modifier =
-    androidx.compose.ui.composed {
+    composed {
         clickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,
@@ -84,7 +85,7 @@ private fun Modifier.clickableNoIndication(enabled: Boolean, onClick: () -> Unit
 
 /** Click + long press (for context menus) without ripples, with tilt. */
 fun Modifier.wpCombinedClickable(onLongClick: (() -> Unit)?, tilt: Boolean = true, onClick: () -> Unit): Modifier =
-    androidx.compose.ui.composed {
+    composed {
         this.then(if (tilt) Modifier.tilt() else Modifier).combinedClickable(
             interactionSource = remember { MutableInteractionSource() },
             indication = null,

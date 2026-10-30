@@ -76,6 +76,7 @@ fun WpChrome(
 }
 
 /** Top padding for the status bar area: the (possibly hidden) status bar or the display cutout. */
+@Composable
 fun Modifier.topSystemPadding(): Modifier = this.windowInsetsPadding(
     WindowInsets.statusBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Top),
 )

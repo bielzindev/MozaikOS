@@ -4,6 +4,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.text.format.DateFormat
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -55,7 +56,8 @@ import java.util.Date
 data class TileInputs(
     val live: LiveData,
     val notificationCount: Int,
-    val latestNotification: WpNotification?,
+    /** Latest notifications of the app (newest first, up to three) for social live tiles. */
+    val recent: List<WpNotification>,
     val nowPlaying: NowPlaying?,
     val nowPlayingArt: Uri?,
     val liveEnabled: Boolean,
@@ -275,19 +277,10 @@ private fun CalendarTile(size: TileSize, live: LiveData, enabled: Boolean, seed:
 
 @Composable
 private fun AndroidAppTile(app: AppEntry?, size: TileSize, inputs: TileInputs, seed: Int) {
-    val context = LocalContext.current
-    val density = LocalDensity.current
-    val iconDp = iconSizeFor(size) + if (size == TileSize.Small) 4.dp else 6.dp
-    val px = with(density) { iconDp.roundToPx() }
-    val icon by produceState<ImageBitmap?>(
-        app?.let { AppRepository.get(context).cachedIcon(it, px)?.asImageBitmap() },
-        app?.key, px,
-    ) {
-        if (app != null && value == null) value = AppRepository.get(context).icon(app, px)?.asImageBitmap()
-    }
+    val iconDp = iconSizeFor(size) + if (size == TileSize.Small) 0.dp else 4.dp
     val front: @Composable () -> Unit = {
         Box(Modifier.fillMaxSize()) {
-            icon?.let { Image(it, null, Modifier.size(iconDp).align(Alignment.Center)) }
+            if (app != null) AppIcon(app, iconDp, Modifier.align(Alignment.Center))
             if (inputs.notificationCount > 0) {
                 WpText(
                     inputs.notificationCount.coerceAtMost(99).toString(),
@@ -298,15 +291,61 @@ private fun AndroidAppTile(app: AppEntry?, size: TileSize, inputs: TileInputs, s
             }
         }
     }
-    val n = inputs.latestNotification
-    if (n != null && size != TileSize.Small && inputs.liveEnabled) {
-        FlipTile(enabled = true, seed = seed, front = front, back = {
-            Column(Modifier.fillMaxSize().padding(8.dp)) {
-                WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                WpText(n.text, style = WpType.Small, color = Color.White, maxLines = if (size == TileSize.Medium) 3 else 2, overflow = TextOverflow.Ellipsis)
-            }
-        })
-    } else {
+    val recent = inputs.recent
+    if (recent.isEmpty() || size == TileSize.Small || !inputs.liveEnabled) {
         front()
+        return
+    }
+    // Social live tile: the front shows the icon and counter; the back cycles through the
+    // latest notifications with the sender's picture, like the WP People-style app tiles.
+    FlipTile(enabled = true, seed = seed, front = front, back = {
+        CycleTile(recent, enabled = recent.size > 1, seed = seed + 7) { n -> SocialFace(n, size) }
+    })
+}
+
+@Composable
+private fun SocialFace(n: WpNotification, size: TileSize) {
+    val context = LocalContext.current
+    val avatar by produceState<ImageBitmap?>(null, n.key) {
+        value = n.picture?.asImageBitmap() ?: try {
+            n.largeIcon?.loadDrawable(context)?.let { d ->
+                val w = d.intrinsicWidth.coerceIn(48, 256)
+                val h = d.intrinsicHeight.coerceIn(48, 256)
+                android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888).also { b ->
+                    val c = android.graphics.Canvas(b)
+                    d.setBounds(0, 0, w, h)
+                    d.draw(c)
+                }.asImageBitmap()
+            }
+        } catch (_: Exception) {
+            null
+        }
+    }
+    val image = avatar
+    if (size == TileSize.Medium && image != null) {
+        // Medium: the sender's photo fills the tile, name and message on a scrim.
+        Box(Modifier.fillMaxSize()) {
+            Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Column(
+                Modifier
+                    .align(Alignment.BottomStart)
+                    .fillMaxWidth()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 8.dp, vertical = 5.dp),
+            ) {
+                WpText(n.title, style = WpType.Small.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                WpText(n.text, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+        }
+        return
+    }
+    Row(Modifier.fillMaxSize()) {
+        if (image != null) {
+            Image(image, null, Modifier.fillMaxHeight().aspectRatio(1f), contentScale = ContentScale.Crop)
+        }
+        Column(Modifier.weight(1f).fillMaxHeight().padding(8.dp)) {
+            WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(n.text, style = WpType.Small, color = Color.White, maxLines = if (size == TileSize.Medium) 4 else 3, overflow = TextOverflow.Ellipsis)
+        }
     }
 }

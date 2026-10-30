@@ -122,6 +122,7 @@ fun StartScreen(
     onResize: (TileSpec) -> Unit,
     onColor: (TileSpec, AccentColor?) -> Unit,
     onMove: (String, Int, Boolean) -> Unit,
+    onPersonalize: () -> Unit = {},
 ) {
     val settings = Wp.settings
     val density = LocalDensity.current
@@ -156,6 +157,7 @@ fun StartScreen(
         val currentAppFor by rememberUpdatedState(appFor)
         val currentOnLaunch by rememberUpdatedState(onLaunch)
         val currentOnMove by rememberUpdatedState(onMove)
+        val currentOnPersonalize by rememberUpdatedState(onPersonalize)
         val currentPlacements by rememberUpdatedState(placements)
 
         fun tileAt(p: Offset): Int {
@@ -201,8 +203,17 @@ fun StartScreen(
                                 val down = awaitFirstDown(requireUnconsumed = false)
                                 val hit = tileAt(down.position)
                                 if (hit < 0) {
-                                    val up = waitForUpOrCancellation()
-                                    if (up != null && state.editId != null) state.editId = null
+                                    if (state.editId != null) {
+                                        val up = waitForUpOrCancellation()
+                                        if (up != null) state.editId = null
+                                    } else {
+                                        // Press and hold on empty space: personalise Start.
+                                        var cancelled = false
+                                        val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                            waitForUpOrCancellation().also { if (it == null) cancelled = true }
+                                        }
+                                        if (up == null && !cancelled) currentOnPersonalize()
+                                    }
                                     return@awaitEachGesture
                                 }
                                 val tile = currentTiles[hit]
@@ -281,7 +292,8 @@ fun StartScreen(
                         )
                         val w = geo.w(tile.size, geo.columns)
                         val h = geo.h(tile.size)
-                        val feather = ((pl.y / 2) + (pl.x / 3)).coerceAtMost(5)
+                        // Tiles fly out/in from the top-left corner towards the bottom-right.
+                        val feather = ((pl.y / 2) + (pl.x / 2)).coerceAtMost(7)
                         val tileColor = tile.color?.color ?: Wp.accent
                         Box(
                             Modifier

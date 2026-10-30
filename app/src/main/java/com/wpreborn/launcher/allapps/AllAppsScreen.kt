@@ -223,12 +223,8 @@ fun AllAppsScreen(
 
 @Composable
 private fun AppRow(app: AppEntry, repo: AppRepository, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val density = LocalDensity.current
-    val px = with(density) { 40.dp.roundToPx() }
-    val icon by produceState<ImageBitmap?>(repo.cachedIcon(app, px)?.asImageBitmap(), app.key) {
-        if (value == null && app.builtIn == null) value = repo.icon(app, px)?.asImageBitmap()
-    }
-    val onAccent = Wp.settings.iconsOnAccent || app.builtIn != null
+    val metro = Wp.settings.metroIcons || app.builtIn != null
+    val onAccent = metro || Wp.settings.iconsOnAccent
     Row(
         modifier
             .fillMaxWidth()
@@ -242,12 +238,7 @@ private fun AppRow(app: AppEntry, repo: AppRepository, modifier: Modifier, onCli
                 .then(if (onAccent) Modifier.background(Wp.accent) else Modifier),
             contentAlignment = Alignment.Center,
         ) {
-            val b = app.builtIn
-            if (b != null) {
-                WpIcon(b.icon, tint = Color.White, size = 30.dp)
-            } else {
-                icon?.let { Image(it, null, Modifier.size(if (onAccent) 36.dp else 46.dp)) }
-            }
+            com.wpreborn.launcher.start.AppIcon(app, if (metro) 28.dp else if (onAccent) 36.dp else 46.dp)
         }
         Spacer(Modifier.width(14.dp))
         WpText(

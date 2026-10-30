@@ -76,6 +76,7 @@ private sealed interface PhotosPage {
     data object Hub : PhotosPage
     data class AlbumPage(val id: Long) : PhotosPage
     data class Viewer(val albumId: Long?, val index: Int) : PhotosPage
+    data class Edit(val photoId: Long) : PhotosPage
 }
 
 /** Photos hub: "collection" by month, "albums", an album page and the full-screen viewer. */
@@ -115,7 +116,10 @@ class PhotosActivity : WpActivity() {
                 }
                 is PhotosPage.Viewer -> {
                     val list = if (page.albumId == null) photos.orEmpty() else albums.firstOrNull { it.id == page.albumId }?.photos.orEmpty()
-                    Viewer(list, page.index, onDeleted = { reload++; nav.pop() })
+                    Viewer(list, page.index, onDeleted = { reload++; nav.pop() }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
+                }
+                is PhotosPage.Edit -> photos?.firstOrNull { it.id == page.photoId }?.let { photo ->
+                    PhotoEditorPage(photo, onSaved = { reload++ })
                 }
             }
         }
@@ -192,7 +196,7 @@ private fun Albums(albums: List<PhotoAlbum>, onOpen: (PhotoAlbum) -> Unit) {
 }
 
 @Composable
-private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit) {
+private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdit: (Photo) -> Unit) {
     val context = LocalContext.current
     if (photos.isEmpty()) return
     val pager = rememberPagerState(initialPage = start.coerceIn(0, photos.lastIndex)) { photos.size }
@@ -216,6 +220,7 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit) {
                 WpAppBar(
                     buttons = buildList {
                         add(AppBarButton(WpIcons.Share, stringResource(R.string.share)) {
+                            runCatching {
                             context.startActivity(
                                 Intent.createChooser(
                                     Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, p.uri)
@@ -230,14 +235,7 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit) {
                                 deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                             })
                         }
-                        add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) {
-                            context.startActivity(
-                                Intent.createChooser(
-                                    Intent(Intent.ACTION_EDIT).setDataAndType(p.uri, "image/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_WRITE_URI_PERMISSION),
-                                    null,
-                                ),
-                            )
-                        })
+                        add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) { onEdit(p) })
                     },
                     background = Color.Black.copy(alpha = 0.6f),
                 )

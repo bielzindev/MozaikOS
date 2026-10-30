@@ -37,6 +37,8 @@ data class WpSettings(
     val wpStatusBar: Boolean = true,
     /** Draw third-party icons on accent-colored squares in the app list. */
     val iconsOnAccent: Boolean = true,
+    /** Metro icon pack (white glyphs) instead of the original Android icons. */
+    val metroIcons: Boolean = true,
     val liveTiles: Boolean = true,
     val firstRunDone: Boolean = false,
 )
@@ -70,6 +72,7 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setLockShowNotifications(value: Boolean) = update { it[LOCK_NOTIF] = value }
     fun setWpStatusBar(value: Boolean) = update { it[WP_STATUS] = value }
     fun setIconsOnAccent(value: Boolean) = update { it[ICONS_ACCENT] = value }
+    fun setMetroIcons(value: Boolean) = update { it[METRO_ICONS] = value }
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
@@ -83,6 +86,7 @@ class SettingsRepository private constructor(private val context: Context) {
         lockShowNotifications = this[LOCK_NOTIF] ?: true,
         wpStatusBar = this[WP_STATUS] ?: true,
         iconsOnAccent = this[ICONS_ACCENT] ?: true,
+        metroIcons = this[METRO_ICONS] ?: true,
         liveTiles = this[LIVE_TILES] ?: true,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
@@ -97,6 +101,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val LOCK_NOTIF = booleanPreferencesKey("lock_notifications")
         private val WP_STATUS = booleanPreferencesKey("wp_status_bar")
         private val ICONS_ACCENT = booleanPreferencesKey("icons_on_accent")
+        private val METRO_ICONS = booleanPreferencesKey("metro_icons")
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 

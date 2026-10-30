@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Windows Phone Reborn</string>
+    <string name="app_name">ZUNEX</string>
     <string name="app_phone">Phone</string>
     <string name="app_messaging">Messaging</string>
     <string name="app_music">Music</string>
@@ -64,7 +64,7 @@
     <string name="ac_flashlight">Flashlight</string>
     <string name="ac_vibrate">Vibrate</string>
     <string name="ac_internet">Internet</string>
-    <string name="ac_no_access">To show notifications here, allow notification access for Windows Phone Reborn.</string>
+    <string name="ac_no_access">To show notifications here, allow notification access for ZUNEX.</string>
     <string name="ac_no_notifications">No new notifications</string>
     <string name="ac_clear_all">clear all</string>
     <string name="volume_ringer">ringer + notifications</string>
@@ -72,9 +72,9 @@
     <string name="volume_vibrate_on">vibrate on</string>
     <string name="volume_vibrate_off">vibrate off</string>
     <string name="welcome_title">hi there</string>
-    <string name="welcome_body">Windows Phone Reborn brings back the Windows Phone 8.1 experience. Let\'s set up a couple of things. You can change them later in Settings.</string>
+    <string name="welcome_body">ZUNEX brings back the Windows Phone 8.1 experience. Let\'s set up a couple of things. You can change them later in Settings.</string>
     <string name="welcome_default_title">Make it your Start screen</string>
-    <string name="welcome_default_body">Set Windows Phone Reborn as the default Home app so the Start button always brings you here.</string>
+    <string name="welcome_default_body">Set ZUNEX as the default Home app so the Start button always brings you here.</string>
     <string name="welcome_default_button">set as default</string>
     <string name="welcome_notifications_title">Live tiles and Action Center</string>
     <string name="welcome_notifications_body">Notification access lets tiles show counters, the Action Center list your notifications and the Music tile show what\'s playing.</string>
@@ -187,7 +187,7 @@
     <string name="set_not_default_app">not the default SMS app</string>
     <string name="set_default_apps">default apps</string>
     <string name="set_all_apps">all Android apps</string>
-    <string name="set_app_permissions">Windows Phone Reborn permissions</string>
+    <string name="set_app_permissions">ZUNEX permissions</string>
     <string name="set_android_settings">Android settings</string>
     <string name="set_background">Background</string>
     <string name="theme_dark">dark</string>
@@ -207,7 +207,7 @@
     <string name="lock_preview">preview</string>
     <string name="lock_system">Android screen lock</string>
     <string name="lock_system_hint">PIN, pattern, biometrics</string>
-    <string name="notif_explain">Notification access lets Windows Phone Reborn show your notifications in the Action Center, count them on live tiles and on the lock screen, and show what other music apps are playing.</string>
+    <string name="notif_explain">Notification access lets ZUNEX show your notifications in the Action Center, count them on live tiles and on the lock screen, and show what other music apps are playing.</string>
     <string name="notif_access">Notification access</string>
     <string name="notif_android">app notifications</string>
     <string name="notif_dnd">quiet hours</string>
@@ -221,11 +221,11 @@
     <string name="about_name">Phone name</string>
     <string name="about_manufacturer">Manufacturer</string>
     <string name="about_android">Software</string>
-    <string name="about_launcher">Windows Phone Reborn</string>
+    <string name="about_launcher">ZUNEX</string>
     <string name="about_ram">RAM</string>
     <string name="about_more">more info</string>
-    <string name="about_disclaimer">Windows Phone Reborn is a fan-made recreation. It is not affiliated with or endorsed by Microsoft or Nokia. Selawik font © Microsoft, SIL Open Font License.</string>
-    <string name="launcher_explain">Windows Phone Reborn works as your Home app: the Start button opens the Start screen and it starts automatically after the phone restarts.</string>
+    <string name="about_disclaimer">ZUNEX is a fan-made recreation. It is not affiliated with or endorsed by Microsoft or Nokia. Open Sans font, SIL Open Font License.</string>
+    <string name="launcher_explain">ZUNEX works as your Home app: the Start button opens the Start screen and it starts automatically after the phone restarts.</string>
     <string name="launcher_is_default">It\'s your Home app.</string>
     <string name="launcher_not_default">It\'s not your Home app yet.</string>
     <string name="launcher_reboot_note">If another launcher was chosen, open Android Settings › Apps › Default apps › Home app.</string>
@@ -235,4 +235,30 @@
     </plurals>
     <string name="phone_lite_history">Call history is kept by the Android Phone app in the lite edition.</string>
     <string name="phone_open_history">open call history</string>
+    <string name="crop_original">original crop</string>
+    <string name="crop_square">square crop</string>
+    <string name="crop_4_3">4:3 crop</string>
+    <string name="crop_16_9">16:9 crop</string>
+    <string name="filter_none">no filter</string>
+    <string name="filter_vivid">vivid</string>
+    <string name="filter_bw">black &amp; white</string>
+    <string name="filter_sepia">sepia</string>
+    <string name="filter_cool">cool</string>
+    <string name="filter_warm">warm</string>
+    <string name="icons_title">Icons</string>
+    <string name="icons_metro">ZUNEX Metro</string>
+    <string name="icons_original">Android originals</string>
+    <string name="personalize_title">personalize</string>
+    <string name="photos_edit">edit</string>
+    <string name="photos_rotate">rotate</string>
+    <string name="photos_crop">crop</string>
+    <string name="photos_filter">filter</string>
+    <string name="photos_autofix">auto-fix</string>
+    <string name="photos_autofix_off">undo auto-fix</string>
+    <string name="photos_reset">reset</string>
+    <string name="photos_brightness">brightness</string>
+    <string name="photos_contrast">contrast</string>
+    <string name="photos_saturation">color</string>
+    <string name="photos_saved">Saved a copy in Pictures/ZUNEX.</string>
+    <string name="photos_save_failed">Couldn\'t save the photo.</string>
 </resources>

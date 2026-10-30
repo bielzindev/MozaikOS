@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "WindowsPhoneReborn"
+rootProject.name = "ZUNEX"
 include(":app")

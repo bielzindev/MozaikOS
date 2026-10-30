@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Windows Phone Reborn</string>
+    <string name="app_name">ZUNEX</string>
     <string name="app_phone">Telefone</string>
     <string name="app_messaging">Mensagens</string>
     <string name="app_music">Música</string>
@@ -64,7 +64,7 @@
     <string name="ac_flashlight">Lanterna</string>
     <string name="ac_vibrate">Vibrar</string>
     <string name="ac_internet">Internet</string>
-    <string name="ac_no_access">Para mostrar notificações aqui, permita o acesso às notificações para o Windows Phone Reborn.</string>
+    <string name="ac_no_access">Para mostrar notificações aqui, permita o acesso às notificações para o ZUNEX.</string>
     <string name="ac_no_notifications">Nenhuma notificação nova</string>
     <string name="ac_clear_all">limpar tudo</string>
     <string name="volume_ringer">toque + notificações</string>
@@ -72,9 +72,9 @@
     <string name="volume_vibrate_on">vibrar ativado</string>
     <string name="volume_vibrate_off">vibrar desativado</string>
     <string name="welcome_title">olá</string>
-    <string name="welcome_body">O Windows Phone Reborn traz de volta a experiência do Windows Phone 8.1. Vamos configurar algumas coisas. Você pode alterá-las depois em Configurações.</string>
+    <string name="welcome_body">O ZUNEX traz de volta a experiência do Windows Phone 8.1. Vamos configurar algumas coisas. Você pode alterá-las depois em Configurações.</string>
     <string name="welcome_default_title">Torne-a sua tela inicial</string>
-    <string name="welcome_default_body">Defina o Windows Phone Reborn como aplicativo de tela inicial padrão para que o botão Início sempre traga você aqui.</string>
+    <string name="welcome_default_body">Defina o ZUNEX como aplicativo de tela inicial padrão para que o botão Início sempre traga você aqui.</string>
     <string name="welcome_default_button">definir como padrão</string>
     <string name="welcome_notifications_title">Blocos dinâmicos e Central de Ações</string>
     <string name="welcome_notifications_body">O acesso às notificações permite que os blocos mostrem contadores, que a Central de Ações liste suas notificações e que o bloco Música mostre o que está tocando.</string>
@@ -187,7 +187,7 @@
     <string name="set_not_default_app">não é o app de SMS padrão</string>
     <string name="set_default_apps">aplicativos padrão</string>
     <string name="set_all_apps">todos os aplicativos Android</string>
-    <string name="set_app_permissions">permissões do Windows Phone Reborn</string>
+    <string name="set_app_permissions">permissões do ZUNEX</string>
     <string name="set_android_settings">configurações do Android</string>
     <string name="set_background">Tela de fundo</string>
     <string name="theme_dark">escura</string>
@@ -207,7 +207,7 @@
     <string name="lock_preview">visualizar</string>
     <string name="lock_system">bloqueio de tela do Android</string>
     <string name="lock_system_hint">PIN, padrão, biometria</string>
-    <string name="notif_explain">O acesso às notificações permite que o Windows Phone Reborn mostre suas notificações na Central de Ações, conte-as nos blocos dinâmicos e na tela de bloqueio, e mostre o que outros apps de música estão tocando.</string>
+    <string name="notif_explain">O acesso às notificações permite que o ZUNEX mostre suas notificações na Central de Ações, conte-as nos blocos dinâmicos e na tela de bloqueio, e mostre o que outros apps de música estão tocando.</string>
     <string name="notif_access">Acesso às notificações</string>
     <string name="notif_android">notificações do aplicativo</string>
     <string name="notif_dnd">horas de silêncio</string>
@@ -221,11 +221,11 @@
     <string name="about_name">Nome do telefone</string>
     <string name="about_manufacturer">Fabricante</string>
     <string name="about_android">Software</string>
-    <string name="about_launcher">Windows Phone Reborn</string>
+    <string name="about_launcher">ZUNEX</string>
     <string name="about_ram">RAM</string>
     <string name="about_more">mais informações</string>
-    <string name="about_disclaimer">O Windows Phone Reborn é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Fonte Selawik © Microsoft, SIL Open Font License.</string>
-    <string name="launcher_explain">O Windows Phone Reborn funciona como seu app de tela inicial: o botão Início abre a tela Iniciar e ele inicia automaticamente quando o telefone reinicia.</string>
+    <string name="about_disclaimer">O ZUNEX é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Fonte Open Sans, SIL Open Font License.</string>
+    <string name="launcher_explain">O ZUNEX funciona como seu app de tela inicial: o botão Início abre a tela Iniciar e ele inicia automaticamente quando o telefone reinicia.</string>
     <string name="launcher_is_default">É seu app de tela inicial.</string>
     <string name="launcher_not_default">Ainda não é seu app de tela inicial.</string>
     <string name="launcher_reboot_note">Se outro launcher foi escolhido, abra Configurações do Android › Apps › Apps padrão › App de tela inicial.</string>
@@ -236,4 +236,30 @@
     </plurals>
     <string name="phone_lite_history">Na versão leve, o histórico de chamadas fica no app Telefone do Android.</string>
     <string name="phone_open_history">abrir histórico de chamadas</string>
+    <string name="crop_original">corte original</string>
+    <string name="crop_square">corte quadrado</string>
+    <string name="crop_4_3">corte 4:3</string>
+    <string name="crop_16_9">corte 16:9</string>
+    <string name="filter_none">sem filtro</string>
+    <string name="filter_vivid">vívido</string>
+    <string name="filter_bw">preto e branco</string>
+    <string name="filter_sepia">sépia</string>
+    <string name="filter_cool">frio</string>
+    <string name="filter_warm">quente</string>
+    <string name="icons_title">Ícones</string>
+    <string name="icons_metro">Metro ZUNEX</string>
+    <string name="icons_original">Originais do Android</string>
+    <string name="personalize_title">personalizar</string>
+    <string name="photos_edit">editar</string>
+    <string name="photos_rotate">girar</string>
+    <string name="photos_crop">cortar</string>
+    <string name="photos_filter">filtro</string>
+    <string name="photos_autofix">correção automática</string>
+    <string name="photos_autofix_off">desfazer correção automática</string>
+    <string name="photos_reset">redefinir</string>
+    <string name="photos_brightness">brilho</string>
+    <string name="photos_contrast">contraste</string>
+    <string name="photos_saturation">cor</string>
+    <string name="photos_saved">Cópia salva em Imagens/ZUNEX.</string>
+    <string name="photos_save_failed">Não foi possível salvar a foto.</string>
 </resources>

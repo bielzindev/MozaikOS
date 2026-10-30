@@ -50,8 +50,9 @@ enum class TurnstileMode(val from: Float, val to: Float, val entering: Boolean) 
 const val TURNSTILE_SIGN = -1f
 
 /** Maximum number of feather steps; elements further down move together with the last step. */
-private const val MAX_FEATHER = 6
-private const val FEATHER_SPAN = MAX_FEATHER * WpDurations.FeatherStagger / 2
+private const val MAX_FEATHER = 8
+private const val FEATHER_STEP = WpDurations.FeatherStagger * 3 / 4
+private const val FEATHER_SPAN = MAX_FEATHER * FEATHER_STEP
 
 @Stable
 class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
@@ -70,7 +71,7 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
         val m = mode
         if (m == TurnstileMode.None) return@with
         val elapsed = progress.value * (m.duration + FEATHER_SPAN)
-        val delay = min(featherIndex, MAX_FEATHER) * (WpDurations.FeatherStagger / 2)
+        val delay = min(featherIndex, MAX_FEATHER) * FEATHER_STEP
         val local = ((elapsed - delay) / m.duration).coerceIn(0f, 1f)
         val eased = if (m.entering) WpEasing.ExpOut.transform(local) else WpEasing.ExpIn.transform(local)
         transformOrigin = TransformOrigin(pivotX, 0.5f)

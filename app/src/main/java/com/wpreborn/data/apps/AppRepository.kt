@@ -35,6 +35,8 @@ data class AppEntry(
     val builtIn: BuiltInApp? = null,
     /** First install time, used for the "new" section of the app list. */
     val installedAt: Long = 0,
+    /** ApplicationInfo.category, used by the Metro icon pack as a last resort. */
+    val category: Int = -1,
 ) {
     /** Letter group for the alphabetical list: a..z, or "#" for digits and symbols. */
     val group: String
@@ -95,7 +97,7 @@ class AppRepository private constructor(private val context: Context) {
     private fun LauncherActivityInfo.toEntry(user: UserHandle): AppEntry {
         val cn = componentName
         val suffix = if (user == Process.myUserHandle()) "" else "@${user.hashCode()}"
-        return AppEntry("${cn.flattenToString()}$suffix", label.toString(), cn.packageName, cn, user, installedAt = firstInstallTime)
+        return AppEntry("${cn.flattenToString()}$suffix", label.toString(), cn.packageName, cn, user, installedAt = firstInstallTime, category = applicationInfo.category)
     }
 
     fun find(key: String): AppEntry? = _apps.value.firstOrNull { it.key == key }
@@ -116,6 +118,54 @@ class AppRepository private constructor(private val context: Context) {
     }
 
     fun cachedIcon(entry: AppEntry, sizePx: Int): Bitmap? = iconCache.get("${entry.key}@$sizePx")
+
+    /**
+     * A white, single-colour version of the app's own icon for the Metro style: the themed
+     * (monochrome) layer apps provide on Android 13+, or else the silhouette of the adaptive
+     * icon foreground. Returns null when that would just be a blob (full-bleed artwork).
+     */
+    suspend fun metroIcon(entry: AppEntry, sizePx: Int): Bitmap? {
+        if (entry.builtIn != null) return null
+        val cacheKey = "${entry.key}@$sizePx#metro"
+        iconCache.get(cacheKey)?.let { return it.takeIf { b -> b.width > 1 } }
+        return withContext(Dispatchers.IO) {
+            val result = try {
+                val info = launcherApps.resolveActivity(Intent().setComponent(entry.component), entry.user ?: Process.myUserHandle())
+                val drawable = info?.getIcon(context.resources.displayMetrics.densityDpi)
+                if (drawable is android.graphics.drawable.AdaptiveIconDrawable) {
+                    val layer = (if (android.os.Build.VERSION.SDK_INT >= 33) drawable.monochrome else null) ?: drawable.foreground
+                    silhouette(layer, sizePx, strict = layer === drawable.foreground)
+                } else {
+                    null
+                }
+            } catch (_: Exception) {
+                null
+            }
+            // Cache misses too (as a 1x1 marker) so we do not decode again.
+            iconCache.put(cacheKey, result ?: Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8))
+            result
+        }
+    }
+
+    /** Renders the layer's safe zone (the inner 72/108) and turns every opaque pixel white. */
+    private fun silhouette(layer: android.graphics.drawable.Drawable?, sizePx: Int, strict: Boolean): Bitmap? {
+        layer ?: return null
+        val full = (sizePx * 108f / 72f).toInt()
+        val inset = (full - sizePx) / 2
+        val bmp = Bitmap.createBitmap(sizePx, sizePx, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bmp)
+        canvas.translate(-inset.toFloat(), -inset.toFloat())
+        layer.setBounds(0, 0, full, full)
+        layer.colorFilter = android.graphics.PorterDuffColorFilter(android.graphics.Color.WHITE, android.graphics.PorterDuff.Mode.SRC_IN)
+        layer.draw(canvas)
+        layer.colorFilter = null
+        // Reject solid backgrounds that would become a white square.
+        val pixels = IntArray(sizePx * sizePx)
+        bmp.getPixels(pixels, 0, sizePx, 0, 0, sizePx, sizePx)
+        val opaque = pixels.count { (it ushr 24) > 128 }.toFloat() / pixels.size
+        val maxCoverage = if (strict) 0.5f else 0.8f
+        return if (opaque < 0.03f || opaque > maxCoverage) null else bmp
+    }
 
     fun launch(entry: AppEntry, bounds: Rect? = null, options: android.os.Bundle? = null) {
         val cn = entry.component ?: return

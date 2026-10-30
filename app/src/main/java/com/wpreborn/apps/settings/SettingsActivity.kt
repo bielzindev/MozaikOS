@@ -88,9 +88,14 @@ private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifica
  */
 class SettingsActivity : WpActivity() {
 
+    companion object {
+        /** Opens a sub-page directly, e.g. "lock" from the Start personalisation hub. */
+        const val EXTRA_PAGE = "page"
+    }
+
     @Composable
     override fun Content() {
-        val nav = rememberNavigator(SettingsPage.Home)
+        val nav = rememberNavigator(if (intent?.getStringExtra(EXTRA_PAGE) == "lock") SettingsPage.LockScreen else SettingsPage.Home)
         WpNavHost(nav) { page ->
             when (page) {
                 SettingsPage.Home -> SettingsHome { nav.navigate(it) }

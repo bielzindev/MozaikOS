@@ -19,6 +19,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -60,6 +61,9 @@ class MainActivity : ComponentActivity() {
     private val appsTurnstile = TurnstileState()
     private var pager: PagerState? = null
     private var returning = false
+    private var stopped = false
+    private var personalizing by mutableStateOf(false)
+    private val personalizeTurnstile = TurnstileState()
     private var homePresses by mutableIntStateOf(0)
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,6 +73,7 @@ class MainActivity : ComponentActivity() {
             WpTheme {
                 WpChrome(chrome) {
                     LauncherContent()
+                    if (personalizing) PersonalizeScreen(personalizeTurnstile, onClose = ::closePersonalize)
                 }
                 if (!Wp.settings.firstRunDone) {
                     WelcomeScreen(
@@ -99,6 +104,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(homePresses) {
             if (homePresses == 0) return@LaunchedEffect
             when {
+                personalizing -> closePersonalize()
                 chrome.actionCenter.visible -> chrome.actionCenter.close()
                 start.editId != null -> start.editId = null
                 pagerState.currentPage != 0 -> pagerState.animateScrollToPage(0)
@@ -109,7 +115,7 @@ class MainActivity : ComponentActivity() {
         // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
         val appsByKey = remember(apps) { apps.associateBy { it.key } }
         val counts = remember(notifications) { notifications.groupingBy { it.packageName }.eachCount() }
-        val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.first() } }
+        val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.take(3) } }
         val nowPlaying = when {
             player.hasMedia -> com.wpreborn.data.media.NowPlaying(player.title, player.artist, player.album, null, player.playing, packageName)
             else -> external
@@ -127,7 +133,7 @@ class MainActivity : ComponentActivity() {
         fun inputsFor(tile: TileSpec, app: AppEntry?) = TileInputs(
             live = liveData,
             notificationCount = if (app?.builtIn == null) counts[app?.packageName] ?: 0 else 0,
-            latestNotification = if (app?.builtIn == null) latest[app?.packageName] else null,
+            recent = if (app?.builtIn == null) latest[app?.packageName].orEmpty() else emptyList(),
             nowPlaying = nowPlaying,
             nowPlayingArt = if (player.hasMedia) player.artUri else null,
             liveEnabled = settings.liveTiles,
@@ -151,6 +157,7 @@ class MainActivity : ComponentActivity() {
                         onResize = { vm.resize(it.id, allowLarge = !settings.moreTiles) },
                         onColor = { t, c -> vm.setColor(t.id, c) },
                         onMove = { id, index, persist -> vm.move(id, index, persist) },
+                        onPersonalize = ::openPersonalize,
                     )
                 } else {
                     Box(Modifier.fillMaxSize().turnstile(appsTurnstile)) {
@@ -202,6 +209,38 @@ class MainActivity : ComponentActivity() {
         true
     } catch (_: Exception) {
         false
+    }
+
+    /** The tiles fly away, then the personalisation page swings in. */
+    private fun openPersonalize() {
+        if (personalizing) return
+        lifecycleScope.launch(AndroidUiDispatcher.Main) {
+            start.turnstile.run(TurnstileMode.ForwardOut)
+            personalizing = true
+            personalizeTurnstile.run(TurnstileMode.ForwardIn)
+        }
+    }
+
+    private fun closePersonalize() {
+        lifecycleScope.launch(AndroidUiDispatcher.Main) {
+            personalizeTurnstile.run(TurnstileMode.BackwardOut)
+            personalizing = false
+            start.turnstile.run(TurnstileMode.BackwardIn)
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        stopped = true
+    }
+
+    override fun onStart() {
+        super.onStart()
+        // Coming back to Start (unlock, home from another app): tiles fly in like on 8.1.
+        if (stopped && !returning && !personalizing) {
+            lifecycleScope.launch(AndroidUiDispatcher.Main) { start.turnstile.run(TurnstileMode.ForwardIn) }
+        }
+        stopped = false
     }
 
     override fun onResume() {

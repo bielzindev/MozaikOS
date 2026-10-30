@@ -8,16 +8,13 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import com.wpreborn.R
 
-/**
- * Selawik is Microsoft's open-source (SIL OFL) metric-compatible fallback for Segoe UI.
- * It stands in for Segoe WP, which cannot be redistributed.
- */
+/** Open Sans (SIL OFL), the typeface of ZUNEX. It has no SemiLight cut, so Light stands in for it. */
 val SegoeFamily = FontFamily(
-    Font(R.font.selawik_light, FontWeight.Light),
-    Font(R.font.selawik_semilight, FontWeight.ExtraLight),
-    Font(R.font.selawik_regular, FontWeight.Normal),
-    Font(R.font.selawik_semibold, FontWeight.SemiBold),
-    Font(R.font.selawik_bold, FontWeight.Bold),
+    Font(R.font.opensans_light, FontWeight.Light),
+    Font(R.font.opensans_light, FontWeight.ExtraLight),
+    Font(R.font.opensans_regular, FontWeight.Normal),
+    Font(R.font.opensans_semibold, FontWeight.SemiBold),
+    Font(R.font.opensans_bold, FontWeight.Bold),
 )
 
 /** Segoe WP SemiLight is mapped onto ExtraLight so that both light cuts stay addressable. */

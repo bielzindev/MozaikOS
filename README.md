@@ -1,23 +1,23 @@
-# Windows Phone Reborn
+# ZUNEX
 
 Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência do **Windows Phone 8.1** — Start Screen com blocos dinâmicos, lista de aplicativos, Central de Ações, controle de volume, tela de bloqueio estilo Lumia e aplicativos próprios: Telefone, Mensagens, Música, Pessoas, Calendário, Fotos e Configurações.
 
-> Projeto de fã, sem afiliação com Microsoft ou Nokia. A fonte Segoe WP não pode ser redistribuída; usamos a **Selawik** (fonte open source da Microsoft, métrica compatível com a Segoe UI, licença SIL OFL — veja `third_party/selawik/LICENSE.txt`).
+> Projeto de fã, sem afiliação com Microsoft ou Nokia. A fonte Segoe WP não pode ser redistribuída; usamos a **Open Sans** (licença SIL OFL — veja `third_party/opensans/OFL.txt`).
 
 ## Instalação
 
 Há duas edições:
 
-- **Lite** (`WindowsPhoneReborn-Lite.apk`, pacote `com.wpreborn.launcher.lite`): sem permissões de SMS, registro de chamadas e chamada direta, o que reduz os bloqueios do Play Protect. Mensagens abre o app de mensagens do Android; o histórico de chamadas fica no app Telefone do Android; os contadores dos blocos Telefone/Mensagens vêm das notificações desses apps.
-- **Completa** (`WindowsPhoneReborn.apk`): Mensagens próprio (pode ser o app de SMS padrão) e histórico de chamadas.
+- **Lite** (`ZUNEX-Lite.apk`, pacote `com.wpreborn.launcher.lite`): sem permissões de SMS, registro de chamadas e chamada direta, o que reduz os bloqueios do Play Protect. Mensagens abre o app de mensagens do Android; o histórico de chamadas fica no app Telefone do Android; os contadores dos blocos Telefone/Mensagens vêm das notificações desses apps.
+- **Completa** (`ZUNEX.apk`): Mensagens próprio (pode ser o app de SMS padrão) e histórico de chamadas.
 
-O link direto está em **GitHub → Releases**. Se o Play Protect bloquear: "Mais detalhes" → "Instalar mesmo assim" (ou desative temporariamente a verificação em Play Store › Play Protect › engrenagem). No Android 13+, se uma permissão aparecer como "configuração restrita": Configurações › Apps › Windows Phone Reborn › ⋮ › "Permitir configurações restritas".
+O link direto está em **GitHub → Releases**. Se o Play Protect bloquear: "Mais detalhes" → "Instalar mesmo assim" (ou desative temporariamente a verificação em Play Store › Play Protect › engrenagem). No Android 13+, se uma permissão aparecer como "configuração restrita": Configurações › Apps › ZUNEX › ⋮ › "Permitir configurações restritas".
 
 1. Baixe o APK em **GitHub → Actions → Android build → (último run) → Artifacts → `windows-phone-reborn-apk`**.
    - `app-release.apk` (otimizado com R8) ou `app-debug.apk`.
 2. Instale (permita "instalar apps desconhecidos" para o navegador/gerenciador de arquivos).
-3. Abra o **Windows Phone Reborn**. Na tela de boas-vindas toque em **definir como padrão**.
-   - Ou: Configurações do Android › Apps › Apps padrão › **App de tela inicial** › Windows Phone Reborn.
+3. Abra o **ZUNEX**. Na tela de boas-vindas toque em **definir como padrão**.
+   - Ou: Configurações do Android › Apps › Apps padrão › **App de tela inicial** › ZUNEX.
 4. Recomendado: em *Configurações › notificações+ações*, ative o **acesso às notificações** (Central de Ações, contadores nos blocos, bloco Música com outros players).
 
 Como app de tela inicial padrão, o launcher volta automaticamente após reiniciar o telefone.
@@ -42,7 +42,7 @@ Valores reproduzidos do sistema original:
 |---|---|---|
 | Cores de destaque | 20 cores (lime #A4C400 … taupe #87794E) | `core/theme/WpColors.kt`, nomes oficiais em PT-BR |
 | Pincéis do tema | PhoneSubtle 60%, PhoneChrome #1F1F1F/#DDDDDD, etc. | `WpPalette.Dark/Light` |
-| Tipografia | Segoe WP Light/SemiLight, títulos minúsculos, app title em caixa alta | `WpTypography.kt` (Selawik) |
+| Tipografia | Segoe WP Light/SemiLight, títulos minúsculos, app title em caixa alta | `WpTypography.kt` (Open Sans) |
 | Grade do Start | blocos 1×1, 2×2, 4×2 (+4×4), 4 ou 6 colunas ("mostrar mais blocos") | `data/tiles/Tiles.kt`, empacotamento em blocos 2×2 |
 | Turnstile | ForwardIn −80°→0 (350 ms), ForwardOut 0→50° (250 ms), easing exponencial 6 (WP Toolkit) | `core/motion/Turnstile.kt` |
 | Feather | blocos giram a partir da borda esquerda da tela, de cima para baixo, o tocado por último | `turnstileItem()` + `StartScreen` |

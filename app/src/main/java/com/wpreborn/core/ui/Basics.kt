@@ -26,6 +26,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -105,6 +107,7 @@ fun RoundButton(
     size: Dp = 44.dp,
     enabled: Boolean = true,
     color: Color = Color.Unspecified,
+    contentDescription: String? = null,
     onClick: () -> Unit,
 ) {
     val fg = if (color == Color.Unspecified) Wp.palette.foreground else color
@@ -116,7 +119,14 @@ fun RoundButton(
             .size(size)
             .border(2.dp, tint, CircleShape)
             .background(if (pressed) tint else Color.Transparent, CircleShape)
-            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick),
+            .clickable(interactionSource = interaction, indication = null, enabled = enabled, onClick = onClick)
+            .then(
+                if (contentDescription != null) {
+                    Modifier.semantics { this.contentDescription = contentDescription }
+                } else {
+                    Modifier
+                },
+            ),
         contentAlignment = Alignment.Center,
     ) {
         WpIcon(icon, tint = if (pressed) Wp.palette.background else tint, size = size * 0.55f)

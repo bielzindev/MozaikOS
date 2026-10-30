@@ -92,14 +92,14 @@ fun WpPivot(
 private fun PivotHeaders(headers: List<String>, state: PivotState, onSelect: (Int) -> Unit) {
     val widths = remember { mutableStateMapOf<Int, Int>() }
     val density = LocalDensity.current
-    val gap = with(density) { 22.dp.roundToPx() }
     val count = headers.size
     val current = state.selected
     val frac = state.pager.currentPageOffsetFraction
     // Draw the previous header too, so it can slide back in when swiping right.
     val order = (-1 until count).map { Math.floorMod(current + it, count) }.let { if (count == 1) listOf(0) else it }
-    val prevWidth = if (count > 1) (widths[order.first()] ?: 0) + gap else 0
-    val curWidth = (widths[current] ?: 0) + gap
+    // Measured widths already include each header's trailing 22 dp gap.
+    val prevWidth = if (count > 1) (widths[order.first()] ?: 0) else 0
+    val curWidth = widths[current] ?: 0
     val shift = if (frac >= 0f) frac * curWidth else frac * prevWidth
     Box(
         Modifier

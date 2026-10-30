@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.lifecycle.lifecycleScope
 import com.wpreborn.core.motion.LocalTurnstile
 import com.wpreborn.core.motion.TurnstileMode
@@ -104,7 +105,7 @@ abstract class WpActivity : ComponentActivity() {
     fun closeWithTurnstile() {
         if (closing) return
         closing = true
-        lifecycleScope.launch {
+        lifecycleScope.launch(AndroidUiDispatcher.Main) {
             turnstile.run(TurnstileMode.BackwardOut)
             finish()
         }

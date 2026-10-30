@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.ime
@@ -64,7 +65,7 @@ fun WpChrome(
                 } else {
                     Box(Modifier.statusBarsPadding().topSystemPadding())
                 }
-                Box(Modifier.weight(1f).fillMaxWidth()) { content() }
+                Box(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding()) { content() }
             }
             if (wpBar) {
                 ActionCenterHandle(chrome.actionCenter, Modifier.align(Alignment.TopCenter).topSystemPadding())

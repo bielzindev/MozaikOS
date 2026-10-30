@@ -81,7 +81,7 @@ fun WpAppBar(
                             Modifier.width(78.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
-                            RoundButton(b.icon, enabled = b.enabled, size = 42.dp) {
+                            RoundButton(b.icon, enabled = b.enabled, size = 42.dp, contentDescription = b.label) {
                                 state.expanded = false
                                 b.onClick()
                             }

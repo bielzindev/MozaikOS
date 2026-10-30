@@ -157,7 +157,7 @@ fun ActionCenter(state: ActionCenterState) {
             Modifier
                 .fillMaxSize()
                 .offset { IntOffset(0, ((state.progress.value - 1f) * fullPx).roundToInt()) }
-                .background(Color(0xF2000000))
+                .background(Color.Black)
                 .clickable(remember { MutableInteractionSource() }, null) {}
                 .statusBarsPadding()
                 .navigationBarsPadding(),

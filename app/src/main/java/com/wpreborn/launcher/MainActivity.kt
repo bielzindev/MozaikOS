@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.AndroidUiDispatcher
 import androidx.lifecycle.lifecycleScope
 import com.wpreborn.R
 import com.wpreborn.apps.common.ChromeState
@@ -173,7 +174,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchFromTile(tile: TileSpec, app: AppEntry) {
-        lifecycleScope.launch {
+        lifecycleScope.launch(AndroidUiDispatcher.Main) {
             start.launchingId = tile.id
             start.turnstile.run(TurnstileMode.ForwardOut)
             if (!launch(app)) {
@@ -184,7 +185,7 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun launchFromList(app: AppEntry) {
-        lifecycleScope.launch {
+        lifecycleScope.launch(AndroidUiDispatcher.Main) {
             appsTurnstile.run(TurnstileMode.ForwardOut)
             if (!launch(app)) appsTurnstile.run(TurnstileMode.BackwardIn)
         }
@@ -209,13 +210,13 @@ class MainActivity : ComponentActivity() {
         vm.refreshLive()
         if (returning) {
             returning = false
-            lifecycleScope.launch {
+            lifecycleScope.launch(AndroidUiDispatcher.Main) {
                 if (start.turnstile.mode == TurnstileMode.ForwardOut) {
                     start.turnstile.run(TurnstileMode.BackwardIn)
                     start.launchingId = null
                 }
             }
-            lifecycleScope.launch {
+            lifecycleScope.launch(AndroidUiDispatcher.Main) {
                 if (appsTurnstile.mode == TurnstileMode.ForwardOut) appsTurnstile.run(TurnstileMode.BackwardIn)
             }
         }

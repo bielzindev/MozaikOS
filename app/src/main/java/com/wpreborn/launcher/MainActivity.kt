@@ -105,6 +105,8 @@ class MainActivity : ComponentActivity() {
             }
         }
 
+        // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
+        val appsByKey = remember(apps) { apps.associateBy { it.key } }
         val counts = remember(notifications) { notifications.groupingBy { it.packageName }.eachCount() }
         val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.first() } }
         val nowPlaying = when {
@@ -136,21 +138,12 @@ class MainActivity : ComponentActivity() {
             beyondViewportPageCount = 1,
             userScrollEnabled = start.editId == null,
         ) { page ->
-            // WP 8.1 parallax: the page being left slides slower and dims slightly.
-            val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .graphicsLayer {
-                        translationX = offset * size.width * 0.25f
-                        alpha = 1f - (kotlin.math.abs(offset) * 0.6f).coerceIn(0f, 0.6f)
-                    },
-            ) {
+            Box(Modifier.fillMaxSize()) {
                 if (page == 0) {
                     StartScreen(
                         state = start,
                         tiles = tiles,
-                        appFor = vm::appFor,
+                        appFor = { appsByKey[it.appKey] },
                         inputsFor = ::inputsFor,
                         onLaunch = { tile, app -> launchFromTile(tile, app) },
                         onUnpin = { vm.unpin(it.id) },

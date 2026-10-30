@@ -152,6 +152,10 @@ fun StartScreen(
         var dragDown by remember { mutableStateOf(Offset.Zero) }
         var dragPointerViewport by remember { mutableStateOf(Offset.Zero) }
         val currentTiles by rememberUpdatedState(tiles)
+        // The gesture handler outlives recompositions: always call the latest callbacks.
+        val currentAppFor by rememberUpdatedState(appFor)
+        val currentOnLaunch by rememberUpdatedState(onLaunch)
+        val currentOnMove by rememberUpdatedState(onMove)
         val currentPlacements by rememberUpdatedState(placements)
 
         fun tileAt(p: Offset): Int {
@@ -222,12 +226,12 @@ fun StartScreen(
                                             ch.consume()
                                             dragPointerViewport = Offset(ch.position.x, ch.position.y - state.scroll.value)
                                             val over = tileAt(ch.position)
-                                            if (over >= 0 && currentTiles[over].id != tile.id) onMove(tile.id, over, false)
+                                            if (over >= 0 && currentTiles[over].id != tile.id) currentOnMove(tile.id, over, false)
                                         }
                                     }
                                     if (dragging) {
                                         state.dragId = null
-                                        onMove(tile.id, currentTiles.indexOfFirst { it.id == tile.id }, true)
+                                        currentOnMove(tile.id, currentTiles.indexOfFirst { it.id == tile.id }, true)
                                     }
                                 }
                                 if (state.editId != null) {
@@ -240,7 +244,7 @@ fun StartScreen(
                                     }
                                     if (up != null) {
                                         up.consume()
-                                        appFor(tile)?.let { onLaunch(tile, it) }
+                                        currentAppFor(tile)?.let { currentOnLaunch(tile, it) }
                                     } else if (!cancelled) {
                                         state.editId = tile.id
                                         dragLoop()

@@ -125,6 +125,11 @@ fun <K : Any> TurnstileHost(
     modifier: Modifier = Modifier,
     animateFirst: Boolean = true,
     feathered: Boolean = false,
+    /**
+     * Key under which each page's saveable state is stored. It must be a type Android can put
+     * in a Bundle (String, Int, ...), otherwise SaveableStateHolder throws.
+     */
+    stateKey: (K) -> Any = { it.toString() },
     content: @Composable (K) -> Unit,
 ) {
     val holder = rememberSaveableStateHolder()
@@ -142,7 +147,7 @@ fun <K : Any> TurnstileHost(
         if (shown != target) {
             val goingBack = back
             state.run(if (goingBack) TurnstileMode.BackwardOut else TurnstileMode.ForwardOut)
-            if (goingBack) holder.removeState(shown)
+            if (goingBack) holder.removeState(stateKey(shown))
             shown = target
             state.run(if (goingBack) TurnstileMode.BackwardIn else TurnstileMode.ForwardIn)
         }
@@ -151,7 +156,7 @@ fun <K : Any> TurnstileHost(
     CompositionLocalProvider(LocalTurnstile provides state, LocalFeathered provides feathered) {
         Box(modifier.fillMaxSize().then(if (feathered) Modifier else Modifier.turnstile(state))) {
             key(shown) {
-                holder.SaveableStateProvider(shown) { content(shown) }
+                holder.SaveableStateProvider(stateKey(shown)) { content(shown) }
             }
         }
     }

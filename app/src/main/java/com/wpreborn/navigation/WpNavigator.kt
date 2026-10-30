@@ -69,5 +69,6 @@ fun <T : Any> WpNavHost(
         isBack = navigator.lastWasBack,
         modifier = modifier,
         animateFirst = animateFirst,
+        stateKey = { it.id },
     ) { entry -> content(entry.page) }
 }

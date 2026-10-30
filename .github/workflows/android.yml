@@ -74,6 +74,8 @@ jobs:
             - **ZUNEX.apk**: versão completa (Mensagens próprio, app de SMS padrão, histórico de chamadas).
 
             Instale no Android (permita "instalar apps desconhecidos") e defina como app de tela inicial padrão.
+
+            Todas as builds a partir da build-25 usam a mesma assinatura: atualizações instalam por cima, sem desinstalar. (Vindo de uma build anterior, desinstale uma última vez.)
           files: |
             dist/ZUNEX-Lite.apk
             dist/ZUNEX.apk

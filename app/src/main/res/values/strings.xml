@@ -196,7 +196,7 @@
     <string name="set_more_tiles">Show more tiles</string>
     <string name="set_live_tiles">Live tiles</string>
     <string name="set_icons_accent">App icons on accent squares</string>
-    <string name="set_wp_status_bar">Windows Phone status bar</string>
+    <string name="set_wp_status_bar">Windows Phone status bar (instead of Android\'s)</string>
     <string name="set_start_background">Start background</string>
     <string name="set_start_background_hint">The picture shows through the tiles, like on Windows Phone 8.1.</string>
     <string name="lock_explain">The Windows Phone lock screen appears in front of the Android lock screen. Swiping it up hands over to Android, so your PIN, pattern, fingerprint or face unlock keep protecting the phone.</string>
@@ -291,4 +291,6 @@
     <string name="kb_vibrate">Vibrate on keypress</string>
     <string name="set_show_duplicates">Show system apps that ZUNEX replaces (phone, messages, music, calendar, contacts, gallery, settings)</string>
     <string name="set_brand_colors">App colors on tiles</string>
+    <string name="set_system_apps">Use the phone\'s own Phone, People and Calendar apps</string>
+    <string name="set_system_apps_hint">The ZUNEX tiles keep showing missed calls, contacts and your next event, but open the apps of your phone.</string>
 </resources>

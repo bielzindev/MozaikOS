@@ -32,11 +32,14 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -81,6 +84,9 @@ import java.util.Date
  */
 class LockActivity : ComponentActivity() {
 
+    /** Bumped every time the lock screen is brought back, so the content resets to its rest state. */
+    private var session by mutableIntStateOf(0)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (Build.VERSION.SDK_INT >= 27) {
@@ -90,45 +96,79 @@ class LockActivity : ComponentActivity() {
             window.addFlags(WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED)
         }
         WpActivity.setupWindow(this)
-        val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
-        controller.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars())
-        controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        hideBars()
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = Unit // Back does nothing on the lock screen.
         })
         setContent {
             WpTheme {
-                LockScreen(onUnlock = ::unlock)
+                LockScreen(session, onUnlock = ::unlock)
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        session++
+        hideBars()
+    }
+
+    private fun hideBars() {
+        val controller = androidx.core.view.WindowInsetsControllerCompat(window, window.decorView)
+        val wpBar = SettingsRepository.get(this).cached.wpStatusBar
+        controller.isAppearanceLightStatusBars = false
+        controller.show(androidx.core.view.WindowInsetsCompat.Type.statusBars())
+        // Android's own status bar stays unless the Windows Phone one was chosen.
+        controller.hide(
+            if (wpBar) androidx.core.view.WindowInsetsCompat.Type.systemBars() else androidx.core.view.WindowInsetsCompat.Type.navigationBars(),
+        )
+        controller.systemBarsBehavior = androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
     }
 
     private fun unlock() {
         val km = getSystemService(KeyguardManager::class.java)
         if (km.isKeyguardLocked) {
             km.requestDismissKeyguard(this, object : KeyguardManager.KeyguardDismissCallback() {
-                override fun onDismissSucceeded() = finishQuietly()
-                override fun onDismissCancelled() = recreate()
-                override fun onDismissError() = finishQuietly()
+                override fun onDismissSucceeded() = hideQuietly()
+                override fun onDismissCancelled() {
+                    session++
+                }
+                override fun onDismissError() = hideQuietly()
             })
         } else {
-            finishQuietly()
+            hideQuietly()
         }
     }
 
-    private fun finishQuietly() {
-        finish()
+    /**
+     * Steps aside without being destroyed: the next time the screen turns off the same,
+     * already drawn activity is brought back, so it is on screen the instant the display
+     * wakes instead of the Android lock screen showing first while ZUNEX starts.
+     */
+    private fun hideQuietly() {
+        if (!moveTaskToBack(true)) finish()
         @Suppress("DEPRECATION")
         overridePendingTransition(0, 0)
     }
 
     companion object {
+        private const val WALLPAPER_SIZE = 1920
+
+        /** Decodes the chosen picture ahead of time so the first frame already shows it. */
+        fun preloadWallpaper(context: Context, uri: String?) {
+            if (uri == null) return
+            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch {
+                ImageLoader.full(context.applicationContext, Uri.parse(uri), WALLPAPER_SIZE)
+            }
+        }
+
         /** Registered by the Application: shows the lock screen whenever the screen turns off. */
         fun register(context: Context) {
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context, intent: Intent) {
                     val settings = SettingsRepository.get(c).cached
                     if (!settings.lockEnabled || !c.canDrawOverlays()) return
+                    preloadWallpaper(c, settings.lockWallpaper)
                     val am = c.getSystemService(AudioManager::class.java)
                     if (am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION || am.mode == AudioManager.MODE_RINGTONE) return
                     try {
@@ -141,6 +181,7 @@ class LockActivity : ComponentActivity() {
                     }
                 }
             }
+            preloadWallpaper(context, SettingsRepository.get(context).cached.lockWallpaper)
             androidx.core.content.ContextCompat.registerReceiver(
                 context.applicationContext, receiver, IntentFilter(Intent.ACTION_SCREEN_OFF),
                 androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
@@ -150,7 +191,7 @@ class LockActivity : ComponentActivity() {
 }
 
 @Composable
-fun LockScreen(onUnlock: () -> Unit) {
+fun LockScreen(session: Int, onUnlock: () -> Unit) {
     val context = LocalContext.current
     val settings = Wp.settings
     val scope = rememberCoroutineScope()
@@ -163,8 +204,11 @@ fun LockScreen(onUnlock: () -> Unit) {
 
     // Background: chosen picture, or the latest photos cycling (like the Photos/Bing lock
     // screen apps of 8.1), or an accent gradient.
-    val wallpaper by produceState<ImageBitmap?>(null, settings.lockWallpaper) {
-        value = settings.lockWallpaper?.let { ImageLoader.full(context, Uri.parse(it), 1920)?.asImageBitmap() }
+    val wallpaper by produceState(
+        settings.lockWallpaper?.let { ImageLoader.cachedFull(Uri.parse(it), 1920)?.asImageBitmap() },
+        settings.lockWallpaper,
+    ) {
+        if (value == null) value = settings.lockWallpaper?.let { ImageLoader.full(context, Uri.parse(it), 1920)?.asImageBitmap() }
     }
     val slideshow by produceState(emptyList<Uri>(), settings.lockPhotos, settings.lockWallpaper) {
         value = if (settings.lockPhotos && settings.lockWallpaper == null && context.hasPermissions(Perms.IMAGES)) {
@@ -188,8 +232,8 @@ fun LockScreen(onUnlock: () -> Unit) {
         context.getSystemService(android.app.AlarmManager::class.java)?.nextAlarmClock?.triggerTime?.takeIf { it - now < 24L * 3600 * 1000 }
     }
     val offset = remember { Animatable(0f) }
-    val enter = remember { Animatable(0f) }
-    LaunchedEffect(Unit) { enter.animateTo(1f, tween(500, easing = WpEasing.ExpOut)) }
+    // Back on screen after being hidden (or the PIN prompt was cancelled): rest position.
+    LaunchedEffect(session) { offset.snapTo(0f) }
 
     BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black)) {
         val heightPx = with(LocalDensity.current) { maxHeight.toPx() }
@@ -235,8 +279,13 @@ fun LockScreen(onUnlock: () -> Unit) {
             // Keep the text readable on bright pictures.
             Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.5f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.55f))))
 
-            Column(Modifier.fillMaxSize().graphicsLayer { alpha = enter.value; translationY = (1f - enter.value) * 60f }) {
-                WpStatusBar(Modifier.padding(top = 6.dp), color = Color.White)
+            // No fade-in: the screen must be complete on the very first frame after wake-up.
+            Column(Modifier.fillMaxSize()) {
+                if (settings.wpStatusBar) {
+                    WpStatusBar(Modifier.padding(top = 6.dp), color = Color.White)
+                } else {
+                    Spacer(Modifier.statusBarsPadding())
+                }
                 // Media controls when something is playing.
                 val title = if (player.hasMedia) player.title else external?.title
                 if (title != null && (player.playing || external?.playing == true)) {

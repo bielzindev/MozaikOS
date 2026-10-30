@@ -153,8 +153,7 @@ abstract class WpActivity : ComponentActivity() {
             applySystemBars(activity)
         }
 
-        fun applySystemBars(activity: Activity) {
-            val settings = SettingsRepository.get(activity).cached
+        fun applySystemBars(activity: Activity, settings: com.wpreborn.data.prefs.WpSettings = SettingsRepository.get(activity).cached) {
             val controller = WindowInsetsControllerCompat(activity.window, activity.window.decorView)
             controller.isAppearanceLightStatusBars = !settings.darkTheme
             controller.isAppearanceLightNavigationBars = !settings.darkTheme

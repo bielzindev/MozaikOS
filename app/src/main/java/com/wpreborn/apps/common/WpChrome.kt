@@ -53,6 +53,12 @@ fun WpChrome(
 ) {
     val bg = if (background == Color.Unspecified) Wp.palette.background else background
     val wpBar = Wp.settings.wpStatusBar && showStatusBar
+    // Follow the status bar and theme switches live (Personalize / Settings) without a restart.
+    val activity = androidx.compose.ui.platform.LocalContext.current as? android.app.Activity
+    val settings = Wp.settings
+    androidx.compose.runtime.LaunchedEffect(settings.wpStatusBar, settings.darkTheme) {
+        activity?.let { WpActivity.applySystemBars(it, settings) }
+    }
     CompositionLocalProvider(LocalChrome provides chrome) {
         Box(Modifier.fillMaxSize().background(bg)) {
             Column(

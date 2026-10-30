@@ -37,6 +37,8 @@ object ImageLoader {
 
     fun cached(uri: Uri, size: Int): Bitmap? = cache.get("$uri@$size")
 
+    fun cachedFull(uri: Uri, maxSide: Int): Bitmap? = cache.get("$uri#full$maxSide")
+
     suspend fun thumbnail(context: Context, uri: Uri, size: Int): Bitmap? {
         val key = "$uri@$size"
         cache.get(key)?.let { return it }

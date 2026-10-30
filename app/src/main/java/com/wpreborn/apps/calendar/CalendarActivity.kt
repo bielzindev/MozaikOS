@@ -1,5 +1,6 @@
 package com.wpreborn.apps.calendar
 
+import com.wpreborn.data.apps.SystemApps
 import android.content.ContentUris
 import android.content.Intent
 import android.provider.CalendarContract
@@ -75,6 +76,8 @@ private const val DAY = 24L * 60 * 60 * 1000
 
 /** Calendar: agenda and month views over the Android calendar provider, plus event details. */
 class CalendarActivity : WpActivity() {
+
+    override fun redirect(): Boolean = SystemApps.preferred(this) && SystemApps.open(this, SystemApps.Kind.Calendar)
 
     @Composable
     override fun Content() {

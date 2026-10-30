@@ -196,7 +196,7 @@
     <string name="set_more_tiles">Mostrar mais blocos</string>
     <string name="set_live_tiles">Blocos dinâmicos</string>
     <string name="set_icons_accent">Ícones dos apps em quadrados de destaque</string>
-    <string name="set_wp_status_bar">Barra de status do Windows Phone</string>
+    <string name="set_wp_status_bar">Barra de status do Windows Phone (em vez da do Android)</string>
     <string name="set_start_background">Tela de fundo do início</string>
     <string name="set_start_background_hint">A imagem aparece através dos blocos, como no Windows Phone 8.1.</string>
     <string name="lock_explain">A tela de bloqueio do Windows Phone aparece na frente da tela de bloqueio do Android. Ao deslizá-la para cima, o Android assume, então seu PIN, padrão, digital ou rosto continuam protegendo o telefone.</string>
@@ -292,4 +292,6 @@
     <string name="kb_vibrate">Vibrar ao tocar</string>
     <string name="set_show_duplicates">Mostrar apps do sistema que o ZUNEX substitui (telefone, mensagens, música, calendário, contatos, galeria, configurações)</string>
     <string name="set_brand_colors">Cores dos apps nos blocos</string>
+    <string name="set_system_apps">Usar os apps do celular para Telefone, Pessoas e Calendário</string>
+    <string name="set_system_apps_hint">Os blocos do ZUNEX continuam mostrando chamadas perdidas, contatos e o próximo compromisso, mas abrem os apps do seu celular.</string>
 </resources>

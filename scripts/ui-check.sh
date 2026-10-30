@@ -61,7 +61,8 @@ tap_text() {
     echo "text not found: $1"
   fi
 }
-start() { adb shell am start -W -n "$PKG/$1" >/dev/null; }
+# zunex_own: open the ZUNEX screens even though Phone/People/Calendar prefer the phone's apps.
+start() { adb shell am start -W -n "$PKG/$1" --ez zunex_own true >/dev/null; }
 
 seed_data
 adb shell am force-stop $PKG
@@ -88,6 +89,15 @@ adb shell input keyevent KEYCODE_BACK
 # Volume flyout
 adb shell input keyevent KEYCODE_VOLUME_UP
 shot 06-volume 1
+
+# By default the Phone and Calendar tiles hand over to the phone's own apps.
+adb shell am start -W -n "$PKG/com.wpreborn.apps.phone.PhoneActivity" >/dev/null
+shot 08-phone-system 4
+adb shell input keyevent KEYCODE_HOME
+adb shell am start -W -n "$PKG/com.wpreborn.apps.calendar.CalendarActivity" >/dev/null
+shot 09-calendar-system 4
+adb shell input keyevent KEYCODE_HOME
+sleep 1
 
 # Built-in apps: first page, then swipe to the second pivot item
 for app in phone.PhoneActivity messages.MessagingActivity music.MusicActivity people.PeopleActivity \
@@ -200,6 +210,11 @@ adb shell input keyevent KEYCODE_HOME
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true
 shot 30-lock 3
+# Swipe up: the lock screen steps aside (kept alive), then comes back already drawn.
+adb shell input swipe 540 1800 540 300 250
+shot 31-after-unlock 2
+adb shell am start -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true
+shot 32-lock-again 0.3
 
 adb logcat -d -b crash > "$OUT/crashes.txt"
 # Crashes of any process (ours or system) are failures: count them for the summary.

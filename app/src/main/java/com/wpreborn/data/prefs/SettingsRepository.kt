@@ -36,7 +36,9 @@ data class WpSettings(
     /** Without a chosen picture, cycle the latest photos on the lock screen. */
     val lockPhotos: Boolean = true,
     /** Replace the Android status bar by the Windows Phone one inside our screens. */
-    val wpStatusBar: Boolean = true,
+    val wpStatusBar: Boolean = false,
+    /** Phone, People and Calendar tiles open the phone's own apps instead of the ZUNEX ones. */
+    val systemApps: Boolean = true,
     /** Draw third-party icons on accent-colored squares in the app list. */
     val iconsOnAccent: Boolean = true,
     /** Metro icon pack (white glyphs) instead of the original Android icons. */
@@ -78,6 +80,7 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setLockShowNotifications(value: Boolean) = update { it[LOCK_NOTIF] = value }
     fun setLockPhotos(value: Boolean) = update { it[LOCK_PHOTOS] = value }
     fun setWpStatusBar(value: Boolean) = update { it[WP_STATUS] = value }
+    fun setSystemApps(value: Boolean) = update { it[SYSTEM_APPS] = value }
     fun setIconsOnAccent(value: Boolean) = update { it[ICONS_ACCENT] = value }
     fun setMetroIcons(value: Boolean) = update { it[METRO_ICONS] = value }
     fun setBrandColors(value: Boolean) = update { it[BRAND_COLORS] = value }
@@ -94,7 +97,8 @@ class SettingsRepository private constructor(private val context: Context) {
         lockEnabled = this[LOCK_ENABLED] ?: false,
         lockShowNotifications = this[LOCK_NOTIF] ?: true,
         lockPhotos = this[LOCK_PHOTOS] ?: true,
-        wpStatusBar = this[WP_STATUS] ?: true,
+        wpStatusBar = this[WP_STATUS] ?: false,
+        systemApps = this[SYSTEM_APPS] ?: true,
         iconsOnAccent = this[ICONS_ACCENT] ?: true,
         metroIcons = this[METRO_ICONS] ?: true,
         brandColors = this[BRAND_COLORS] ?: true,
@@ -113,6 +117,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val LOCK_NOTIF = booleanPreferencesKey("lock_notifications")
         private val LOCK_PHOTOS = booleanPreferencesKey("lock_photos")
         private val WP_STATUS = booleanPreferencesKey("wp_status_bar")
+        private val SYSTEM_APPS = booleanPreferencesKey("system_apps")
         private val ICONS_ACCENT = booleanPreferencesKey("icons_on_accent")
         private val METRO_ICONS = booleanPreferencesKey("metro_icons")
         private val BRAND_COLORS = booleanPreferencesKey("brand_colors")

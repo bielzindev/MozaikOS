@@ -130,7 +130,7 @@ class MusicController private constructor(private val context: Context) {
             title = md.title?.toString().orEmpty(),
             artist = md.artist?.toString().orEmpty(),
             album = md.albumTitle?.toString().orEmpty(),
-            artUri = md.artworkUri,
+            artUri = md.extras?.getString(EXTRA_ART)?.let(Uri::parse) ?: md.artworkUri,
             playing = c.isPlaying,
             positionMs = c.currentPosition.coerceAtLeast(0),
             durationMs = c.duration.takeIf { it > 0 } ?: 0,
@@ -150,12 +150,17 @@ class MusicController private constructor(private val context: Context) {
                 .setTitle(title)
                 .setArtist(artist)
                 .setAlbumTitle(album)
-                .setArtworkUri(albumArtUri)
+                // No artworkUri: System UI tries to resolve it itself and crashes on MediaStore
+                // album URIs. ExoPlayer reads the embedded cover for the notification instead;
+                // our own screens get the album URI through the extras.
+                .setExtras(android.os.Bundle().apply { putString(EXTRA_ART, albumArtUri.toString()) })
                 .build(),
         )
         .build()
 
     companion object {
+        private const val EXTRA_ART = "wp_art_uri"
+
         @Volatile
         private var instance: MusicController? = null
 

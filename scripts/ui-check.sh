@@ -133,7 +133,7 @@ adb shell input keyevent KEYCODE_HOME
 start com.wpreborn.apps.messages.MessagingActivity
 sleep 4
 shot 41-messages-threads 1
-adb shell input tap 540 520
+tap_text "Ana Souza"
 shot 42-messages-conversation 3
 adb shell input keyevent KEYCODE_HOME
 
@@ -154,7 +154,9 @@ shot 46-photos-collection 1
 swipe_left
 shot 47-photos-albums 2
 swipe_left; sleep 1
-adb shell input tap 150 520
+adb shell input keyevent KEYCODE_BACK; sleep 1
+swipe_left; sleep 1
+adb shell input tap 200 500
 shot 48-photos-viewer 3
 adb shell input keyevent KEYCODE_HOME
 shot 49-start-live-tiles 6
@@ -164,6 +166,8 @@ adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/nu
 shot 30-lock 3
 
 adb logcat -d -b crash > "$OUT/crashes.txt"
+# Crashes of any process (ours or system) are failures: count them for the summary.
+grep -c "FATAL EXCEPTION" "$OUT/crashes.txt" > "$OUT/crash_count.txt" || true
 adb logcat -d '*:E' | grep -iE "wpreborn|AndroidRuntime|FATAL" > "$OUT/errors.txt" || true
 echo "=== crashes ==="
 cat "$OUT/crashes.txt"

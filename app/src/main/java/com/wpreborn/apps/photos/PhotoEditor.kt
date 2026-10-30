@@ -245,7 +245,8 @@ fun PhotoEditorPage(photo: Photo, onSaved: () -> Unit) {
                     edit = edit.copy(filter = PhotoFilter.entries[(edit.filter.ordinal + 1) % PhotoFilter.entries.size])
                 },
                 AppBarButton(WpIcons.Check, stringResource(R.string.save), enabled = preview != null && !saving) {
-                    val src = preview ?: return@AppBarButton
+                    val src = preview
+                    if (src != null) {
                     saving = true
                     scope.launch {
                         // Re-decode at a larger size for the saved copy.
@@ -255,6 +256,7 @@ fun PhotoEditorPage(photo: Photo, onSaved: () -> Unit) {
                         saving = false
                         message = if (uri != null) savedText else failedText
                         if (uri != null) onSaved()
+                    }
                     }
                 },
             ),

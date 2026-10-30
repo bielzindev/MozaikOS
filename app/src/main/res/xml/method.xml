@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.wpreborn.keyboard.KeyboardSettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="pt_BR" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=pt" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="en_US" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=en" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="es" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=es" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="fr" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=fr" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="de" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=de" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="it" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=it" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="nl" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=nl" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="pl" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=pl" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ro" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ro" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="cs" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=cs" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="hu" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=hu" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sv" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sv" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="da" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=da" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="nb" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=nb" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="fi" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=fi" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="tr" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=tr" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="in" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=id" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ms" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ms" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="tl" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=tl" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="vi" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=vi" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ca" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ca" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="gl" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=gl" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="eu" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=eu" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="hr" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=hr" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sk" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sk" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sl" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sl" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="lt" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=lt" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="lv" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=lv" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="et" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=et" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sq" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sq" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="af" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=af" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sw" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sw" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ha" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ha" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="yo" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=yo" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ru" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ru" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="uk" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=uk" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="be" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=be" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="bg" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=bg" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="sr" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=sr" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="kk" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=kk" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="el" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=el" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ar" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ar" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="fa" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=fa" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ur" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ur" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="iw" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=he" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="hi" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=hi" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="bn" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=bn" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ta" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ta" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="th" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=th" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ko" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ko" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ja" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ja" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="hy" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=hy" />
+    <subtype android:label="@string/kb_subtype" android:imeSubtypeLocale="ka" android:imeSubtypeMode="keyboard" android:imeSubtypeExtraValue="zunex=ka" />
+</input-method>

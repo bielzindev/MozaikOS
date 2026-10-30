@@ -28,7 +28,8 @@ enum class BuiltInApp(
     Music("music", R.string.app_music, WpIcons.Music, MusicActivity::class.java, TileSize.Wide),
     Photos("photos", R.string.app_photos, WpIcons.Photos, PhotosActivity::class.java, TileSize.Wide),
     Calendar("calendar", R.string.app_calendar, WpIcons.Calendar, CalendarActivity::class.java, TileSize.Wide),
-    Settings("settings", R.string.app_settings, WpIcons.Settings, SettingsActivity::class.java, TileSize.Small);
+    Settings("settings", R.string.app_settings, WpIcons.Settings, SettingsActivity::class.java, TileSize.Small),
+    Keyboard("keyboard", R.string.app_keyboard, WpIcons.Keypad, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java, TileSize.Small);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

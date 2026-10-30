@@ -195,6 +195,30 @@
             </intent-filter>
         </activity>
 
+        <!-- ZUNEX keyboard (Word Flow) -->
+        <service
+            android:name=".keyboard.ZunexKeyboardService"
+            android:exported="true"
+            android:label="@string/app_keyboard"
+            android:permission="android.permission.BIND_INPUT_METHOD">
+            <intent-filter>
+                <action android:name="android.view.InputMethod" />
+            </intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/method" />
+        </service>
+        <activity
+            android:name=".keyboard.KeyboardSettingsActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.keyboard"
+            android:icon="@mipmap/ic_launcher"
+            android:label="@string/app_keyboard"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <!-- Lock screen in front of (never instead of) the Android keyguard -->
         <activity
             android:name=".launcher.lock.LockActivity"

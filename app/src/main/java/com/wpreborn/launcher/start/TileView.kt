@@ -80,6 +80,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Music -> MusicTile(tile.size, inputs.nowPlaying, inputs.nowPlayingArt, inputs.liveEnabled, seed)
             BuiltInApp.Calendar -> CalendarTile(tile.size, inputs.live, inputs.liveEnabled, seed)
             BuiltInApp.Settings -> IconTile(WpIcons.Settings, tile.size)
+            BuiltInApp.Keyboard -> IconTile(WpIcons.Keypad, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&

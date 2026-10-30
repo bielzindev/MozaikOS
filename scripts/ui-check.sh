@@ -161,6 +161,42 @@ shot 48-photos-viewer 3
 adb shell input keyevent KEYCODE_HOME
 shot 49-start-live-tiles 6
 
+# Personalization: press and hold empty Start space
+adb shell input keyevent KEYCODE_HOME; sleep 2
+adb shell input swipe 540 2000 540 2000 1300
+shot 50-personalize 3
+adb shell input keyevent KEYCODE_BACK; sleep 2
+
+# All apps with the Metro icon pack
+swipe_left
+shot 51-all-apps-metro 2
+
+# ZUNEX keyboard: enable it, then open the app list search box
+adb shell ime enable $PKG/com.wpreborn.keyboard.ZunexKeyboardService || true
+adb shell ime set $PKG/com.wpreborn.keyboard.ZunexKeyboardService || true
+adb shell input tap 100 160
+shot 52-keyboard 3
+adb shell input tap 70 1720
+shot 53-keyboard-symbols 2
+adb shell input keyevent KEYCODE_BACK; adb shell input keyevent KEYCODE_BACK
+adb shell input keyevent KEYCODE_HOME
+
+# Photo editor
+start com.wpreborn.apps.photos.PhotosActivity
+sleep 4
+adb shell input tap 165 570
+sleep 3
+tap_text "edit"
+shot 54-photo-editor 4
+tap_text "filter"; sleep 1; tap_text "filter"
+shot 55-photo-editor-filter 3
+adb shell input keyevent KEYCODE_HOME
+
+# Keyboard settings app
+start com.wpreborn.keyboard.KeyboardSettingsActivity
+shot 56-keyboard-settings 3
+adb shell input keyevent KEYCODE_HOME
+
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true
 shot 30-lock 3

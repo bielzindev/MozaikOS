@@ -167,7 +167,9 @@ private fun SettingsHome(go: (SettingsPage) -> Unit) {
         Entry(stringResource(R.string.set_location), null) { context.open(Settings.ACTION_LOCATION_SOURCE_SETTINGS) },
         Entry(stringResource(R.string.set_date_time), null) { context.open(Settings.ACTION_DATE_SETTINGS) },
         Entry(stringResource(R.string.set_language), null) { context.open(Settings.ACTION_LOCALE_SETTINGS) },
-        Entry(stringResource(R.string.set_keyboard), null) { context.open(Settings.ACTION_INPUT_METHOD_SETTINGS) },
+        Entry(stringResource(R.string.set_keyboard), stringResource(R.string.app_keyboard) + " ZUNEX") {
+            context.startActivity(Intent(context, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java))
+        },
         Entry(stringResource(R.string.set_ease_of_access), null) { context.open(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
         Entry(stringResource(R.string.set_security), null) { context.open(Settings.ACTION_SECURITY_SETTINGS) },
         Entry(stringResource(R.string.set_about), Build.MODEL) { go(SettingsPage.About) },
@@ -363,6 +365,9 @@ private fun LockScreenPage() {
         }
         WpToggle(stringResource(R.string.lock_show_notifications), settings.lockShowNotifications, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setLockShowNotifications(it)
+        }
+        WpToggle(stringResource(R.string.lock_photos), settings.lockPhotos, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
+            repo.setLockPhotos(it)
         }
         Spacer(Modifier.height(12.dp))
         WpText(stringResource(R.string.lock_background), style = WpType.Subtle, color = Wp.palette.subtle)

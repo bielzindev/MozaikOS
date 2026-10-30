@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="wp_black">#FF000000</color>
+    <color name="wp_white">#FFFFFFFF</color>
+    <color name="wp_cobalt">#FF0050EF</color>
+    <color name="wp_cyan">#FF1BA1E2</color>
+    <color name="wp_emerald">#FF008A00</color>
+    <color name="wp_magenta">#FFD80073</color>
+    <color name="wp_orange">#FFFA6800</color>
+    <color name="wp_violet">#FFAA00FF</color>
+    <color name="wp_teal">#FF00ABA9</color>
+    <color name="wp_steel">#FF647687</color>
+</resources>

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Plain black window: every screen is drawn by Compose with the Windows Phone design. -->
+    <style name="Theme.WpReborn" parent="android:Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@color/wp_black</item>
+        <item name="android:colorBackground">@color/wp_black</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowDrawsSystemBarBackgrounds">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:colorAccent">@color/wp_cobalt</item>
+        <item name="android:windowShowWallpaper">false</item>
+    </style>
+
+    <style name="Theme.WpReborn.Lock">
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>

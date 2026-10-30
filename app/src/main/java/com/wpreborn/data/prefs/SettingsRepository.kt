@@ -1,0 +1,111 @@
+package com.wpreborn.data.prefs
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.MutablePreferences
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import com.wpreborn.core.theme.AccentColor
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+
+val Context.wpDataStore: DataStore<Preferences> by preferencesDataStore(name = "wp_settings")
+
+/** Everything the user can personalise. Persisted with DataStore. */
+data class WpSettings(
+    val darkTheme: Boolean = true,
+    val accent: AccentColor = AccentColor.Cobalt,
+    /** "Show more tiles": 6 small-tile columns instead of 4. */
+    val moreTiles: Boolean = true,
+    /** Start background image (content uri), drawn through the tiles like on 8.1. */
+    val startBackground: String? = null,
+    val lockWallpaper: String? = null,
+    /** Show the Windows Phone lock screen in front of the system keyguard. */
+    val lockEnabled: Boolean = false,
+    val lockShowNotifications: Boolean = true,
+    /** Replace the Android status bar by the Windows Phone one inside our screens. */
+    val wpStatusBar: Boolean = true,
+    /** Draw third-party icons on accent-colored squares in the app list. */
+    val iconsOnAccent: Boolean = true,
+    val liveTiles: Boolean = true,
+    val firstRunDone: Boolean = false,
+)
+
+class SettingsRepository private constructor(private val context: Context) {
+
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private val store get() = context.wpDataStore
+
+    @Volatile
+    var cached: WpSettings = WpSettings()
+        private set
+
+    val settings: Flow<WpSettings> = store.data.map { it.toSettings() }.onEach { cached = it }
+
+    /** Loads the settings synchronously once at process start so the first frame is correct. */
+    fun warmUp() {
+        cached = runBlocking { store.data.first().toSettings() }
+    }
+
+    fun update(block: (MutablePreferences) -> Unit) {
+        scope.launch { store.edit { block(it) } }
+    }
+
+    fun setDarkTheme(value: Boolean) = update { it[DARK] = value }
+    fun setAccent(value: AccentColor) = update { it[ACCENT] = value.name }
+    fun setMoreTiles(value: Boolean) = update { it[MORE_TILES] = value }
+    fun setStartBackground(uri: String?) = update { if (uri == null) it.remove(START_BG) else it[START_BG] = uri }
+    fun setLockWallpaper(uri: String?) = update { if (uri == null) it.remove(LOCK_BG) else it[LOCK_BG] = uri }
+    fun setLockEnabled(value: Boolean) = update { it[LOCK_ENABLED] = value }
+    fun setLockShowNotifications(value: Boolean) = update { it[LOCK_NOTIF] = value }
+    fun setWpStatusBar(value: Boolean) = update { it[WP_STATUS] = value }
+    fun setIconsOnAccent(value: Boolean) = update { it[ICONS_ACCENT] = value }
+    fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
+    fun setFirstRunDone() = update { it[FIRST_RUN] = true }
+
+    private fun Preferences.toSettings() = WpSettings(
+        darkTheme = this[DARK] ?: true,
+        accent = AccentColor.fromName(this[ACCENT]),
+        moreTiles = this[MORE_TILES] ?: true,
+        startBackground = this[START_BG],
+        lockWallpaper = this[LOCK_BG],
+        lockEnabled = this[LOCK_ENABLED] ?: false,
+        lockShowNotifications = this[LOCK_NOTIF] ?: true,
+        wpStatusBar = this[WP_STATUS] ?: true,
+        iconsOnAccent = this[ICONS_ACCENT] ?: true,
+        liveTiles = this[LIVE_TILES] ?: true,
+        firstRunDone = this[FIRST_RUN] ?: false,
+    )
+
+    companion object {
+        private val DARK = booleanPreferencesKey("dark_theme")
+        private val ACCENT = stringPreferencesKey("accent")
+        private val MORE_TILES = booleanPreferencesKey("more_tiles")
+        private val START_BG = stringPreferencesKey("start_background")
+        private val LOCK_BG = stringPreferencesKey("lock_wallpaper")
+        private val LOCK_ENABLED = booleanPreferencesKey("lock_enabled")
+        private val LOCK_NOTIF = booleanPreferencesKey("lock_notifications")
+        private val WP_STATUS = booleanPreferencesKey("wp_status_bar")
+        private val ICONS_ACCENT = booleanPreferencesKey("icons_on_accent")
+        private val LIVE_TILES = booleanPreferencesKey("live_tiles")
+        private val FIRST_RUN = booleanPreferencesKey("first_run_done")
+
+        @Volatile
+        private var instance: SettingsRepository? = null
+
+        fun get(context: Context): SettingsRepository =
+            instance ?: synchronized(this) {
+                instance ?: SettingsRepository(context.applicationContext).also { instance = it }
+            }
+    }
+}

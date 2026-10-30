@@ -1,0 +1,244 @@
+package com.wpreborn.launcher
+
+import android.app.ActivityOptions
+import android.app.role.RoleManager
+import android.content.Intent
+import android.os.Bundle
+import android.view.KeyEvent
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.viewModels
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.lifecycleScope
+import com.wpreborn.R
+import com.wpreborn.apps.common.ChromeState
+import com.wpreborn.apps.common.WpActivity
+import com.wpreborn.apps.common.WpChrome
+import com.wpreborn.core.motion.TurnstileMode
+import com.wpreborn.core.motion.TurnstileState
+import com.wpreborn.core.motion.turnstile
+import com.wpreborn.core.theme.Wp
+import com.wpreborn.core.theme.WpTheme
+import com.wpreborn.data.apps.AppEntry
+import com.wpreborn.data.media.ExternalMediaWatcher
+import com.wpreborn.data.notifications.NotificationCenter
+import com.wpreborn.data.prefs.SettingsRepository
+import com.wpreborn.data.tiles.TileSpec
+import com.wpreborn.launcher.allapps.AllAppsScreen
+import com.wpreborn.launcher.start.StartScreen
+import com.wpreborn.launcher.start.StartScreenState
+import com.wpreborn.launcher.start.TileInputs
+import com.wpreborn.services.music.MusicController
+import kotlinx.coroutines.launch
+
+/**
+ * The Home activity: Start screen and app list side by side, swiped horizontally like on
+ * Windows Phone 8.1, with the status bar, Action Center and volume flyout on top.
+ */
+class MainActivity : ComponentActivity() {
+
+    private val vm: LauncherViewModel by viewModels()
+    private val chrome = ChromeState()
+    private val start = StartScreenState()
+    private val appsTurnstile = TurnstileState()
+    private var pager: PagerState? = null
+    private var returning = false
+    private var homePresses by mutableIntStateOf(0)
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        WpActivity.setupWindow(this)
+        setContent {
+            WpTheme {
+                WpChrome(chrome) {
+                    LauncherContent()
+                }
+                if (!Wp.settings.firstRunDone) {
+                    WelcomeScreen(
+                        onMakeDefault = { requestHomeRole() },
+                        onDone = { SettingsRepository.get(this).setFirstRunDone() },
+                    )
+                }
+            }
+        }
+    }
+
+    @Composable
+    private fun LauncherContent() {
+        val context = LocalContext.current
+        val scope = rememberCoroutineScope()
+        val tiles by vm.tiles.collectAsState()
+        val apps by vm.apps.collectAsState()
+        val live by vm.live.collectAsState()
+        val notifications by NotificationCenter.items.collectAsState()
+        val player by MusicController.get(context).ui.collectAsState()
+        val external by ExternalMediaWatcher.state.collectAsState()
+        val settings = Wp.settings
+        val pagerState = rememberPagerState { 2 }
+        pager = pagerState
+
+        BackHandler(enabled = pagerState.currentPage == 1) { scope.launch { pagerState.animateScrollToPage(0) } }
+
+        LaunchedEffect(homePresses) {
+            if (homePresses == 0) return@LaunchedEffect
+            when {
+                chrome.actionCenter.visible -> chrome.actionCenter.close()
+                start.editId != null -> start.editId = null
+                pagerState.currentPage != 0 -> pagerState.animateScrollToPage(0)
+                else -> start.scroll.animateScrollTo(0)
+            }
+        }
+
+        val counts = remember(notifications) { notifications.groupingBy { it.packageName }.eachCount() }
+        val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.first() } }
+        val nowPlaying = when {
+            player.hasMedia -> com.wpreborn.data.media.NowPlaying(player.title, player.artist, player.album, null, player.playing, packageName)
+            else -> external
+        }
+
+        fun inputsFor(tile: TileSpec, app: AppEntry?) = TileInputs(
+            live = live,
+            notificationCount = if (app?.builtIn == null) counts[app?.packageName] ?: 0 else 0,
+            latestNotification = if (app?.builtIn == null) latest[app?.packageName] else null,
+            nowPlaying = nowPlaying,
+            nowPlayingArt = if (player.hasMedia) player.artUri else null,
+            liveEnabled = settings.liveTiles,
+        )
+
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            beyondViewportPageCount = 1,
+            userScrollEnabled = start.editId == null,
+        ) { page ->
+            // WP 8.1 parallax: the page being left slides slower and dims slightly.
+            val offset = (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .graphicsLayer {
+                        translationX = offset * size.width * 0.25f
+                        alpha = 1f - (kotlin.math.abs(offset) * 0.6f).coerceIn(0f, 0.6f)
+                    },
+            ) {
+                if (page == 0) {
+                    StartScreen(
+                        state = start,
+                        tiles = tiles,
+                        appFor = vm::appFor,
+                        inputsFor = ::inputsFor,
+                        onLaunch = { tile, app -> launchFromTile(tile, app) },
+                        onUnpin = { vm.unpin(it.id) },
+                        onResize = { vm.resize(it.id, allowLarge = !settings.moreTiles) },
+                        onColor = { t, c -> vm.setColor(t.id, c) },
+                        onMove = { id, index, persist -> vm.move(id, index, persist) },
+                    )
+                } else {
+                    Box(Modifier.fillMaxSize().turnstile(appsTurnstile)) {
+                        AllAppsScreen(
+                            apps = apps,
+                            isPinned = vm::isPinned,
+                            onLaunch = { launchFromList(it) },
+                            onPin = { app ->
+                                vm.pin(app)
+                                scope.launch {
+                                    pagerState.animateScrollToPage(0)
+                                    start.scroll.animateScrollTo(start.scroll.maxValue)
+                                }
+                            },
+                            visible = pagerState.currentPage == 1,
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private fun launchFromTile(tile: TileSpec, app: AppEntry) {
+        lifecycleScope.launch {
+            start.launchingId = tile.id
+            start.turnstile.run(TurnstileMode.ForwardOut)
+            if (!launch(app)) {
+                start.turnstile.run(TurnstileMode.BackwardIn)
+                start.launchingId = null
+            }
+        }
+    }
+
+    private fun launchFromList(app: AppEntry) {
+        lifecycleScope.launch {
+            appsTurnstile.run(TurnstileMode.ForwardOut)
+            if (!launch(app)) appsTurnstile.run(TurnstileMode.BackwardIn)
+        }
+    }
+
+    private fun launch(app: AppEntry): Boolean = try {
+        val options = if (app.builtIn != null) {
+            ActivityOptions.makeCustomAnimation(this, 0, 0)
+        } else {
+            ActivityOptions.makeCustomAnimation(this, R.anim.wp_app_open, R.anim.wp_stay)
+        }
+        vm.appRepo.launch(app, null, options.toBundle())
+        returning = true
+        true
+    } catch (_: Exception) {
+        false
+    }
+
+    override fun onResume() {
+        super.onResume()
+        WpActivity.applySystemBars(this)
+        vm.refreshLive()
+        if (returning) {
+            returning = false
+            lifecycleScope.launch {
+                if (start.turnstile.mode == TurnstileMode.ForwardOut) {
+                    start.turnstile.run(TurnstileMode.BackwardIn)
+                    start.launchingId = null
+                }
+            }
+            lifecycleScope.launch {
+                if (appsTurnstile.mode == TurnstileMode.ForwardOut) appsTurnstile.run(TurnstileMode.BackwardIn)
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        if (intent.action == Intent.ACTION_MAIN && hasWindowFocus()) homePresses++
+    }
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.keyCode == KeyEvent.KEYCODE_VOLUME_UP || event.keyCode == KeyEvent.KEYCODE_VOLUME_DOWN) {
+            if (event.action == KeyEvent.ACTION_DOWN) chrome.volume.onKey(this, event.keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+            return true
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    private fun requestHomeRole() {
+        val rm = getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_HOME) && !rm.isRoleHeld(RoleManager.ROLE_HOME)) {
+            @Suppress("DEPRECATION")
+            startActivityForResult(rm.createRequestRoleIntent(RoleManager.ROLE_HOME), 1)
+        } else {
+            startActivity(Intent(android.provider.Settings.ACTION_HOME_SETTINGS))
+        }
+    }
+}

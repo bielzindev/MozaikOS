@@ -97,6 +97,32 @@ app/src/main/java/com/wpreborn/
 - **Configurações**: pivots "sistema" e "aplicativos"; início+tema, cor de destaque, tela de bloqueio, notificações, brilho, armazenamento, sobre, tela inicial padrão — o resto abre a tela nativa via intents oficiais.
 - Interface em **português (Brasil)** e inglês.
 
+## Teclado ZUNEX (Word Flow)
+
+Teclado do sistema no estilo do Windows Phone 8.1. Abra o app **Teclado** e siga os dois passos: ativar e escolher.
+
+- **Idiomas e escritas:** mais de 50 idiomas, com layouts próprios para:
+  - alfabeto latino (QWERTY, AZERTY, QWERTZ e as letras de cada país);
+  - cirílico, grego, árabe, persa, urdu e hebraico;
+  - devanágari, bengali, tâmil e tailandês;
+  - armênio e georgiano;
+  - coreano, com composição Hangul, e japonês, digitado em romaji e convertido para kana.
+- **Acentos:** em qualquer idioma de alfabeto latino, segure a tecla para ver os acentos.
+- **Sugestões e correção automática:** dicionários de frequência para 20 idiomas, mais as palavras que você digita e a previsão da próxima palavra. Apertar o apagar logo depois de uma correção a desfaz.
+- **Word Flow:** deslize sobre as letras para escrever; o rastro aparece na cor de destaque e as alternativas surgem na barra de sugestões.
+- **Outros recursos:**
+  - símbolos (2 páginas), emoji por categoria e teclado numérico ou de telefone;
+  - a tecla Enter muda conforme o campo (ir, pesquisar, enviar);
+  - maiúscula automática no início da frase e dois espaços para inserir um ponto;
+  - deslizar na barra de espaço move o cursor; deslizar para a esquerda no apagar apaga a palavra;
+  - som e vibração opcionais.
+- **Limitação:** não há chinês, porque a conversão pinyin para caracteres exige dicionários grandes. Para chinês, use outro teclado; segurar a barra de espaço abre o seletor de teclados.
+
+## Créditos
+
+- Fonte Open Sans: SIL Open Font License (`third_party/opensans/OFL.txt`).
+- Listas de palavras: [FrequencyWords](https://github.com/hermitdave/FrequencyWords), de Hermit Dave. O código é MIT (`third_party/frequencywords/LICENSE`) e os dados vêm das legendas do OpenSubtitles (CC-BY-SA 4.0).
+
 ## Limitações do Android (e alternativas adotadas)
 
 | Recurso | Limitação | Alternativa |

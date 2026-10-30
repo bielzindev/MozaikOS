@@ -27,7 +27,8 @@ jobs:
 
       - name: Show compiler errors
         if: failure()
-        run: grep -E "^e: |^w: .*error|ERROR:|error:|What went wrong" -A3 build.log | head -300
+        run: |
+          grep -E "^e: |ERROR:|error:|What went wrong" -A3 build.log | head -300
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4

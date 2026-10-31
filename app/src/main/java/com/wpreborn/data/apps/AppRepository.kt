@@ -221,6 +221,7 @@ class AppRepository private constructor(private val context: Context) {
         add(BuiltInApp.Calculator, main(Intent.CATEGORY_APP_CALCULATOR))
         add(BuiltInApp.Camera, Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
         add(BuiltInApp.Settings, Intent(android.provider.Settings.ACTION_SETTINGS))
+        add(BuiltInApp.Alarms, Intent(android.provider.AlarmClock.ACTION_SHOW_ALARMS))
         return result
     }
 

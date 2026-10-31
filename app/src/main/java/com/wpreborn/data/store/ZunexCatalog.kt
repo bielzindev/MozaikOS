@@ -100,6 +100,29 @@ object ZunexCatalog {
             BuiltInApp.Keyboard, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_keyboard, R.string.store_new_keyboard, Color(0xFF6A00FF),
         ),
         CatalogApp(
+            BuiltInApp.Alarms, "8.1.0", 1, StoreCategory.Utilities, R.string.store_desc_alarms, R.string.store_new_alarms, Color(0xFFE51400),
+            permissions = listOf(R.string.perm_label_alarms, R.string.perm_label_notifications), featured = true,
+            clearData = { c -> com.wpreborn.data.alarms.AlarmStore.get(c).let { s -> s.alarms.value.forEach { s.delete(it.id) } } },
+        ),
+        CatalogApp(
+            BuiltInApp.Clock, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_clock, R.string.store_new_clock, Color(0xFF00ABA9),
+            dependsOn = listOf(BuiltInApp.Alarms),
+            clearData = prefs("clock", "stopwatch"),
+        ),
+        CatalogApp(
+            BuiltInApp.Recorder, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_recorder, R.string.store_new_recorder, Color(0xFFD80073),
+            permissions = listOf(R.string.perm_label_microphone),
+        ),
+        CatalogApp(
+            BuiltInApp.Flashlight, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_flashlight, R.string.store_new_flashlight, Color(0xFFF0A30A),
+            permissions = listOf(R.string.perm_label_camera),
+        ),
+        CatalogApp(
+            BuiltInApp.Maps, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_maps, R.string.store_new_maps, Color(0xFF60A917),
+            permissions = listOf(R.string.perm_label_internet, R.string.perm_label_location), featured = true,
+            clearData = prefs("osmdroid"),
+        ),
+        CatalogApp(
             BuiltInApp.Settings, "8.1.0", 1, StoreCategory.System, R.string.store_desc_settings, R.string.store_new_settings, Color(0xFF647687), required = true,
         ),
         CatalogApp(

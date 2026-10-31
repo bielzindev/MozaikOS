@@ -24,6 +24,11 @@
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <!-- Music and Photos -->
@@ -264,6 +269,90 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".apps.alarms.AlarmsActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.alarms"
+            android:icon="@mipmap/ic_alarms"
+            android:label="@string/app_alarms"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".apps.alarms.ClockActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.clock"
+            android:icon="@mipmap/ic_clock"
+            android:label="@string/app_clock"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".apps.recorder.RecorderActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.recorder"
+            android:icon="@mipmap/ic_recorder"
+            android:label="@string/app_recorder"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".apps.flashlight.FlashlightActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.flashlight"
+            android:icon="@mipmap/ic_flashlight"
+            android:label="@string/app_flashlight"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".apps.maps.MapsActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.maps"
+            android:icon="@mipmap/ic_maps"
+            android:label="@string/app_maps"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".apps.alarms.AlarmRingActivity"
+            android:exported="false"
+            android:taskAffinity="com.wpreborn.alarmring"
+            android:excludeFromRecents="true"
+            android:launchMode="singleInstance"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:theme="@style/Theme.WpReborn.Lock" />
+
+        <receiver android:name=".data.alarms.AlarmReceiver" android:exported="false" />
+        <receiver android:name=".data.alarms.BootReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".apps.settings.SettingsActivity"

@@ -126,6 +126,7 @@ Teclado do sistema no estilo do Windows Phone 8.1. Abra o app **Teclado** e siga
 - Listas de palavras: [FrequencyWords](https://github.com/hermitdave/FrequencyWords), de Hermit Dave. O código é MIT (`third_party/frequencywords/LICENSE`) e os dados vêm das legendas do OpenSubtitles (CC-BY-SA 4.0).
 - Ícones de clima: [Meteocons](https://github.com/basmilius/weather-icons), de Bas Milius, licença MIT (`third_party/meteocons/LICENSE`).
 - Fotos de fundo do Clima: Wikimedia Commons, domínio público / CC0; arquivo, autor e licença de cada uma em `third_party/weather-photos/photos.tsv` (baixadas no build).
+- Mapas: [osmdroid](https://github.com/osmdroid/osmdroid) (Apache 2.0); dados e mapas © colaboradores do OpenStreetMap (ODbL), busca pelo Nominatim.
 
 ## Limitações do Android (e alternativas adotadas)
 

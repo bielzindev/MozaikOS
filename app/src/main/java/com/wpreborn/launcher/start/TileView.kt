@@ -87,6 +87,11 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Notes -> IconTile(com.wpreborn.core.icons.Glyphs.Note, tile.size)
             BuiltInApp.Weather -> WeatherTile(tile.size, inputs.liveEnabled)
             BuiltInApp.Store -> StoreTile(tile.size)
+            BuiltInApp.Alarms -> AlarmsTile(tile.size)
+            BuiltInApp.Clock -> IconTile(WpIcons.Clock, tile.size)
+            BuiltInApp.Recorder -> IconTile(com.wpreborn.core.icons.Glyphs.Microphone, tile.size)
+            BuiltInApp.Flashlight -> IconTile(WpIcons.Flashlight, tile.size)
+            BuiltInApp.Maps -> IconTile(com.wpreborn.core.icons.Glyphs.MapPin, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&
@@ -414,4 +419,23 @@ private fun BoxScope.StoreTile(size: TileSize) {
     val states by manager.states.collectAsState()
     val updates = remember(states) { com.wpreborn.data.store.ZunexCatalog.apps.count { manager.hasUpdate(it) } }
     CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
+}
+
+/** Alarms: the next alarm's time under the bell, like the 8.1 Alarms tile. */
+@Composable
+private fun BoxScope.AlarmsTile(size: TileSize) {
+    val context = LocalContext.current
+    val store = remember { com.wpreborn.data.alarms.AlarmStore.get(context) }
+    val alarms by store.alarms.collectAsState()
+    val next = remember(alarms) { alarms.filter { it.enabled && !it.timer }.minByOrNull { it.next() } }
+    if (next == null || size == TileSize.Small) {
+        IconTile(WpIcons.Alarm, size)
+        return
+    }
+    Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+        WpIcon(WpIcons.Alarm, tint = Color.White, size = 36.dp)
+        val time = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(next.next()))
+        WpText(time, style = WpType.Large, color = Color.White)
+        if (next.label.isNotBlank()) WpText(next.label, style = WpType.Small, color = Color.White, maxLines = 1)
+    }
 }

@@ -34,7 +34,12 @@ enum class BuiltInApp(
     Calculator("calculator", R.string.app_calculator, com.wpreborn.core.icons.Glyphs.Calculator, com.wpreborn.apps.calculator.CalculatorActivity::class.java, TileSize.Small),
     Notes("notes", R.string.app_notes, com.wpreborn.core.icons.Glyphs.Note, com.wpreborn.apps.notes.NotesActivity::class.java, TileSize.Medium),
     Weather("weather", R.string.app_weather, com.wpreborn.core.icons.Glyphs.Weather, com.wpreborn.apps.weather.WeatherActivity::class.java, TileSize.Wide),
-    Store("store", R.string.app_store, com.wpreborn.core.icons.Glyphs.Bag, com.wpreborn.apps.store.StoreActivity::class.java, TileSize.Medium);
+    Store("store", R.string.app_store, com.wpreborn.core.icons.Glyphs.Bag, com.wpreborn.apps.store.StoreActivity::class.java, TileSize.Medium),
+    Alarms("alarms", R.string.app_alarms, WpIcons.Alarm, com.wpreborn.apps.alarms.AlarmsActivity::class.java, TileSize.Medium),
+    Clock("clock", R.string.app_clock, WpIcons.Clock, com.wpreborn.apps.alarms.ClockActivity::class.java, TileSize.Small),
+    Recorder("recorder", R.string.app_recorder, com.wpreborn.core.icons.Glyphs.Microphone, com.wpreborn.apps.recorder.RecorderActivity::class.java, TileSize.Small),
+    Flashlight("flashlight", R.string.app_flashlight, WpIcons.Flashlight, com.wpreborn.apps.flashlight.FlashlightActivity::class.java, TileSize.Small),
+    Maps("maps", R.string.app_maps, com.wpreborn.core.icons.Glyphs.MapPin, com.wpreborn.apps.maps.MapsActivity::class.java, TileSize.Medium);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

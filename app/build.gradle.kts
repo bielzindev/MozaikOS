@@ -23,19 +23,17 @@ android {
     // the repository; CI writes it from the ZUNEX_KEYSTORE_BASE64 secret to $ZUNEX_KEYSTORE.
     val zunexKeystore = System.getenv("ZUNEX_KEYSTORE")?.let { file(it) }?.takeIf { it.exists() }
     signingConfigs {
-        create("zunex") {
-            if (zunexKeystore != null) {
-                storeFile = zunexKeystore
-                // A missing secret reaches the build as an empty variable: treat it as unset.
-                fun env(name: String) = System.getenv(name)?.takeIf { it.isNotBlank() }
-                storePassword = env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
-                keyAlias = env("ZUNEX_KEY_ALIAS") ?: "zunex"
-                keyPassword = env("ZUNEX_KEY_PASSWORD") ?: env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
-            } else {
-                initWith(getByName("debug"))
-            }
+        if (zunexKeystore != null) create("zunex") {
+            // A missing secret reaches the build as an empty variable: treat it as unset.
+            fun env(name: String) = System.getenv(name)?.takeIf { it.isNotBlank() }
+            storeFile = zunexKeystore
+            storePassword = env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
+            keyAlias = env("ZUNEX_KEY_ALIAS") ?: "zunex"
+            keyPassword = env("ZUNEX_KEY_PASSWORD") ?: env("ZUNEX_KEYSTORE_PASSWORD") ?: "zunex-release"
         }
     }
+    // Without the key (local builds, the emulator check) the standard debug key signs.
+    val signing = if (zunexKeystore != null) signingConfigs.getByName("zunex") else signingConfigs.getByName("debug")
 
     flavorDimensions += "edition"
     productFlavors {
@@ -55,13 +53,13 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("zunex")
+            signingConfig = signing
         }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("zunex")
+            signingConfig = signing
         }
     }
     compileOptions {

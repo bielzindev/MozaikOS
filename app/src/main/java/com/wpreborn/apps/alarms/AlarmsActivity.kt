@@ -191,7 +191,7 @@ fun NumberWheel(range: IntRange, value: Int, onChange: (Int) -> Unit) {
             .distinctUntilChanged()
             .collect { (first, moving) -> if (!moving) onChange(range.first + (first + 1) % count) }
     }
-    Box(Modifier.width(96.dp).height(3 * 76.dp), contentAlignment = Alignment.Center) {
+    Box(Modifier.width(96.dp).height(76.dp * 3), contentAlignment = Alignment.Center) {
         Box(Modifier.size(96.dp, 76.dp).border(2.dp, Wp.accent))
         LazyColumn(state = state, flingBehavior = fling, modifier = Modifier.fillMaxSize()) {
             items(loops * count) { i ->

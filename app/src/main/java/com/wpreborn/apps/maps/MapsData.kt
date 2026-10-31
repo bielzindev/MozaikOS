@@ -23,7 +23,16 @@ enum class TravelMode(val profile: String, val label: Int, val googleMode: Strin
     Foot("routed-foot", R.string.maps_mode_foot, "w"),
 }
 
-data class Step(val type: String, val modifier: String, val street: String, val exit: Int, val distanceM: Double) {
+data class Step(
+    val type: String,
+    val modifier: String,
+    val street: String,
+    val exit: Int,
+    val distanceM: Double,
+    /** Where the manoeuvre happens. */
+    val lat: Double = 0.0,
+    val lon: Double = 0.0,
+) {
     /** A short instruction, e.g. "Turn right onto Main Street". */
     fun text(context: Context): String {
         val dir = when (modifier) {
@@ -98,13 +107,19 @@ suspend fun reverse(lat: Double, lon: Double): Place? = withContext(Dispatchers.
     }.getOrNull()
 }
 
-/** A route with its line and steps, or null when none was found. */
-suspend fun route(mode: TravelMode, fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): Route? = withContext(Dispatchers.IO) {
+/** The routes found (the best first, then up to two alternatives); empty when none. */
+suspend fun routes(mode: TravelMode, fromLat: Double, fromLon: Double, toLat: Double, toLon: Double): List<Route> = withContext(Dispatchers.IO) {
     runCatching {
-        val url = "https://routing.openstreetmap.de/${mode.profile}/route/v1/driving/$fromLon,$fromLat;$toLon,$toLat?overview=full&geometries=geojson&steps=true"
+        val url = "https://routing.openstreetmap.de/${mode.profile}/route/v1/driving/$fromLon,$fromLat;$toLon,$toLat?overview=full&geometries=geojson&steps=true&alternatives=true"
         val json = JSONObject(get(url))
-        if (json.optString("code") != "Ok") return@runCatching null
-        val r = json.getJSONArray("routes").getJSONObject(0)
+        if (json.optString("code") != "Ok") return@runCatching emptyList()
+        val arr = json.getJSONArray("routes")
+        List(minOf(arr.length(), 3)) { parseRoute(arr.getJSONObject(it)) }
+    }.getOrDefault(emptyList())
+}
+
+private fun parseRoute(r: JSONObject): Route {
+    run {
         val coords = r.getJSONObject("geometry").getJSONArray("coordinates")
         val points = List(coords.length()) { i -> coords.getJSONArray(i).let { it.getDouble(1) to it.getDouble(0) } }
         val steps = ArrayList<Step>()
@@ -114,11 +129,39 @@ suspend fun route(mode: TravelMode, fromLat: Double, fromLon: Double, toLat: Dou
             for (i in 0 until s.length()) {
                 val st = s.getJSONObject(i)
                 val m = st.getJSONObject("maneuver")
-                steps += Step(m.optString("type"), m.optString("modifier"), st.optString("name"), m.optInt("exit", 0), st.optDouble("distance", 0.0))
+                val loc = m.optJSONArray("location")
+                steps += Step(
+                    m.optString("type"), m.optString("modifier"), st.optString("name"), m.optInt("exit", 0), st.optDouble("distance", 0.0),
+                    lat = loc?.optDouble(1) ?: 0.0, lon = loc?.optDouble(0) ?: 0.0,
+                )
             }
         }
-        Route(r.getDouble("distance"), r.getDouble("duration"), points, steps)
-    }.getOrNull()
+        return Route(r.getDouble("distance"), r.getDouble("duration"), points, steps)
+    }
+}
+
+/** Shortest distance in metres from a point to a polyline (lat, lon pairs). */
+fun distanceToLine(lat: Double, lon: Double, line: List<Pair<Double, Double>>): Double {
+    if (line.isEmpty()) return Double.MAX_VALUE
+    if (line.size == 1) return distanceM(lat, lon, line[0].first, line[0].second)
+    // Local equirectangular projection around the point is accurate enough at these scales.
+    val kx = 111_320.0 * cos(Math.toRadians(lat))
+    val ky = 110_540.0
+    var best = Double.MAX_VALUE
+    for (i in 0 until line.size - 1) {
+        val ax = (line[i].second - lon) * kx
+        val ay = (line[i].first - lat) * ky
+        val bx = (line[i + 1].second - lon) * kx
+        val by = (line[i + 1].first - lat) * ky
+        val dx = bx - ax
+        val dy = by - ay
+        val len2 = dx * dx + dy * dy
+        val t = if (len2 == 0.0) 0.0 else (-(ax * dx + ay * dy) / len2).coerceIn(0.0, 1.0)
+        val px = ax + t * dx
+        val py = ay + t * dy
+        best = minOf(best, sqrt(px * px + py * py))
+    }
+    return best
 }
 
 fun distanceM(lat1: Double, lon1: Double, lat2: Double, lon2: Double): Double {
@@ -138,4 +181,26 @@ fun formatDistance(m: Double): String = when {
 fun formatDuration(context: Context, s: Double): String {
     val min = (s / 60).roundToInt().coerceAtLeast(1)
     return if (min < 60) context.getString(R.string.maps_minutes, min) else context.getString(R.string.maps_hours, min / 60, min % 60)
+}
+
+/** Spoken directions with Android's text-to-speech, in the phone's language. */
+class Voice(context: android.content.Context) {
+    private var ready = false
+    private lateinit var tts: android.speech.tts.TextToSpeech
+
+    init {
+        tts = android.speech.tts.TextToSpeech(context.applicationContext) { status ->
+            ready = status == android.speech.tts.TextToSpeech.SUCCESS
+            if (ready) runCatching { tts.language = java.util.Locale.getDefault() }
+        }
+    }
+
+    fun say(text: String) {
+        if (!ready || text.isBlank()) return
+        tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, "zunex-nav")
+    }
+
+    fun stop() = runCatching { tts.stop() }
+
+    fun shutdown() = runCatching { tts.shutdown() }
 }

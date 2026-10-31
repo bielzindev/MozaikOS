@@ -624,4 +624,12 @@
     <string name="maps_step_turn">Turn %1$s %2$s</string>
     <string name="maps_minutes">%1$d min</string>
     <string name="maps_hours">%1$d h %2$d min</string>
+    <string name="maps_start">start</string>
+    <string name="maps_end">end</string>
+    <string name="maps_mute">mute</string>
+    <string name="maps_unmute">voice</string>
+    <string name="maps_route_fastest">fastest</string>
+    <string name="maps_route_option">option %1$d</string>
+    <string name="maps_in_distance">In %1$s, %2$s</string>
+    <string name="maps_rerouting">Recalculating the route</string>
 </resources>

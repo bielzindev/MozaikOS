@@ -119,7 +119,17 @@ class MapsActivity : WpActivity() {
 
         var routing by remember { mutableStateOf(false) }
         var mode by remember { mutableStateOf(TravelMode.Car) }
+        var found by remember { mutableStateOf<List<Route>>(emptyList()) }
+        var chosen by remember { mutableStateOf(0) }
         var route by remember { mutableStateOf<Route?>(null) }
+        // Turn-by-turn navigation.
+        var navigating by remember { mutableStateOf(false) }
+        var nextStep by remember { mutableStateOf(0) }
+        var toNextM by remember { mutableStateOf(0.0) }
+        var remainingM by remember { mutableStateOf(0.0) }
+        var voiceOn by remember { mutableStateOf(true) }
+        val voice = remember { Voice(context) }
+        DisposableEffect(Unit) { onDispose { voice.shutdown() } }
         var routeError by remember { mutableStateOf(false) }
         var showSteps by remember { mutableStateOf(false) }
 
@@ -160,6 +170,15 @@ class MapsActivity : WpActivity() {
         LaunchedEffect(map, style) {
             val m = map ?: return@LaunchedEffect
             m.setStyle(Style.Builder().fromUri(style.url)) { s ->
+                s.addSource(GeoJsonSource(SRC_ALT))
+                s.addLayer(
+                    LineLayer(LAYER_ALT, SRC_ALT).withProperties(
+                        PropertyFactory.lineColor(android.graphics.Color.rgb(140, 140, 150)),
+                        PropertyFactory.lineWidth(5f),
+                        PropertyFactory.lineCap(Property.LINE_CAP_ROUND),
+                        PropertyFactory.lineJoin(Property.LINE_JOIN_ROUND),
+                    ),
+                )
                 s.addSource(GeoJsonSource(SRC_ROUTE))
                 s.addLayer(
                     LineLayer(LAYER_ROUTE_CASING, SRC_ROUTE).withProperties(
@@ -226,13 +245,17 @@ class MapsActivity : WpActivity() {
             )
             if (p != null && !routing) map?.animateCamera(CameraUpdateFactory.newLatLngZoom(LatLng(p.lat, p.lon), maxOf(map?.cameraPosition?.zoom ?: 15.0, 15.0)), 700)
         }
-        LaunchedEffect(route, styleReady) {
+        LaunchedEffect(route, found, styleReady) {
             val s = map?.style ?: return@LaunchedEffect
             val r = route
+            fun line(x: Route) = Feature.fromGeometry(LineString.fromLngLats(x.points.map { Point.fromLngLat(it.second, it.first) }))
             s.getSourceAs<GeoJsonSource>(SRC_ROUTE)?.setGeoJson(
-                if (r == null) FeatureCollection.fromFeatures(emptyList()) else FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(r.points.map { Point.fromLngLat(it.second, it.first) }))),
+                if (r == null) FeatureCollection.fromFeatures(emptyList()) else FeatureCollection.fromFeature(line(r)),
             )
-            if (r != null && r.points.size > 1) {
+            s.getSourceAs<GeoJsonSource>(SRC_ALT)?.setGeoJson(
+                FeatureCollection.fromFeatures(if (navigating) emptyList() else found.filter { it !== r }.map { line(it) }),
+            )
+            if (r != null && r.points.size > 1 && !navigating) {
                 val b = LatLngBounds.Builder().apply { r.points.forEach { include(LatLng(it.first, it.second)) } }.build()
                 map?.animateCamera(CameraUpdateFactory.newLatLngBounds(b, 120), 900)
             }
@@ -249,10 +272,88 @@ class MapsActivity : WpActivity() {
             }
             loading = true
             routeError = false
-            route = route(mode, from.latitude, from.longitude, dest.lat, dest.lon)
+            found = routes(mode, from.latitude, from.longitude, dest.lat, dest.lon)
+            chosen = 0
+            route = found.firstOrNull()
             routeError = route == null
             loading = false
         }
+        // Navigation: follow the position, announce the manoeuvres, re-route when off the route.
+        LaunchedEffect(navigating) {
+            if (!navigating) return@LaunchedEffect
+            val m = map ?: return@LaunchedEffect
+            runCatching {
+                m.locationComponent.cameraMode = CameraMode.TRACKING_GPS
+                m.locationComponent.renderMode = RenderMode.GPS
+                m.animateCamera(CameraUpdateFactory.newCameraPosition(CameraPosition.Builder(m.cameraPosition).zoom(17.0).tilt(50.0).build()), 800)
+            }
+            (context as? android.app.Activity)?.window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            nextStep = 1
+            var announcedFar = -1
+            var announcedNear = -1
+            var offCount = 0
+            route?.steps?.firstOrNull()?.let { if (voiceOn) voice.say(it.text(context)) }
+            while (navigating) {
+                val r = route
+                val me = myLocation()
+                if (r != null && me != null) {
+                    val steps = r.steps
+                    val i = nextStep.coerceAtMost(steps.lastIndex)
+                    val st = steps.getOrNull(i)
+                    if (st != null) {
+                        toNextM = distanceM(me.latitude, me.longitude, st.lat, st.lon)
+                        remainingM = toNextM + steps.drop(i + 1).sumOf { it.distanceM }
+                        val far = if (mode == TravelMode.Car) 300.0 else 100.0
+                        if (toNextM <= far && toNextM > 60 && announcedFar != i) {
+                            announcedFar = i
+                            if (voiceOn) voice.say(context.getString(R.string.maps_in_distance, formatDistance(toNextM), st.text(context).replaceFirstChar { it.lowercase() }))
+                        }
+                        if (toNextM <= 40 && announcedNear != i) {
+                            announcedNear = i
+                            if (voiceOn) voice.say(st.text(context))
+                        }
+                        if (toNextM <= 20) {
+                            if (st.type == "arrive") {
+                                navigating = false
+                                break
+                            }
+                            nextStep = i + 1
+                        }
+                    }
+                    // Off the route for a few seconds: find a new one from here.
+                    offCount = if (distanceToLine(me.latitude, me.longitude, r.points) > 60) offCount + 1 else 0
+                    if (offCount >= 4) {
+                        offCount = 0
+                        selected?.let { dest ->
+                            if (voiceOn) voice.say(context.getString(R.string.maps_rerouting))
+                            routes(mode, me.latitude, me.longitude, dest.lat, dest.lon).firstOrNull()?.let {
+                                found = listOf(it)
+                                route = it
+                                nextStep = 1
+                                announcedFar = -1
+                                announcedNear = -1
+                            }
+                        }
+                    }
+                }
+                delay(1000)
+            }
+        }
+        DisposableEffect(navigating) {
+            onDispose {
+                (context as? android.app.Activity)?.window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+            }
+        }
+        LaunchedEffect(navigating) {
+            if (navigating) return@LaunchedEffect
+            map?.let { m ->
+                runCatching {
+                    m.locationComponent.cameraMode = CameraMode.NONE
+                    m.locationComponent.renderMode = RenderMode.COMPASS
+                }
+            }
+        }
+
         // Search as you type, near the map centre (debounced).
         LaunchedEffect(query) {
             val q = query.trim()
@@ -338,11 +439,24 @@ class MapsActivity : WpActivity() {
                             loading -> LoadingDots(Modifier.padding(top = 10.dp))
                             routeError -> WpText(stringResource(R.string.maps_route_error), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.padding(top = 10.dp))
                             r != null -> {
-                                Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.Bottom) {
-                                    WpText(formatDuration(context, r.durationS), style = WpType.ExtraLarge.copy(fontWeight = FontWeight.SemiBold), color = Wp.accent)
-                                    Spacer(Modifier.width(12.dp))
-                                    WpText(formatDistance(r.distanceM), style = WpType.Large, color = Wp.palette.subtle)
+                                // Route options: tap one to choose it.
+                                found.forEachIndexed { i, alt ->
+                                    Row(
+                                        Modifier.fillMaxWidth().wpClickable { chosen = i; route = alt }.padding(top = 8.dp),
+                                        verticalAlignment = Alignment.Bottom,
+                                    ) {
+                                        WpText(
+                                            formatDuration(context, alt.durationS),
+                                            style = WpType.ExtraLarge.copy(fontWeight = FontWeight.SemiBold),
+                                            color = if (i == chosen) Wp.accent else Wp.palette.subtle,
+                                        )
+                                        Spacer(Modifier.width(12.dp))
+                                        WpText(formatDistance(alt.distanceM), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.weight(1f))
+                                        WpText(stringResource(if (i == 0) R.string.maps_route_fastest else R.string.maps_route_option, i + 1), style = WpType.Small, color = Wp.palette.subtle)
+                                    }
                                 }
+                                Spacer(Modifier.height(8.dp))
+                                WpButton(stringResource(R.string.maps_start)) { navigating = true; routing = false }
                                 WpText(
                                     stringResource(if (showSteps) R.string.maps_hide_steps else R.string.maps_show_steps, r.steps.size),
                                     style = WpType.Normal,
@@ -364,9 +478,31 @@ class MapsActivity : WpActivity() {
                     }
                 }
 
+                // Navigation: the next manoeuvre on top, remaining distance and controls below.
+                if (navigating) {
+                    val r = route
+                    val st = r?.steps?.getOrNull(nextStep.coerceAtMost((r.steps.size - 1).coerceAtLeast(0)))
+                    Column(Modifier.fillMaxWidth().background(Wp.accent).padding(horizontal = 16.dp, vertical = 14.dp)) {
+                        WpText(formatDistance(toNextM), style = WpType.Header.copy(fontWeight = FontWeight.Light), color = Color.White)
+                        WpText(st?.text(context).orEmpty(), style = WpType.Large, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    Row(
+                        Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Wp.palette.chrome).padding(16.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(Modifier.weight(1f)) {
+                            WpText(formatDistance(remainingM), style = WpType.ExtraLarge)
+                            WpText(selected?.name.orEmpty(), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                        WpButton(stringResource(if (voiceOn) R.string.maps_mute else R.string.maps_unmute)) { voiceOn = !voiceOn; if (!voiceOn) voice.stop() }
+                        Spacer(Modifier.width(8.dp))
+                        WpButton(stringResource(R.string.maps_end)) { navigating = false; voice.stop() }
+                    }
+                }
+
                 // Place card.
                 selected?.let { p ->
-                    if (!searching && !routing) {
+                    if (!searching && !routing && !navigating) {
                         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Wp.palette.chrome).padding(16.dp)) {
                             WpText(p.name, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             if (p.detail.isNotBlank()) WpText(p.detail, style = WpType.Small, color = Wp.palette.subtle, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -416,6 +552,8 @@ class MapsActivity : WpActivity() {
     private companion object {
         const val SRC_ROUTE = "zunex-route"
         const val SRC_PIN = "zunex-pin"
+        const val SRC_ALT = "zunex-alt"
+        const val LAYER_ALT = "zunex-alt-line"
         const val LAYER_ROUTE = "zunex-route-line"
         const val LAYER_ROUTE_CASING = "zunex-route-casing"
         const val LAYER_PIN = "zunex-pin-dot"

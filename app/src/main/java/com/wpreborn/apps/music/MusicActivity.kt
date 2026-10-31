@@ -34,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -113,6 +114,7 @@ class MusicActivity : WpActivity() {
         val controller = remember { MusicController.get(context) }
         LaunchedEffect(Unit) { controller.connect() }
         val ui by controller.ui.collectAsState()
+        val external by com.wpreborn.data.media.ExternalMediaWatcher.state.collectAsState()
 
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
         Column(Modifier.fillMaxSize()) {
@@ -120,7 +122,7 @@ class MusicActivity : WpActivity() {
                 WpNavHost(nav) { page ->
                     val col = collection
                     when (page) {
-                        MusicPage.Collection -> CollectionPage(perm.granted, col, nav, controller, ui, onReload = { reload++ }) {
+                        MusicPage.Collection -> CollectionPage(perm.granted, col, nav, controller, ui, external, onReload = { reload++ }) {
                             PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
                         }
                         is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { ArtistDetail(it, nav, controller) }
@@ -128,7 +130,7 @@ class MusicActivity : WpActivity() {
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() })
                         }
-                        MusicPage.NowPlaying -> NowPlayingPage(ui, controller)
+                        MusicPage.NowPlaying -> NowPlayingScreen(ui, external, controller)
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
                     }
                 }
@@ -153,11 +155,13 @@ private fun CollectionPage(
     nav: WpNavigator<MusicPage>,
     controller: MusicController,
     ui: PlayerUi,
+    external: com.wpreborn.data.media.NowPlaying?,
     onReload: () -> Unit,
     gate: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val pivot = rememberPivotState(4)
+    val pivot = rememberPivotState(6)
+    val mixes = remember(col) { col?.let { MixBuilder.build(context, it, com.wpreborn.data.media.PlayStats.get(context).counts()) }.orEmpty() }
     var menuSong by remember { mutableStateOf<Song?>(null) }
     var menuY by remember { mutableFloatStateOf(0f) }
     var top by remember { mutableFloatStateOf(0f) }
@@ -168,18 +172,27 @@ private fun CollectionPage(
             WpPivot(
                 title = stringResource(R.string.music_title),
                 headers = listOf(
+                    stringResource(R.string.music_mixes),
                     stringResource(R.string.music_artists),
                     stringResource(R.string.music_albums),
                     stringResource(R.string.music_songs),
                     stringResource(R.string.music_playlists),
+                    "spotify",
                 ),
                 state = pivot,
                 modifier = Modifier.weight(1f),
-            ) { index ->
+            ) { page ->
+                // Pages: mixes, artists, albums, songs, playlists, spotify
+                val index = page - 1
                 when {
+                    page == 5 -> SpotifyPage(external) { nav.navigate(MusicPage.NowPlaying) }
                     !granted -> gate()
                     col == null -> LoadingDots(Modifier.padding(top = 24.dp))
                     col.songs.isEmpty() && index != 3 -> CenteredMessage(stringResource(R.string.music_empty), Modifier.padding(start = 20.dp))
+                    page == 0 -> MixesGrid(mixes) { m ->
+                        controller.playSongs(m.songs, 0)
+                        nav.navigate(MusicPage.NowPlaying)
+                    }
                     index == 0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, bottom = 16.dp)) {
                         itemsIndexed(col.artists, key = { _, a -> a.name }) { i, a ->
                             WpText(
@@ -210,6 +223,7 @@ private fun CollectionPage(
                             SongRow(
                                 s,
                                 Modifier.onGloballyPositioned { bottom = it.boundsInWindow().bottom }.slideInStaggered(i),
+                                current = ui.mediaId == s.id.toString(),
                                 onLongClick = { menuY = bottom - top; menuSong = s },
                             ) {
                                 controller.playSongs(col.songs, i)
@@ -241,7 +255,7 @@ private fun CollectionPage(
                     }
                 }
             }
-            if (ui.hasMedia) MiniPlayer(ui, controller) { nav.navigate(MusicPage.NowPlaying) }
+            if (ui.hasMedia || external != null) MiniPlayer(ui, external, controller) { nav.navigate(MusicPage.NowPlaying) }
             WpAppBar(
                 buttons = emptyList(),
                 menuItems = listOf(AppBarMenuItem(stringResource(R.string.refresh)) { onReload() }),
@@ -275,15 +289,20 @@ private fun CollectionPage(
 }
 
 @Composable
-private fun SongRow(s: Song, modifier: Modifier, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
-    Column(
+private fun SongRow(s: Song, modifier: Modifier, current: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+    Row(
         modifier
             .fillMaxWidth()
             .wpCombinedClickable(onLongClick = onLongClick, onClick = onClick)
             .padding(vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        WpText(s.title, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        WpText(s.artist, style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f)) {
+            WpText(s.title, style = WpType.Large, color = if (current) Wp.accent else Color.Unspecified, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(s.artist, style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (current) WpIcon(WpIcons.MusicNote, tint = Wp.accent, size = 18.dp, modifier = Modifier.padding(horizontal = 6.dp))
+        WpText(WpFormat.duration(s.durationMs), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(start = 8.dp))
     }
 }
 
@@ -291,9 +310,10 @@ private fun SongRow(s: Song, modifier: Modifier, onLongClick: (() -> Unit)? = nu
 private fun AlbumGrid(albums: List<Album>, onOpen: (Album) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
-        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 16.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         itemsIndexed(albums, key = { _, a -> a.id }) { i, a ->
             Column(Modifier.slideInStaggered(i / 2).wpClickable { onOpen(a) }) {
@@ -425,9 +445,13 @@ private fun NewPlaylistPage(library: MusicLibrary, onCreated: () -> Unit) {
     }
 }
 
-/** Bottom strip with the current song, like the "now playing" bar of Music on 8.1. */
+/** Bottom strip with the current song (ours or Spotify's), like the now playing bar of Music on 8.1. */
 @Composable
-private fun MiniPlayer(ui: PlayerUi, controller: MusicController, onOpen: () -> Unit) {
+private fun MiniPlayer(ui: PlayerUi, external: com.wpreborn.data.media.NowPlaying?, controller: MusicController, onOpen: () -> Unit) {
+    val own = ui.hasMedia && (ui.playing || external?.playing != true)
+    val title = if (own) ui.title else external?.title.orEmpty()
+    val artist = if (own) ui.artist else external?.artist.orEmpty()
+    val playing = if (own) ui.playing else external?.playing == true
     Row(
         Modifier
             .fillMaxWidth()
@@ -436,101 +460,29 @@ private fun MiniPlayer(ui: PlayerUi, controller: MusicController, onOpen: () -> 
             .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        AlbumCover(ui.artUri, Modifier.size(48.dp))
+        if (own) {
+            AlbumCover(ui.artUri, Modifier.size(48.dp))
+        } else {
+            Box(Modifier.size(48.dp).background(Color(0xFF1DB954)), contentAlignment = Alignment.Center) {
+                val art = external?.art
+                if (art != null) {
+                    androidx.compose.foundation.Image(remember(art) { art.asImageBitmap() }, null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                } else {
+                    WpIcon(WpIcons.Music, tint = Color.White, size = 24.dp)
+                }
+            }
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            WpText(ui.title, style = WpType.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            WpText(ui.artist, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(title, style = WpType.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(artist, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        RoundButton(if (ui.playing) WpIcons.Pause else WpIcons.Play, size = 40.dp) { controller.togglePlay() }
+        RoundButton(if (playing) WpIcons.Pause else WpIcons.Play, size = 40.dp) {
+            if (own) controller.togglePlay() else com.wpreborn.data.media.ExternalMediaWatcher.playPause()
+        }
         Spacer(Modifier.width(8.dp))
-        RoundButton(WpIcons.Next, size = 40.dp) { controller.next() }
-    }
-}
-
-@Composable
-private fun NowPlayingPage(ui: PlayerUi, controller: MusicController) {
-    Column(Modifier.fillMaxSize()) {
-        WpPageHeader(stringResource(R.string.music_now_playing), null)
-        Column(
-            Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp),
-        ) {
-            if (!ui.hasMedia) {
-                CenteredMessage(stringResource(R.string.music_nothing_playing))
-                return@Column
-            }
-            // Big artist name behind the art, as Xbox Music did.
-            WpText(
-                ui.artist.lowercase(),
-                style = WpType.Header.copy(fontSize = 40.sp),
-                maxLines = 1,
-                softWrap = false,
-                color = Wp.palette.subtle,
-                modifier = Modifier.padding(bottom = 8.dp),
-            )
-            AlbumCover(ui.artUri, Modifier.fillMaxWidth(0.82f).aspectRatio(1f).tilt())
-            Spacer(Modifier.height(14.dp))
-            WpText(ui.title, style = WpType.ExtraLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-            WpText(ui.album, style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Spacer(Modifier.height(14.dp))
-            Progress(ui, controller)
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                RoundButton(WpIcons.Previous, size = 56.dp) { controller.previous() }
-                Spacer(Modifier.width(24.dp))
-                RoundButton(if (ui.playing) WpIcons.Pause else WpIcons.Play, size = 72.dp) { controller.togglePlay() }
-                Spacer(Modifier.width(24.dp))
-                RoundButton(WpIcons.Next, size = 56.dp) { controller.next() }
-            }
-            if (ui.nextTitles.isNotEmpty()) {
-                Spacer(Modifier.height(20.dp))
-                WpText(stringResource(R.string.music_up_next), style = WpType.GroupHeader, color = Wp.palette.subtle)
-                ui.nextTitles.forEach { WpText(it, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(vertical = 3.dp)) }
-            }
-            Spacer(Modifier.height(16.dp))
-        }
-        WpAppBar(
-            buttons = listOf(
-                AppBarButton(WpIcons.Shuffle, stringResource(if (ui.shuffle) R.string.music_shuffle_on else R.string.music_shuffle)) { controller.toggleShuffle() },
-                AppBarButton(
-                    if (ui.repeatMode == Player.REPEAT_MODE_ONE) WpIcons.RepeatOne else WpIcons.Repeat,
-                    stringResource(
-                        when (ui.repeatMode) {
-                            Player.REPEAT_MODE_ALL -> R.string.music_repeat_all
-                            Player.REPEAT_MODE_ONE -> R.string.music_repeat_one
-                            else -> R.string.music_repeat
-                        },
-                    ),
-                ) { controller.cycleRepeat() },
-            ),
-        )
-    }
-}
-
-@Composable
-private fun Progress(ui: PlayerUi, controller: MusicController) {
-    val fraction = if (ui.durationMs > 0) (ui.positionMs.toFloat() / ui.durationMs).coerceIn(0f, 1f) else 0f
-    var widthPx by remember { mutableFloatStateOf(1f) }
-    Column {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(20.dp)
-                .onGloballyPositioned { widthPx = it.size.width.toFloat() }
-                .pointerInput(ui.durationMs) {
-                    detectTapGestures { controller.seekTo((it.x / widthPx * ui.durationMs).toLong()) }
-                },
-            contentAlignment = Alignment.CenterStart,
-        ) {
-            Box(Modifier.fillMaxWidth().height(4.dp).background(Wp.palette.raised))
-            Box(Modifier.fillMaxWidth(fraction.coerceAtLeast(0.001f)).height(4.dp).background(Wp.accent))
-        }
-        Row(Modifier.fillMaxWidth()) {
-            WpText(WpFormat.duration(ui.positionMs), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.weight(1f))
-            WpText(WpFormat.duration(ui.durationMs), style = WpType.Small, color = Wp.palette.subtle)
+        RoundButton(WpIcons.Next, size = 40.dp) {
+            if (own) controller.next() else com.wpreborn.data.media.ExternalMediaWatcher.next()
         }
     }
 }

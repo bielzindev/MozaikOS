@@ -205,9 +205,10 @@ class AppRepository private constructor(private val context: Context) {
         add(Intent(Intent.ACTION_DIAL))
         listOf(
             Intent.CATEGORY_APP_MESSAGING, Intent.CATEGORY_APP_MUSIC, Intent.CATEGORY_APP_CALENDAR,
-            Intent.CATEGORY_APP_CONTACTS, Intent.CATEGORY_APP_GALLERY,
+            Intent.CATEGORY_APP_CONTACTS, Intent.CATEGORY_APP_GALLERY, Intent.CATEGORY_APP_CALCULATOR,
         ).forEach { add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, it)) }
         add(Intent(android.provider.Settings.ACTION_SETTINGS))
+        add(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
         return result
     }
 

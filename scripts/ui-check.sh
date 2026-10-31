@@ -139,6 +139,8 @@ adb shell input keyevent KEYCODE_HOME
 
 start com.wpreborn.apps.music.MusicActivity
 sleep 4
+shot 42b-music-mixes 1
+swipe_left; sleep 1
 swipe_left; sleep 1
 shot 43-music-albums 2
 swipe_left; sleep 1
@@ -195,6 +197,38 @@ adb shell input keyevent KEYCODE_HOME
 # Keyboard settings app
 start com.wpreborn.keyboard.KeyboardSettingsActivity
 shot 56-keyboard-settings 3
+adb shell input keyevent KEYCODE_HOME
+
+# Calculator: 12×(3+4)= and the scientific keys
+start com.wpreborn.apps.calculator.CalculatorActivity
+sleep 2
+for k in "1" "2" "×" "7" "−" "5"; do tap_text "$k"; done
+shot 60-calculator 1
+tap_text "="
+shot 61-calculator-result 1
+adb shell input keyevent KEYCODE_HOME
+
+# Notes: write one
+start com.wpreborn.apps.notes.NotesActivity
+sleep 2
+shot 62-notes-empty 1
+# Text shared from another app becomes a new note
+adb shell am start -W -n "$PKG/com.wpreborn.apps.notes.NotesActivity" -a android.intent.action.SEND -t text/plain \
+  --es android.intent.extra.TEXT "'Lista de compras: leite, pão, café'" >/dev/null
+shot 63-notes-editor 3
+adb shell input keyevent KEYCODE_BACK; sleep 1
+adb shell input keyevent KEYCODE_BACK; sleep 2
+shot 64-notes-list 2
+adb shell input keyevent KEYCODE_HOME
+
+# Camera (emulated scene)
+adb shell pm grant $PKG android.permission.CAMERA || true
+adb shell pm grant $PKG android.permission.RECORD_AUDIO || true
+start com.wpreborn.apps.camera.CameraActivity
+shot 65-camera 5
+adb shell input keyevent KEYCODE_VOLUME_UP
+shot 66-camera-shot 4
+adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell input keyevent KEYCODE_HOME
 
 # Lock screen preview

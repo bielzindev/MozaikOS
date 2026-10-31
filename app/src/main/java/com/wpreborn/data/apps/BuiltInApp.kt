@@ -29,7 +29,10 @@ enum class BuiltInApp(
     Photos("photos", R.string.app_photos, WpIcons.Photos, PhotosActivity::class.java, TileSize.Wide),
     Calendar("calendar", R.string.app_calendar, WpIcons.Calendar, CalendarActivity::class.java, TileSize.Wide),
     Settings("settings", R.string.app_settings, WpIcons.Settings, SettingsActivity::class.java, TileSize.Small),
-    Keyboard("keyboard", R.string.app_keyboard, WpIcons.Keypad, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java, TileSize.Small);
+    Keyboard("keyboard", R.string.app_keyboard, WpIcons.Keypad, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java, TileSize.Small),
+    Camera("camera", R.string.app_camera, WpIcons.Camera, com.wpreborn.apps.camera.CameraActivity::class.java, TileSize.Small),
+    Calculator("calculator", R.string.app_calculator, com.wpreborn.core.icons.Glyphs.Calculator, com.wpreborn.apps.calculator.CalculatorActivity::class.java, TileSize.Small),
+    Notes("notes", R.string.app_notes, com.wpreborn.core.icons.Glyphs.Note, com.wpreborn.apps.notes.NotesActivity::class.java, TileSize.Medium);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

@@ -114,7 +114,6 @@ class TileRepository private constructor(private val context: Context) {
 
         val browser = appFor(resolvePackage(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_BROWSER)))
         val email = appFor(resolvePackage(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_EMAIL)))
-        val camera = appFor(resolvePackage(Intent(MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA)))
         val maps = appFor(resolvePackage(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, Intent.CATEGORY_APP_MAPS)))
         val store = appFor("com.android.vending")
 
@@ -125,11 +124,13 @@ class TileRepository private constructor(private val context: Context) {
             add(TileSpec(appKey = builtin(BuiltInApp.Calendar), size = TileSize.Wide))
             browser?.let { add(TileSpec(appKey = it.key, size = TileSize.Medium)) }
             email?.let { add(TileSpec(appKey = it.key, size = TileSize.Small)) }
-            camera?.let { add(TileSpec(appKey = it.key, size = TileSize.Small)) }
+            add(TileSpec(appKey = builtin(BuiltInApp.Camera), size = TileSize.Small))
             add(TileSpec(appKey = builtin(BuiltInApp.Settings), size = TileSize.Small))
             maps?.let { add(TileSpec(appKey = it.key, size = TileSize.Small)) }
             add(TileSpec(appKey = builtin(BuiltInApp.Photos), size = TileSize.Wide))
             add(TileSpec(appKey = builtin(BuiltInApp.Music), size = TileSize.Wide))
+            add(TileSpec(appKey = builtin(BuiltInApp.Notes), size = TileSize.Medium))
+            add(TileSpec(appKey = builtin(BuiltInApp.Calculator), size = TileSize.Small))
             store?.let { add(TileSpec(appKey = it.key, size = TileSize.Medium)) }
         }
     }

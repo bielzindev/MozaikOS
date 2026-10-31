@@ -81,6 +81,9 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Calendar -> CalendarTile(tile.size, inputs.live, inputs.liveEnabled, seed)
             BuiltInApp.Settings -> IconTile(WpIcons.Settings, tile.size)
             BuiltInApp.Keyboard -> IconTile(WpIcons.Keypad, tile.size)
+            BuiltInApp.Camera -> IconTile(WpIcons.Camera, tile.size)
+            BuiltInApp.Calculator -> IconTile(com.wpreborn.core.icons.Glyphs.Calculator, tile.size)
+            BuiltInApp.Notes -> IconTile(com.wpreborn.core.icons.Glyphs.Note, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&

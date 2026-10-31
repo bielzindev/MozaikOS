@@ -22,7 +22,23 @@ data class NowPlaying(
     val art: Bitmap?,
     val playing: Boolean,
     val packageName: String,
-)
+    val durationMs: Long = 0,
+    private val positionMs: Long = 0,
+    private val positionAt: Long = 0,
+    private val speed: Float = 1f,
+) {
+    /** The current position, advanced from the last update while playing. */
+    fun position(now: Long = android.os.SystemClock.elapsedRealtime()): Long {
+        val p = if (playing) positionMs + ((now - positionAt) * speed).toLong() else positionMs
+        return if (durationMs > 0) p.coerceIn(0, durationMs) else p.coerceAtLeast(0)
+    }
+
+    val isSpotify get() = packageName == SPOTIFY
+
+    companion object {
+        const val SPOTIFY = "com.spotify.music"
+    }
+}
 
 /**
  * Follows the active media sessions of other apps (Spotify, YouTube Music, ...). Requires
@@ -78,6 +94,7 @@ object ExternalMediaWatcher {
         if (c.playbackState?.state == PlaybackState.STATE_PLAYING) c.transportControls.pause() else c.transportControls.play()
     }
 
+    fun seekTo(ms: Long) = controller?.transportControls?.seekTo(ms)
     fun next() = controller?.transportControls?.skipToNext()
     fun previous() = controller?.transportControls?.skipToPrevious()
 
@@ -100,13 +117,18 @@ object ExternalMediaWatcher {
             _state.value = null
             return
         }
+        val st = c.playbackState
         _state.value = NowPlaying(
             title = md.getString(MediaMetadata.METADATA_KEY_TITLE).orEmpty(),
             artist = (md.getString(MediaMetadata.METADATA_KEY_ARTIST) ?: md.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)).orEmpty(),
             album = md.getString(MediaMetadata.METADATA_KEY_ALBUM).orEmpty(),
             art = md.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: md.getBitmap(MediaMetadata.METADATA_KEY_ART),
-            playing = c.playbackState?.state == PlaybackState.STATE_PLAYING,
+            playing = st?.state == PlaybackState.STATE_PLAYING,
             packageName = c.packageName,
+            durationMs = md.getLong(MediaMetadata.METADATA_KEY_DURATION).coerceAtLeast(0),
+            positionMs = st?.position ?: 0,
+            positionAt = st?.lastPositionUpdateTime ?: 0,
+            speed = st?.playbackSpeed?.takeIf { it > 0f } ?: 1f,
         )
     }
 }

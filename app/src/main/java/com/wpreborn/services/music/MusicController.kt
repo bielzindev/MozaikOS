@@ -35,6 +35,7 @@ data class PlayerUi(
     val index: Int = 0,
     val queueSize: Int = 0,
     val nextTitles: List<String> = emptyList(),
+    val mediaId: String? = null,
 )
 
 /** App-side handle on [MusicService] through a Media3 MediaController. */
@@ -51,6 +52,10 @@ class MusicController private constructor(private val context: Context) {
 
     private val listener = object : Player.Listener {
         override fun onEvents(player: Player, events: Player.Events) = publish()
+
+        override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
+            mediaItem?.mediaId?.toLongOrNull()?.let { com.wpreborn.data.media.PlayStats.get(context).record(it) }
+        }
     }
 
     /** Connects lazily; the service is only started when something is played. */
@@ -90,6 +95,13 @@ class MusicController private constructor(private val context: Context) {
         c.play()
     }
 
+    /** Jumps to the [offset]-th song after the current one in play order. */
+    fun skipAhead(offset: Int) = withController { c ->
+        var i = c.currentMediaItemIndex
+        repeat(offset) { i = c.currentTimeline.getNextWindowIndex(i, c.repeatMode, c.shuffleModeEnabled).takeIf { it != androidx.media3.common.C.INDEX_UNSET } ?: return@withController }
+        c.seekTo(i, 0)
+    }
+
     fun togglePlay() = withController { if (it.isPlaying) it.pause() else it.play() }
     fun next() = withController { it.seekToNextMediaItem() }
     fun previous() = withController { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }
@@ -119,7 +131,7 @@ class MusicController private constructor(private val context: Context) {
         val next = buildList {
             var i = c.nextMediaItemIndex
             var guard = 0
-            while (i != androidx.media3.common.C.INDEX_UNSET && guard < 4) {
+            while (i != androidx.media3.common.C.INDEX_UNSET && guard < 8) {
                 add(c.getMediaItemAt(i).mediaMetadata.title?.toString().orEmpty())
                 i = c.currentTimeline.getNextWindowIndex(i, c.repeatMode, c.shuffleModeEnabled)
                 guard++
@@ -139,6 +151,7 @@ class MusicController private constructor(private val context: Context) {
             index = c.currentMediaItemIndex,
             queueSize = c.mediaItemCount,
             nextTitles = next,
+            mediaId = c.currentMediaItem?.mediaId,
         )
     }
 

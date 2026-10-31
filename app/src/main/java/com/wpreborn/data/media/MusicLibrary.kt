@@ -18,6 +18,10 @@ data class Song(
     val albumId: Long,
     val durationMs: Long,
     val track: Int,
+    /** Seconds since the epoch, from MediaStore. */
+    val dateAdded: Long = 0,
+    val year: Int = 0,
+    val genre: String? = null,
 ) {
     val uri: Uri get() = ContentUris.withAppendedId(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, id)
     val albumArtUri: Uri get() = ContentUris.withAppendedId(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId)
@@ -64,7 +68,9 @@ class MusicLibrary(private val context: Context) {
             MediaStore.Audio.Media.ALBUM_ID,
             MediaStore.Audio.Media.DURATION,
             MediaStore.Audio.Media.TRACK,
-        )
+            MediaStore.Audio.Media.DATE_ADDED,
+            MediaStore.Audio.Media.YEAR,
+        ) + if (android.os.Build.VERSION.SDK_INT >= 30) arrayOf(MediaStore.Audio.Media.GENRE) else emptyArray()
         val result = ArrayList<Song>()
         try {
             context.contentResolver.query(
@@ -84,6 +90,9 @@ class MusicLibrary(private val context: Context) {
                         albumId = c.getLong(4),
                         durationMs = c.getLong(5),
                         track = c.getInt(6) % 1000,
+                        dateAdded = c.getLong(7),
+                        year = c.getInt(8),
+                        genre = if (c.columnCount > 9) c.getString(9)?.takeIf { it.isNotBlank() && it != "<unknown>" } else null,
                     )
                 }
             }

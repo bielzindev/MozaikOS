@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.horizontalScroll
@@ -221,9 +222,9 @@ private fun RowScope.Key(
     Box(
         Modifier
             .weight(1f)
+            .height(if (small) 46.dp else 68.dp)
             .background(bg)
             .then(if (onLongClick != null) Modifier.wpCombinedClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.wpClickable(onClick = onClick))
-            .padding(vertical = if (small) 10.dp else 16.dp),
         contentAlignment = Alignment.Center,
     ) {
         if (icon) {

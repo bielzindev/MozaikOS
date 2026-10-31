@@ -215,7 +215,7 @@ private fun HourlySection(w: Weather, f: Boolean) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, bottom = 12.dp)) {
         itemsIndexed(w.hours) { i, h ->
             Row(Modifier.fillMaxWidth().slideInStaggered(i).padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                WpText(DateFormat.getTimeFormat(context).format(Date(h.time)), style = WpType.Large, color = Color.White, modifier = Modifier.width(96.dp))
+                WpText(DateFormat.getTimeFormat(context).format(Date(h.time)), style = WpType.Large, color = Color.White, maxLines = 1, softWrap = false, modifier = Modifier.width(124.dp))
                 WeatherGlyph(h.code, h.isDay, 32.dp)
                 Spacer(Modifier.width(14.dp))
                 WpText(deg(h.temp, f), style = WpType.Large, color = Color.White, modifier = Modifier.weight(1f))

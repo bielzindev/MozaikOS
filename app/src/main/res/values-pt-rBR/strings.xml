@@ -697,4 +697,9 @@
     <string name="news_open_site">site</string>
     <string name="store_desc_news">Notícias do Brasil como o Bing Notícias do Windows Phone: principais, brasil, economia, mundo, esportes, tecnologia e entretenimento de g1, Folha, CNN Brasil, BBC News Brasil, Agência Brasil e outros; visualização de leitura; bloco dinâmico com as manchetes.</string>
     <string name="store_new_news">Primeira versão.</string>
+    <string name="tile_color_custom">cor personalizada</string>
+    <string name="tile_color_hue">tom</string>
+    <string name="tile_color_saturation">saturação</string>
+    <string name="tile_color_brightness">brilho</string>
+    <string name="tile_color_use">usar esta cor</string>
 </resources>

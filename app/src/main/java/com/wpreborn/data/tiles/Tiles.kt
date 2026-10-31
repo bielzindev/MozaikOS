@@ -42,7 +42,13 @@ data class TileSpec(
     val size: TileSize,
     /** Null means "use the accent color". */
     val color: AccentColor? = null,
-)
+    /** A colour of the user's own (ARGB), instead of a palette colour. */
+    val customColor: Int? = null,
+) {
+    /** The colour the user chose for this tile, if any. */
+    val fixedColor: androidx.compose.ui.graphics.Color?
+        get() = customColor?.let { androidx.compose.ui.graphics.Color(it) } ?: color?.color
+}
 
 data class Placement(val x: Int, val y: Int)
 
@@ -144,7 +150,8 @@ class TileRepository private constructor(private val context: Context) {
                     .put("id", t.id)
                     .put("app", t.appKey)
                     .put("size", t.size.name)
-                    .put("color", t.color?.name ?: JSONObject.NULL),
+                    .put("color", t.color?.name ?: JSONObject.NULL)
+                    .put("custom", t.customColor ?: JSONObject.NULL),
             )
         }
     }.toString()
@@ -158,6 +165,7 @@ class TileRepository private constructor(private val context: Context) {
                 appKey = o.getString("app"),
                 size = runCatching { TileSize.valueOf(o.getString("size")) }.getOrDefault(TileSize.Medium),
                 color = if (o.isNull("color")) null else runCatching { AccentColor.valueOf(o.getString("color")) }.getOrNull(),
+                customColor = if (!o.has("custom") || o.isNull("custom")) null else o.optLong("custom").toInt(),
             )
         }
     } catch (_: Exception) {

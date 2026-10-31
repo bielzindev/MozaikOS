@@ -161,6 +161,7 @@ class MainActivity : ComponentActivity() {
                         onUnpin = { vm.unpin(it.id) },
                         onResize = { vm.resize(it.id, allowLarge = !settings.moreTiles) },
                         onColor = { t, c -> vm.setColor(t.id, c) },
+                        onCustomColor = { t, c -> vm.setCustomColor(t.id, c) },
                         onMove = { id, index, persist -> vm.move(id, index, persist) },
                         onPersonalize = ::openPersonalize,
                     )

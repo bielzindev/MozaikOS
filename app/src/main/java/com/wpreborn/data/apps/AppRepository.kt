@@ -122,7 +122,11 @@ class AppRepository private constructor(private val context: Context) {
     fun cachedIcon(entry: AppEntry, sizePx: Int): Bitmap? = iconCache.get("${entry.key}@$sizePx")
 
     /** An app's own artwork prepared for a Metro tile: the logo without its mask, plus its brand colour. */
-    data class BrandIcon(val logo: Bitmap, val color: Int?)
+    /**
+     * [color]: the adaptive icon's background colour (null when white or missing);
+     * [dominant]: the most vivid colour of the whole icon, for tiles showing the original icon.
+     */
+    data class BrandIcon(val logo: Bitmap, val color: Int?, val dominant: Int? = null)
 
     private val brandCache = object : LruCache<String, BrandIcon>(200) {}
 
@@ -144,9 +148,9 @@ class AppRepository private constructor(private val context: Context) {
                 val drawable = info?.getIcon(context.resources.displayMetrics.densityDpi) ?: return@withContext null
                 val result = if (drawable is android.graphics.drawable.AdaptiveIconDrawable && drawable.foreground != null) {
                     val logo = renderSafeZone(drawable.foreground, sizePx)
-                    BrandIcon(logo, drawable.background?.let { averageColor(it) }?.takeIf { !isNearWhite(it) })
+                    BrandIcon(logo, drawable.background?.let { averageColor(it) }?.takeIf { !isNearWhite(it) }, dominantColor(drawable))
                 } else {
-                    BrandIcon(drawable.toBitmap(sizePx, sizePx), null)
+                    BrandIcon(drawable.toBitmap(sizePx, sizePx), null, dominantColor(drawable))
                 }
                 brandCache.put(cacheKey, result)
                 result
@@ -182,6 +186,30 @@ class AppRepository private constructor(private val context: Context) {
         if (n == 0) return null
         return android.graphics.Color.rgb((r / n).toInt(), (g / n).toInt(), (b / n).toInt())
     }
+
+    /** The icon's main vivid colour: the strongest hue among its saturated pixels. */
+    private fun dominantColor(d: android.graphics.drawable.Drawable): Int? = runCatching {
+        val s = 32
+        val bmp = Bitmap.createBitmap(s, s, Bitmap.Config.ARGB_8888)
+        d.setBounds(0, 0, s, s)
+        d.draw(android.graphics.Canvas(bmp))
+        val px = IntArray(s * s)
+        bmp.getPixels(px, 0, s, 0, 0, s, s)
+        val weight = FloatArray(12)
+        val sumR = LongArray(12); val sumG = LongArray(12); val sumB = LongArray(12); val cnt = IntArray(12)
+        val hsv = FloatArray(3)
+        for (p in px) {
+            if ((p ushr 24) < 160) continue
+            android.graphics.Color.colorToHSV(p, hsv)
+            if (hsv[1] < 0.35f || hsv[2] < 0.25f) continue
+            val b = ((hsv[0] / 30f).toInt()).coerceIn(0, 11)
+            weight[b] += hsv[1] * hsv[2]
+            sumR[b] += (p shr 16) and 0xFF; sumG[b] += (p shr 8) and 0xFF; sumB[b] += p and 0xFF; cnt[b]++
+        }
+        val best = weight.indices.maxBy { weight[it] }
+        if (cnt[best] < s * s / 40) null
+        else android.graphics.Color.rgb((sumR[best] / cnt[best]).toInt(), (sumG[best] / cnt[best]).toInt(), (sumB[best] / cnt[best]).toInt())
+    }.getOrNull()
 
     private fun isNearWhite(c: Int): Boolean {
         val r = android.graphics.Color.red(c); val g = android.graphics.Color.green(c); val b = android.graphics.Color.blue(c)

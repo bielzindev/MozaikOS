@@ -696,4 +696,9 @@
     <string name="news_open_site">website</string>
     <string name="store_desc_news">Brazilian news like Bing News on Windows Phone: top stories, Brazil, economy, world, sports, technology and entertainment from g1, Folha, CNN Brasil, BBC News Brasil, Agência Brasil and more; reading view; live tile with the headlines.</string>
     <string name="store_new_news">First release.</string>
+    <string name="tile_color_custom">custom colour</string>
+    <string name="tile_color_hue">hue</string>
+    <string name="tile_color_saturation">saturation</string>
+    <string name="tile_color_brightness">brightness</string>
+    <string name="tile_color_use">use this colour</string>
 </resources>

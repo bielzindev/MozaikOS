@@ -106,7 +106,10 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         update(_tiles.value.map { if (it.id == id) it.copy(size = it.size.next(allowLarge)) else it })
 
     fun setColor(id: String, color: AccentColor?) =
-        update(_tiles.value.map { if (it.id == id) it.copy(color = color) else it })
+        update(_tiles.value.map { if (it.id == id) it.copy(color = color, customColor = null) else it })
+
+    fun setCustomColor(id: String, argb: Int) =
+        update(_tiles.value.map { if (it.id == id) it.copy(color = null, customColor = argb) else it })
 
     /** Moves a tile to another position in the flow (used while dragging). */
     fun move(id: String, toIndex: Int, persist: Boolean) {

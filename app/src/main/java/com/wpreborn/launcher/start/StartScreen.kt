@@ -6,6 +6,12 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -125,6 +131,7 @@ fun StartScreen(
     onUnpin: (TileSpec) -> Unit,
     onResize: (TileSpec) -> Unit,
     onColor: (TileSpec, AccentColor?) -> Unit,
+    onCustomColor: (TileSpec, Int) -> Unit,
     onMove: (String, Int, Boolean) -> Unit,
     onPersonalize: () -> Unit = {},
 ) {
@@ -302,7 +309,7 @@ fun StartScreen(
                         val h = geo.h(tile.size)
                         // Tiles fly out/in from the top-left corner towards the bottom-right.
                         val feather = ((pl.y / 2) + (pl.x / 2)).coerceAtMost(7)
-                        val tileColor = tile.color?.color ?: rememberBrandColor(app) ?: Wp.accent
+                        val tileColor = tile.fixedColor ?: rememberBrandColor(app) ?: Wp.accent
                         Box(
                             Modifier
                                 .offset { pos }
@@ -320,7 +327,7 @@ fun StartScreen(
                                     .fillMaxSize()
                                     .tilt(enabled = !editing)
                                     .then(
-                                        if (background != null && tile.color == null) {
+                                        if (background != null && tile.fixedColor == null) {
                                             Modifier.drawBackgroundSlice(background!!, pos, IntSize(widthPx.roundToInt(), viewportPx.roundToInt()), state.scroll)
                                         } else {
                                             Modifier.background(tileColor)
@@ -356,14 +363,20 @@ fun StartScreen(
 
         state.iconEditorFor?.let { id ->
             tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
-                IconCustomizer(app, tileColor = tiles.first { it.id == id }.color?.color, onDismiss = { state.iconEditorFor = null })
+                IconCustomizer(app, tileColor = tiles.first { it.id == id }.fixedColor, onDismiss = { state.iconEditorFor = null })
             } ?: run { state.iconEditorFor = null }
         }
 
         state.colorPickerFor?.let { id ->
+            val current = tiles.firstOrNull { it.id == id }
             TileColorPicker(
+                initial = current?.fixedColor ?: Wp.accent,
                 onPick = { color ->
-                    tiles.firstOrNull { it.id == id }?.let { onColor(it, color) }
+                    current?.let { onColor(it, color) }
+                    state.colorPickerFor = null
+                },
+                onCustom = { argb ->
+                    current?.let { onCustomColor(it, argb) }
                     state.colorPickerFor = null
                 },
                 onDismiss = { state.colorPickerFor = null },
@@ -408,15 +421,27 @@ private fun Modifier.drawBackgroundSlice(image: ImageBitmap, pos: IntOffset, vie
         )
     }
 
-/** Full-screen accent palette used to recolor a tile ("default" keeps the theme accent). */
+/**
+ * Full-screen tile colour page: "default" (the theme accent, or the app's own colour), the
+ * Windows Phone accent palette, and a colour of your own (hue, saturation, brightness).
+ */
 @Composable
-fun TileColorPicker(onPick: (AccentColor?) -> Unit, onDismiss: () -> Unit) {
+fun TileColorPicker(initial: Color, onPick: (AccentColor?) -> Unit, onCustom: (Int) -> Unit, onDismiss: () -> Unit) {
     BackHandler(onBack = onDismiss)
+    val hsv = remember {
+        FloatArray(3).also { android.graphics.Color.colorToHSV(initial.toArgb(), it) }
+    }
+    var hue by remember { mutableFloatStateOf(hsv[0] / 360f) }
+    var sat by remember { mutableFloatStateOf(hsv[1]) }
+    var value by remember { mutableFloatStateOf(hsv[2]) }
+    val custom = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue * 360f, sat, value)))
     Column(
         Modifier
             .fillMaxSize()
             .background(Wp.palette.background)
             .clickable(remember { MutableInteractionSource() }, null) {}
+            .statusBarsPadding()
+            .verticalScroll(rememberScrollState())
             .padding(horizontal = 16.dp, vertical = 16.dp),
     ) {
         com.wpreborn.core.ui.WpText(
@@ -435,19 +460,56 @@ fun TileColorPicker(onPick: (AccentColor?) -> Unit, onDismiss: () -> Unit) {
                 com.wpreborn.core.ui.WpText(LocalContext.current.getString(com.wpreborn.R.string.tile_color_default))
             }
         }
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(4),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            items(AccentColor.entries) { c ->
-                Box(
-                    Modifier
-                        .aspectRatio(1f)
-                        .background(c.color)
-                        .wpClickable { onPick(c) },
+        AccentColor.entries.chunked(4).forEach { row ->
+            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                row.forEach { c ->
+                    Box(
+                        Modifier
+                            .weight(1f)
+                            .aspectRatio(1f)
+                            .background(c.color)
+                            .wpClickable { onPick(c) },
+                    )
+                }
+                repeat(4 - row.size) { Spacer(Modifier.weight(1f)) }
+            }
+        }
+
+        // A colour of your own.
+        com.wpreborn.core.ui.WpText(
+            LocalContext.current.getString(com.wpreborn.R.string.tile_color_custom).uppercase(),
+            style = com.wpreborn.core.theme.WpType.AppTitle,
+            color = Wp.palette.subtle,
+            modifier = Modifier.padding(start = 4.dp, top = 16.dp, bottom = 10.dp),
+        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(96.dp).background(custom))
+            Spacer(Modifier.width(14.dp))
+            com.wpreborn.core.ui.WpText(
+                "#%06X".format(custom.toArgb() and 0xFFFFFF),
+                style = com.wpreborn.core.theme.WpType.Large,
+            )
+        }
+        Spacer(Modifier.height(10.dp))
+        // Hue strip above its slider, like a colour wheel unrolled.
+        androidx.compose.foundation.Canvas(Modifier.fillMaxWidth().height(14.dp)) {
+            val steps = 36
+            val w = size.width / steps
+            for (i in 0 until steps) {
+                drawRect(
+                    Color(android.graphics.Color.HSVToColor(floatArrayOf(i * 360f / steps, 1f, 1f))),
+                    topLeft = androidx.compose.ui.geometry.Offset(i * w, 0f),
+                    size = androidx.compose.ui.geometry.Size(w + 1f, size.height),
                 )
             }
         }
+        com.wpreborn.core.ui.WpText(LocalContext.current.getString(com.wpreborn.R.string.tile_color_hue), style = com.wpreborn.core.theme.WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 6.dp))
+        com.wpreborn.core.ui.WpSlider(hue, { hue = it })
+        com.wpreborn.core.ui.WpText(LocalContext.current.getString(com.wpreborn.R.string.tile_color_saturation), style = com.wpreborn.core.theme.WpType.Small, color = Wp.palette.subtle)
+        com.wpreborn.core.ui.WpSlider(sat, { sat = it })
+        com.wpreborn.core.ui.WpText(LocalContext.current.getString(com.wpreborn.R.string.tile_color_brightness), style = com.wpreborn.core.theme.WpType.Small, color = Wp.palette.subtle)
+        com.wpreborn.core.ui.WpSlider(value, { value = it })
+        Spacer(Modifier.height(12.dp))
+        com.wpreborn.core.ui.WpButton(LocalContext.current.getString(com.wpreborn.R.string.tile_color_use)) { onCustom(custom.toArgb()) }
     }
 }

@@ -113,18 +113,24 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
 }
 
 /**
- * Tile colour for an app in the Metro style: its brand colour (the background of its
- * adaptive icon), or null to use the accent. Apps drawn with a ZUNEX glyph keep the accent.
+ * Tile colour for an Android app (null = the accent):
+ * - original icon: the colour of the icon itself (its adaptive background, else its main
+ *   vivid colour), so the tile and the icon are one colour, like the app's own brand tile;
+ * - Metro: its brand colour (adaptive background) when "brand colours" is on; apps drawn
+ *   with a ZUNEX glyph keep the accent.
  */
 @Composable
 fun rememberBrandColor(app: AppEntry?): Color? {
     val custom = rememberIconCustom(app)
-    if (app == null || app.builtIn != null || !custom.usesMetro() || !Wp.settings.brandColors) return null
-    if (remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null) return null
+    if (app == null || app.builtIn != null) return null
+    val metro = custom.usesMetro()
+    if (metro && !Wp.settings.brandColors) return null
+    if (metro && remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null) return null
     val context = LocalContext.current
     val repo = remember { AppRepository.get(context) }
     val px = with(LocalDensity.current) { 48.dp.roundToPx() }
     var brand by remember(app.key) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
     LaunchedEffect(app.key) { if (brand == null) brand = repo.brandIcon(app, px) }
-    return brand?.color?.let { Color(it) }
+    val b = brand ?: return null
+    return (if (metro) b.color else b.color ?: b.dominant)?.let { Color(it) }
 }

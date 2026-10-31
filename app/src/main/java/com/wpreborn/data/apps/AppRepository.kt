@@ -126,7 +126,7 @@ class AppRepository private constructor(private val context: Context) {
      * [color]: the adaptive icon's background colour (null when white or missing);
      * [dominant]: the most vivid colour of the whole icon, for tiles showing the original icon.
      */
-    data class BrandIcon(val logo: Bitmap, val color: Int?, val dominant: Int? = null)
+    data class BrandIcon(val logo: Bitmap, val color: Int?, val dominant: Int? = null, val mono: Boolean = false)
 
     private val brandCache = object : LruCache<String, BrandIcon>(200) {}
 
@@ -147,8 +147,15 @@ class AppRepository private constructor(private val context: Context) {
                 val info = launcherApps.resolveActivity(Intent().setComponent(entry.component), entry.user ?: Process.myUserHandle())
                 val drawable = info?.getIcon(context.resources.displayMetrics.densityDpi) ?: return@withContext null
                 val result = if (drawable is android.graphics.drawable.AdaptiveIconDrawable && drawable.foreground != null) {
-                    val logo = renderSafeZone(drawable.foreground, sizePx)
-                    BrandIcon(logo, drawable.background?.let { averageColor(it) }?.takeIf { !isNearWhite(it) }, dominantColor(drawable))
+                    // Themed (monochrome) icon of Android 13+: a single-colour glyph, drawn white
+                    // like Windows Phone's own tile icons; else the coloured foreground.
+                    val mono = if (android.os.Build.VERSION.SDK_INT >= 33) drawable.monochrome else null
+                    val logo = if (mono != null) {
+                        renderSafeZone(mono.mutate().apply { setTint(android.graphics.Color.WHITE) }, sizePx)
+                    } else {
+                        renderSafeZone(drawable.foreground, sizePx)
+                    }
+                    BrandIcon(logo, drawable.background?.let { averageColor(it) }?.takeIf { !isNearWhite(it) }, dominantColor(drawable), mono = mono != null)
                 } else {
                     BrandIcon(drawable.toBitmap(sizePx, sizePx), null, dominantColor(drawable))
                 }

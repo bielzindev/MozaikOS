@@ -133,5 +133,6 @@ fun rememberBrandColor(app: AppEntry?): Color? {
     var brand by remember(app.key) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
     LaunchedEffect(app.key) { if (brand == null) brand = repo.brandIcon(app, px) }
     val b = brand ?: return null
-    return (if (metro) b.color else b.color ?: b.dominant)?.let { Color(it) }
+    // A white monochrome glyph reads on the icon's main colour even when its background is white.
+    return (if (metro && !b.mono) b.color else b.color ?: b.dominant)?.let { Color(it) }
 }

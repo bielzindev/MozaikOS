@@ -144,7 +144,9 @@ private fun SkyLayers(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, 
         val w = size.width
         val h = size.height
 
-        if (!photo) drawRect(Brush.verticalGradient(listOf(top, bottom)))
+        // The condition's gradient leads; a photo only shows through faintly, as texture,
+        // so the forecast stays easy to read.
+        drawRect(Brush.verticalGradient(listOf(top.copy(alpha = if (photo) 0.82f else 1f), bottom.copy(alpha = if (photo) 0.88f else 1f))))
 
         // Stars and moon.
         if (!photo && moonAlpha > 0.01f) {

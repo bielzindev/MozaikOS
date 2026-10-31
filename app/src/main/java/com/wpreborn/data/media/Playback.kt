@@ -70,7 +70,8 @@ data class Playback(
     companion object {
         /** Our player wins while it has something loaded and is playing, or nothing else plays. */
         fun of(ui: PlayerUi, external: NowPlaying?, now: Long = SystemClock.elapsedRealtime()): Playback? = when {
-            ui.hasMedia && (ui.playing || external?.playing != true) -> Playback(
+            // ZUNEX Music only: other apps' players (Spotify...) are not shown or controlled.
+            ui.hasMedia -> Playback(
                 own = true,
                 title = ui.title,
                 artist = ui.artist,
@@ -87,22 +88,6 @@ data class Playback(
                 nextTitles = ui.nextTitles,
                 session = ui.session,
             )
-            external != null -> Playback(
-                own = false,
-                title = external.title,
-                artist = external.artist,
-                album = external.album,
-                artUri = null,
-                artBitmap = external.art,
-                playing = external.playing,
-                positionMs = external.position(now),
-                durationMs = external.durationMs,
-                packageName = external.packageName,
-                mediaId = null,
-                shuffle = false,
-                repeatMode = Player.REPEAT_MODE_OFF,
-                nextTitles = emptyList(),
-            )
             else -> null
         }
     }
@@ -117,7 +102,7 @@ fun rememberPlayback(): Playback? {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
     val ui by controller.ui.collectAsState()
-    val external by ExternalMediaWatcher.state.collectAsState()
+    val external: NowPlaying? = null
     var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(external?.playing) {
         while (external?.playing == true) {

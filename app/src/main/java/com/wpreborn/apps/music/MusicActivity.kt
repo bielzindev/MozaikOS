@@ -174,7 +174,7 @@ private fun CollectionPage(
     gate: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val pivot = rememberPivotState(6)
+    val pivot = rememberPivotState(5)
     val favorites by remember { com.wpreborn.data.media.Favorites.get(context) }.ids.collectAsState()
     val external by com.wpreborn.data.media.ExternalMediaWatcher.state.collectAsState()
     val mixes = remember(col, favorites) { col?.let { MixBuilder.build(context, it, com.wpreborn.data.media.PlayStats.get(context).counts(), favorites) }.orEmpty() }
@@ -193,15 +193,13 @@ private fun CollectionPage(
                     stringResource(R.string.music_albums),
                     stringResource(R.string.music_songs),
                     stringResource(R.string.music_playlists),
-                    "spotify",
                 ),
                 state = pivot,
                 modifier = Modifier.weight(1f),
             ) { page ->
-                // Pages: mixes, artists, albums, songs, playlists, spotify
+                // Pages: mixes, artists, albums, songs, playlists
                 val index = page - 1
                 when {
-                    page == 5 -> SpotifyPage(external) { nav.navigate(MusicPage.NowPlaying) }
                     !granted -> gate()
                     col == null -> LoadingDots(Modifier.padding(top = 24.dp))
                     col.songs.isEmpty() && index != 3 -> CenteredMessage(stringResource(R.string.music_empty), Modifier.padding(start = 20.dp))

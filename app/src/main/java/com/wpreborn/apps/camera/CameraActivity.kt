@@ -175,6 +175,14 @@ private fun CameraScreen(activity: CameraActivity) {
     var error by remember { mutableStateOf<String?>(null) }
     val blink = remember { Animatable(0f) }
 
+    val shutterSound = remember {
+        android.media.MediaActionSound().apply {
+            load(android.media.MediaActionSound.SHUTTER_CLICK)
+            load(android.media.MediaActionSound.START_VIDEO_RECORDING)
+            load(android.media.MediaActionSound.STOP_VIDEO_RECORDING)
+        }
+    }
+    DisposableEffect(Unit) { onDispose { shutterSound.release() } }
     val imageCapture = remember {
         ImageCapture.Builder()
             .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
@@ -266,6 +274,8 @@ private fun CameraScreen(activity: CameraActivity) {
             blink.snapTo(1f)
             blink.animateTo(0f, tween(250))
         }
+        // The shutter sound (Android's own camera sound; some countries require it).
+        shutterSound.play(android.media.MediaActionSound.SHUTTER_CLICK)
         imageCapture.takePicture(options, ContextCompat.getMainExecutor(context), object : ImageCapture.OnImageSavedCallback {
             override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                 lastUri = output.savedUri
@@ -280,6 +290,7 @@ private fun CameraScreen(activity: CameraActivity) {
     fun toggleRecording() {
         recording?.let {
             it.stop()
+            shutterSound.play(android.media.MediaActionSound.STOP_VIDEO_RECORDING)
             recording = null
             return
         }
@@ -294,6 +305,7 @@ private fun CameraScreen(activity: CameraActivity) {
         if (context.hasPermissions(arrayOf(Manifest.permission.RECORD_AUDIO))) pending.withAudioEnabled()
         if (flash == FlashMode.On) camera?.cameraControl?.enableTorch(true)
         recordStart = System.currentTimeMillis()
+        shutterSound.play(android.media.MediaActionSound.START_VIDEO_RECORDING)
         recording = pending.start(ContextCompat.getMainExecutor(context)) { e ->
             if (e is VideoRecordEvent.Finalize) {
                 camera?.cameraControl?.enableTorch(false)

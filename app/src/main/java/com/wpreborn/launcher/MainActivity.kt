@@ -123,7 +123,7 @@ class MainActivity : ComponentActivity() {
         val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.take(3) } }
         val nowPlaying = when {
             player.hasMedia -> com.wpreborn.data.media.NowPlaying(player.title, player.artist, player.album, null, player.playing, packageName)
-            else -> external
+            else -> null // the Music tile only follows ZUNEX Music
         }
 
         // Lite edition: Phone/Messaging counters come from the system apps' notifications.

@@ -479,7 +479,7 @@
     <string name="store_new_people">Contact photos on the live tile.</string>
     <string name="store_desc_messaging">Text conversations in Windows Phone bubbles. Can be your phone\'s SMS app.</string>
     <string name="store_new_messaging">Unread count on the tile.</string>
-    <string name="store_desc_music">Your music collection, MixRadio-style mixes, a full player with the cover at its heart, a real equalizer, and Spotify control.</string>
+    <string name="store_desc_music">Your music collection, MixRadio-style mixes, a Windows Phone player, a real equalizer, favourites and playlists.</string>
     <string name="store_new_music">Playing Now everywhere, lock screen widget, equalizer, favourites, rename and delete songs.</string>
     <string name="store_desc_photos">Camera roll, albums, viewer and an editor with filters.</string>
     <string name="store_new_photos">Edited copies saved to Pictures/ZUNEX.</string>
@@ -582,4 +582,6 @@
     <string name="kb_size_small">small</string>
     <string name="kb_size_medium">medium</string>
     <string name="kb_size_large">large</string>
+    <string name="photos_select">select</string>
+    <string name="photos_select_all">select all</string>
 </resources>

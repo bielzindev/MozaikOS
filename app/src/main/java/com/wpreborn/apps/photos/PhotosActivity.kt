@@ -14,6 +14,10 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import com.wpreborn.core.ui.WpIcon
+import com.wpreborn.core.ui.wpCombinedClickable
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -94,24 +98,35 @@ class PhotosActivity : WpActivity() {
         val nav = rememberNavigator<PhotosPage>(PhotosPage.Hub)
         WpNavHost(nav) { page ->
             when (page) {
-                PhotosPage.Hub -> WpPivot(
-                    title = stringResource(R.string.app_photos),
-                    headers = listOf(stringResource(R.string.photos_collection), stringResource(R.string.photos_albums)),
-                ) { index ->
-                    PermissionGate(perm, stringResource(R.string.perm_photos), Modifier.padding(start = 20.dp)) {
-                        val list = photos
-                        when {
-                            list == null -> LoadingDots(Modifier.padding(top = 24.dp))
-                            list.isEmpty() -> CenteredMessage(stringResource(R.string.photos_empty), Modifier.padding(start = 20.dp))
-                            index == 0 -> Collection(list) { nav.navigate(PhotosPage.Viewer(null, it)) }
-                            else -> Albums(albums) { nav.navigate(PhotosPage.AlbumPage(it.id)) }
+                PhotosPage.Hub -> {
+                    val selection = rememberPhotoSelection()
+                    Column(Modifier.fillMaxSize()) {
+                        WpPivot(
+                            title = stringResource(R.string.app_photos),
+                            headers = listOf(stringResource(R.string.photos_collection), stringResource(R.string.photos_albums)),
+                            modifier = Modifier.weight(1f),
+                        ) { index ->
+                            PermissionGate(perm, stringResource(R.string.perm_photos), Modifier.padding(start = 20.dp)) {
+                                val list = photos
+                                when {
+                                    list == null -> LoadingDots(Modifier.padding(top = 24.dp))
+                                    list.isEmpty() -> CenteredMessage(stringResource(R.string.photos_empty), Modifier.padding(start = 20.dp))
+                                    index == 0 -> Collection(list, selection) { nav.navigate(PhotosPage.Viewer(null, it)) }
+                                    else -> Albums(albums) { nav.navigate(PhotosPage.AlbumPage(it.id)) }
+                                }
+                            }
                         }
+                        if (perm.granted && !photos.isNullOrEmpty()) SelectionAppBar(selection, photos.orEmpty()) { reload++ }
                     }
                 }
                 is PhotosPage.AlbumPage -> albums.firstOrNull { it.id == page.id }?.let { album ->
+                    val selection = rememberPhotoSelection()
                     Column(Modifier.fillMaxSize()) {
                         WpPageHeader(stringResource(R.string.app_photos), album.name)
-                        PhotoGrid(album.photos) { nav.navigate(PhotosPage.Viewer(album.id, it)) }
+                        Box(Modifier.weight(1f)) {
+                            PhotoGrid(album.photos, selection) { nav.navigate(PhotosPage.Viewer(album.id, it)) }
+                        }
+                        SelectionAppBar(selection, album.photos) { reload++ }
                     }
                 }
                 is PhotosPage.Viewer -> {
@@ -127,7 +142,7 @@ class PhotosActivity : WpActivity() {
 }
 
 @Composable
-private fun Collection(photos: List<Photo>, onOpen: (Int) -> Unit) {
+private fun Collection(photos: List<Photo>, selection: PhotoSelection, onOpen: (Int) -> Unit) {
     val groups = remember(photos) {
         photos.withIndex().groupBy {
             val c = Calendar.getInstance().apply { timeInMillis = it.value.dateTaken }
@@ -150,21 +165,14 @@ private fun Collection(photos: List<Photo>, onOpen: (Int) -> Unit) {
                 )
             }
             items(list, key = { it.value.id }) { (index, photo) ->
-                Thumbnail(
-                    photo.uri,
-                    Modifier
-                        .aspectRatio(1f)
-                        .background(Wp.palette.raised)
-                        .wpClickable { onOpen(index) },
-                    sizePx = 256,
-                )
+                SelectableThumb(photo, selection) { onOpen(index) }
             }
         }
     }
 }
 
 @Composable
-private fun PhotoGrid(photos: List<Photo>, onOpen: (Int) -> Unit) {
+private fun PhotoGrid(photos: List<Photo>, selection: PhotoSelection, onOpen: (Int) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(4),
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -172,7 +180,7 @@ private fun PhotoGrid(photos: List<Photo>, onOpen: (Int) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
         items(photos.size, key = { photos[it].id }) { i ->
-            Thumbnail(photos[i].uri, Modifier.aspectRatio(1f).background(Wp.palette.raised).wpClickable { onOpen(i) }, sizePx = 256)
+            SelectableThumb(photos[i], selection) { onOpen(i) }
         }
     }
 }
@@ -317,4 +325,94 @@ private fun ZoomableImage(photo: Photo, onTap: () -> Unit) {
             )
         }
     }
+}
+
+/** Multi-selection in the photo grids, like the Windows Phone 8.1 Photos app. */
+class PhotoSelection {
+    var active by mutableStateOf(false)
+    var ids by mutableStateOf(emptySet<Long>())
+    fun toggle(id: Long) { ids = if (id in ids) ids - id else ids + id }
+    fun clear() { active = false; ids = emptySet() }
+}
+
+@Composable
+private fun rememberPhotoSelection(): PhotoSelection {
+    val s = remember { PhotoSelection() }
+    androidx.activity.compose.BackHandler(enabled = s.active) { s.clear() }
+    return s
+}
+
+/** A thumbnail; in selection mode a tap ticks it (accent check box in the corner). */
+@Composable
+private fun SelectableThumb(photo: Photo, selection: PhotoSelection, onOpen: () -> Unit) {
+    val selected = photo.id in selection.ids
+    Box(
+        Modifier
+            .aspectRatio(1f)
+            .background(Wp.palette.raised)
+            .wpCombinedClickable(onLongClick = {
+                selection.active = true
+                selection.toggle(photo.id)
+            }) { if (selection.active) selection.toggle(photo.id) else onOpen() },
+    ) {
+        Thumbnail(photo.uri, Modifier.fillMaxSize(), sizePx = 256)
+        if (selection.active) {
+            if (selected) Box(Modifier.fillMaxSize().border(3.dp, Wp.accent))
+            Box(
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(6.dp)
+                    .size(22.dp)
+                    .background(if (selected) Wp.accent else androidx.compose.ui.graphics.Color.Black.copy(alpha = 0.35f))
+                    .border(2.dp, androidx.compose.ui.graphics.Color.White),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (selected) WpIcon(WpIcons.Check, tint = androidx.compose.ui.graphics.Color.White, size = 16.dp)
+            }
+        }
+    }
+}
+
+/** select / share / delete / select all / cancel, depending on the selection mode. */
+@Composable
+private fun SelectionAppBar(selection: PhotoSelection, photos: List<Photo>, onDeleted: () -> Unit) {
+    val context = LocalContext.current
+    val chosen = photos.filter { it.id in selection.ids }
+    val deleteLauncher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) {
+            selection.clear()
+            onDeleted()
+        }
+    }
+    if (!selection.active) {
+        WpAppBar(buttons = listOf(AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select)) { selection.active = true }))
+        return
+    }
+    WpAppBar(
+        buttons = listOf(
+            AppBarButton(WpIcons.Share, stringResource(R.string.share), enabled = chosen.isNotEmpty()) {
+                runCatching {
+                    val send = Intent(Intent.ACTION_SEND_MULTIPLE)
+                        .setType("image/*")
+                        .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(chosen.map { it.uri }))
+                        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }
+            },
+            AppBarButton(WpIcons.Delete, stringResource(R.string.delete), enabled = chosen.isNotEmpty()) {
+                if (android.os.Build.VERSION.SDK_INT >= 30) {
+                    val pi = MediaStore.createDeleteRequest(context.contentResolver, chosen.map { it.uri })
+                    deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+                } else {
+                    chosen.forEach { runCatching { context.contentResolver.delete(it.uri, null, null) } }
+                    selection.clear()
+                    onDeleted()
+                }
+            },
+            AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select_all)) {
+                selection.ids = if (selection.ids.size == photos.size) emptySet() else photos.map { it.id }.toSet()
+            },
+            AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { selection.clear() },
+        ),
+    )
 }

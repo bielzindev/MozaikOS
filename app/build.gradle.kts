@@ -102,6 +102,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
-    implementation("org.maplibre.gl:android-sdk:13.7.1")
+    implementation("org.maplibre.gl:android-sdk:11.8.8")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

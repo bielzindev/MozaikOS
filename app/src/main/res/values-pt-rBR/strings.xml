@@ -664,4 +664,8 @@
     <string name="camera_wb_daylight">luz do dia</string>
     <string name="camera_wb_cloudy">nublado</string>
     <string name="camera_wb_shade">sombra</string>
+    <string name="camera_set_resolution">Resolução da foto</string>
+    <string name="camera_res_binned">12 MP (melhor)</string>
+    <string name="camera_res_full">máxima</string>
+    <string name="camera_set_resolution_hint">12 MP junta os pixels de sensores de alta resolução (50-108 MP) para fotos mais limpas e claras, como a câmera do próprio celular. Máxima mantém todos os pixels, mas tem mais ruído com pouca luz.</string>
 </resources>

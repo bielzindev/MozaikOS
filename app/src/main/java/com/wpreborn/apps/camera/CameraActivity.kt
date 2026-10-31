@@ -167,6 +167,8 @@ class CameraActivity : WpActivity() {
 /** Saved camera settings. */
 private data class CamSettings(
     val wide: Boolean = false,
+    /** Off (default): about 12 MP, the sensor's binned mode (best quality); on: every pixel it has. */
+    val fullRes: Boolean = false,
     val fast: Boolean = false,
     /** 0 = best available, 1 = 4K, 2 = 1080p, 3 = 720p. */
     val videoRes: Int = 0,
@@ -179,7 +181,7 @@ private data class CamSettings(
 ) {
     fun save(context: Context) {
         context.getSharedPreferences("camera", Context.MODE_PRIVATE).edit()
-            .putBoolean("wide", wide).putBoolean("fast", fast).putInt("videoRes", videoRes)
+            .putBoolean("wide", wide).putBoolean("fullRes", fullRes).putBoolean("fast", fast).putInt("videoRes", videoRes)
             .putBoolean("stabilize", stabilize).putBoolean("mirror", mirror).putBoolean("sound", sound)
             .putBoolean("grid", grid).putString("look", look.name)
             .apply()
@@ -190,6 +192,7 @@ private data class CamSettings(
             val p = context.getSharedPreferences("camera", Context.MODE_PRIVATE)
             return CamSettings(
                 wide = p.getBoolean("wide", false),
+                fullRes = p.getBoolean("fullRes", false),
                 fast = p.getBoolean("fast", false),
                 videoRes = p.getInt("videoRes", 0),
                 stabilize = p.getBoolean("stabilize", true),
@@ -385,7 +388,7 @@ private fun CameraScreen(activity: CameraActivity) {
     }
 
     // (Re)binds the camera when the lens, the mode or a capture setting changes.
-    LaunchedEffect(front, video, settings.look, settings.wide, settings.fast, settings.videoRes, settings.stabilize, settings.mirror) {
+    LaunchedEffect(front, video, settings.look, settings.wide, settings.fullRes, settings.fast, settings.videoRes, settings.stabilize, settings.mirror) {
         val provider = try {
             ProcessCameraProvider.getInstance(context).awaitOn(context)
         } catch (e: Exception) {
@@ -412,6 +415,18 @@ private fun CameraScreen(activity: CameraActivity) {
                 ResolutionSelector.Builder()
                     .setAspectRatioStrategy(ratio)
                     .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                    .apply {
+                        if (settings.fullRes) {
+                            setAllowedResolutionMode(ResolutionSelector.PREFER_HIGHER_RESOLUTION_OVER_CAPTURE_RATE)
+                        } else {
+                            // 50-200 MP sensors combine 4 or 9 pixels into one (~12 MP): far less
+                            // noise and the full processing, like the phone's own camera. Their
+                            // unbinned size is noisier and slower, so it's an option.
+                            setResolutionFilter { sizes, _ ->
+                                sizes.filter { it.width.toLong() * it.height <= 16_800_000L }.ifEmpty { sizes }
+                            }
+                        }
+                    }
                     .build(),
             )
             .setFlashMode(flash.capture)
@@ -870,6 +885,8 @@ private fun CameraSettingsPage(s: CamSettings, soundForced: Boolean, onChange: (
         WpText(stringResource(R.string.camera_settings), style = WpType.Header, modifier = Modifier.padding(bottom = 12.dp))
 
         Options(stringResource(R.string.camera_set_ratio), listOf("4:3", "16:9"), if (s.wide) 1 else 0) { onChange(s.copy(wide = it == 1)) }
+        Options(stringResource(R.string.camera_set_resolution), listOf(stringResource(R.string.camera_res_binned), stringResource(R.string.camera_res_full)), if (s.fullRes) 1 else 0) { onChange(s.copy(fullRes = it == 1)) }
+        WpText(stringResource(R.string.camera_set_resolution_hint), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 4.dp))
         Options(stringResource(R.string.camera_set_quality), listOf(stringResource(R.string.camera_quality_max), stringResource(R.string.camera_quality_fast)), if (s.fast) 1 else 0) { onChange(s.copy(fast = it == 1)) }
         Options(stringResource(R.string.camera_set_video), listOf(stringResource(R.string.camera_video_best), "4K", "1080p", "720p"), s.videoRes) { onChange(s.copy(videoRes = it)) }
         WpToggle(stringResource(R.string.camera_set_stabilize), s.stabilize, onText = on, offText = off) { onChange(s.copy(stabilize = it)) }

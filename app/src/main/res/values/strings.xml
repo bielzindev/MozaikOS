@@ -663,4 +663,8 @@
     <string name="camera_wb_daylight">daylight</string>
     <string name="camera_wb_cloudy">cloudy</string>
     <string name="camera_wb_shade">shade</string>
+    <string name="camera_set_resolution">Photo resolution</string>
+    <string name="camera_res_binned">12 MP (best)</string>
+    <string name="camera_res_full">maximum</string>
+    <string name="camera_set_resolution_hint">12 MP combines the pixels of high-resolution sensors (50-108 MP) for cleaner, brighter photos, like the phone\'s own camera. Maximum keeps every pixel but is noisier in low light.</string>
 </resources>

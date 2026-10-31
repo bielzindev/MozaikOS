@@ -154,14 +154,15 @@ class PhotosActivity : WpActivity() {
                         }
                         SelectionAppBar(selection, album.photos) { reload++ }
                     }
-                }
+                } ?: GoneBack(photos != null) { nav.pop() }
                 is PhotosPage.Viewer -> {
                     val list = if (page.albumId == null) photos.orEmpty() else albums.firstOrNull { it.id == page.albumId }?.photos.orEmpty()
-                    Viewer(list, page.index, onDeleted = { reload++; nav.pop() }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
+                    if (list.isEmpty()) GoneBack(photos != null) { nav.pop() }
+                    else Viewer(list, page.index, onDeleted = { reload++; nav.pop() }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
                 }
                 is PhotosPage.Edit -> photos?.firstOrNull { it.id == page.photoId }?.let { photo ->
                     PhotoEditorPage(photo, onSaved = { reload++ })
-                }
+                } ?: GoneBack(photos != null) { nav.pop() }
             }
         }
     }
@@ -570,4 +571,13 @@ private fun VideoPage(photo: Photo, active: Boolean, chrome: Boolean, onTap: () 
             }
         }
     }
+}
+
+/**
+ * A page whose album or photo no longer exists (everything in it was deleted): go back
+ * instead of staying on a blank screen (once the library has loaded).
+ */
+@Composable
+private fun GoneBack(loaded: Boolean, back: () -> Unit) {
+    if (loaded) LaunchedEffect(Unit) { back() }
 }

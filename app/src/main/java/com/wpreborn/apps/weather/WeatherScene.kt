@@ -15,6 +15,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -62,7 +63,8 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
     val photo by androidx.compose.runtime.produceState(WeatherPhotos.load(context, key), key) {
         value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { WeatherPhotos.load(context, key) }
     }
-    androidx.compose.foundation.layout.Box(modifier) {
+    // Clipped: the slowly zoomed photo must never spill over the status bar or below the app bar.
+    androidx.compose.foundation.layout.Box(modifier.then(androidx.compose.ui.Modifier.clipToBounds())) {
         val image = photo
         if (image != null) {
             // The photo of the current conditions, drifting slowly, cross-fading when they change.

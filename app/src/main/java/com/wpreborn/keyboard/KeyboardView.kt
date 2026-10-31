@@ -117,9 +117,14 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
         else -> null
     }
 
+    /** Key height in dp (from the size setting). */
+    var keyHeightDp = 54f
+        set(v) { if (field != v) { field = v; layoutKeys(); requestLayout(); invalidate() } }
+
     private val stripHeight get() = 44f * density
-    private val keyHeight get() = 50f * density
-    private val gap get() = 3f * density
+    private val keyHeight get() = keyHeightDp * density
+    /** Space between keys; touches in it still go to the nearest key. */
+    private val gap get() = 5f * density
 
     private data class Placed(val key: Key, val rect: RectF)
     private val placed = ArrayList<Placed>()
@@ -178,7 +183,7 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             var x = (width - total * keyUnit) / 2f
             row.forEach { k ->
                 val w = k.width * keyUnit
-                placed += Placed(k, RectF(x + gap / 2, y + gap, x + w - gap / 2, y + keyHeight))
+                placed += Placed(k, RectF(x + gap / 2, y + gap * 1.2f, x + w - gap / 2, y + keyHeight))
                 x += w
             }
             y += keyHeight
@@ -329,7 +334,7 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             KeyType.Language -> drawGlobe(canvas, p.rect, color)
             KeyType.SymbolsPage -> text(canvas, k.label, cx, cy, if (emojiMode) 20f else 15f, color)
             else -> {
-                val size = if (emojiMode) 26f else if (k.label.length > 1) 15f else 23f
+                val size = if (emojiMode) 26f else if (k.label.length > 1) 16f else 25f
                 text(canvas, k.label, cx, cy, size, color)
                 // Hint that a key has accents/alternates (small dot, like the WP long-press cue).
                 if (!emojiMode && k.type == KeyType.Char && k.label.length == 1 && KeyboardLayouts.alternatesFor(language, k.label[0]).isNotEmpty()) {

@@ -579,4 +579,8 @@
     <string name="icon_done">pronto</string>
     <string name="icon_reset">redefinir</string>
     <string name="kb_emoji_recent">recentes</string>
+    <string name="kb_size">TAMANHO DAS TECLAS</string>
+    <string name="kb_size_small">pequeno</string>
+    <string name="kb_size_medium">médio</string>
+    <string name="kb_size_large">grande</string>
 </resources>

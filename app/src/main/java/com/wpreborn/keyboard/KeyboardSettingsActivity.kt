@@ -143,6 +143,14 @@ class KeyboardSettingsActivity : WpActivity() {
         WpToggle(stringResource(R.string.kb_number_row), n, onText = on, offText = off) { n = it; prefs.numberRow = it }
         WpToggle(stringResource(R.string.kb_sound), snd, onText = on, offText = off) { snd = it; prefs.sound = it }
         WpToggle(stringResource(R.string.kb_vibrate), v, onText = on, offText = off) { v = it; prefs.vibrate = it }
+        // Key size: three choices in the 8.1 button style.
+        var size by remember { mutableStateOf(prefs.size) }
+        com.wpreborn.core.ui.WpText(stringResource(R.string.kb_size), style = com.wpreborn.core.theme.WpType.Subtle, color = com.wpreborn.core.theme.Wp.palette.subtle, modifier = androidx.compose.ui.Modifier.padding(top = 12.dp, bottom = 6.dp))
+        androidx.compose.foundation.layout.Row(horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(8.dp)) {
+            listOf(R.string.kb_size_small, R.string.kb_size_medium, R.string.kb_size_large).forEachIndexed { i, label ->
+                com.wpreborn.core.ui.WpButton(stringResource(label), filled = size == i) { size = i; prefs.size = i }
+            }
+        }
     }
 
     companion object {

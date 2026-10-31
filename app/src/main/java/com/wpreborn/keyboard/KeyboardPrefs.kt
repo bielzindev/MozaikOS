@@ -36,6 +36,10 @@ class KeyboardPrefs(context: Context) {
     var vibrate: Boolean
         get() = p.getBoolean("vibrate", true)
         set(v) = p.edit().putBoolean("vibrate", v).apply()
+    /** Key height: 0 small, 1 medium (default), 2 large. */
+    var size: Int
+        get() = p.getInt("size", 1)
+        set(v) = p.edit().putInt("size", v).apply()
     var numberRow: Boolean
         get() = p.getBoolean("number_row", false)
         set(v) = p.edit().putBoolean("number_row", v).apply()

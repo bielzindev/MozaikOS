@@ -578,4 +578,8 @@
     <string name="icon_done">done</string>
     <string name="icon_reset">reset</string>
     <string name="kb_emoji_recent">recent</string>
+    <string name="kb_size">KEY SIZE</string>
+    <string name="kb_size_small">small</string>
+    <string name="kb_size_medium">medium</string>
+    <string name="kb_size_large">large</string>
 </resources>

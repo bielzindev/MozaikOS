@@ -54,6 +54,15 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
     override fun onCreateInputView(): View {
         val v = KeyboardView(this, this)
         v.feedback = { feedback(it) }
+        // Keep the bottom row above the navigation bar / gesture area.
+        androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(v) { view, insets ->
+            val nav = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.navigationBars()).bottom
+            if (view.paddingBottom != nav) {
+                view.setPadding(0, 0, 0, nav)
+                view.requestLayout()
+            }
+            insets
+        }
         view = v
         return v
     }
@@ -91,6 +100,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
 
     // --- Rendering --------------------------------------------------------------------------
     private fun render() {
+        view?.keyHeightDp = when (prefs.size) { 0 -> 46f; 2 -> 62f; else -> 54f }
         val v = view ?: return
         val settings = SettingsRepository.get(this).cached
         v.dark = settings.darkTheme

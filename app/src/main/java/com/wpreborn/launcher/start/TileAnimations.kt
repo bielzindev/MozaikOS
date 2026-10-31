@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
@@ -65,7 +66,12 @@ fun FlipTile(
 }
 
 /**
- * Cycle tile template (Photos): images slide up one after another.
+ * Cycle tile template (Photos, News): pictures slide up one after another.
+ *
+ * One ever-growing position drives it (its whole part is the picture shown, its fraction how
+ * far the next one has come up), so there is never a frame with the wrong picture. Each
+ * picture keeps its own composition (keyed) as it moves from "next" to "current", so it
+ * doesn't reload or fade in again, and the next one is already loaded (just below, clipped).
  */
 @Composable
 fun <T> CycleTile(
@@ -75,27 +81,33 @@ fun <T> CycleTile(
     modifier: Modifier = Modifier,
     content: @Composable (T) -> Unit,
 ) {
-    var index by remember(items) { mutableIntStateOf(0) }
-    val slide = remember { Animatable(0f) }
+    val pos = remember(items) { Animatable(0f) }
     LaunchedEffect(items, enabled) {
         if (!enabled || items.size < 2) return@LaunchedEffect
         val rnd = Random(seed)
         delay(1500L + rnd.nextLong(3000))
         while (true) {
-            slide.snapTo(0f)
-            slide.animateTo(1f, tween(900, easing = WpEasing.CubicInOut))
-            index = (index + 1) % items.size
-            slide.snapTo(0f)
+            val target = kotlin.math.floor(pos.value) + 1f
+            pos.animateTo(target, tween(900, easing = WpEasing.CubicInOut))
             delay(4500L + rnd.nextLong(2500))
         }
     }
     if (items.isEmpty()) return
-    val current = items[index % items.size]
-    val next = items[(index + 1) % items.size]
+    val p = pos.value
+    val whole = kotlin.math.floor(p).toInt()
+    val frac = p - whole
+    val n = items.size
+    val shown = if (n < 2) listOf(0 to whole) else listOf(0 to whole, 1 to whole + 1)
     Box(modifier.fillMaxSize().clipToBounds()) {
-        Box(Modifier.fillMaxSize().graphicsLayer { translationY = -slide.value * size.height }) { content(current) }
-        if (slide.value > 0f) {
-            Box(Modifier.fillMaxSize().graphicsLayer { translationY = (1f - slide.value) * size.height }) { content(next) }
+        shown.forEach { (slot, i) ->
+            val item = items[Math.floorMod(i, n)]
+            key(i) {
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .graphicsLayer { translationY = (slot - frac) * size.height },
+                ) { content(item) }
+            }
         }
     }
 }

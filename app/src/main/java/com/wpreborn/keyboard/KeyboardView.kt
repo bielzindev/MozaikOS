@@ -53,6 +53,7 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
     private val keyPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = font; textAlign = Paint.Align.CENTER }
     private val iconPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 2f * resources.displayMetrics.density; strokeJoin = Paint.Join.MITER }
+    private val glyphPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.6f * resources.displayMetrics.density; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
     private val trailPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
 
     private val bg get() = if (dark) 0xFF000000.toInt() else 0xFFDEDEDE.toInt()
@@ -275,7 +276,12 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
                     keyPaint.color = accent
                     canvas.drawRect(i * w + gap / 2, gap, (i + 1) * w - gap / 2, stripHeight - 8 * density, keyPaint)
                 }
-                text(canvas, icon, i * w + w / 2, (stripHeight - 8 * density) / 2 + gap / 2, 18f, fg)
+                val icy = (stripHeight - 8 * density) / 2 + gap / 2
+                val glyph = KeyGlyphs.categories[icon]
+                glyphPaint.color = if (i == emojiCategory) Color.WHITE else fg
+                if (glyph == null || !KeyGlyphs.draw(canvas, glyph, i * w + w / 2, icy, min(w * 0.6f, 22f * density), glyphPaint)) {
+                    text(canvas, icon, i * w + w / 2, icy, 18f, fg)
+                }
             }
             val pages = pagesOf(emojiCategory)
             if (pages > 1) {
@@ -294,7 +300,12 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             // The tool strip: evenly spaced glyphs.
             if (toolbar.isEmpty()) return
             val tw = width / toolbar.size.toFloat()
-            toolbar.forEachIndexed { i, (glyph, _) -> text(canvas, glyph, tw * i + tw / 2, stripHeight / 2, 19f, subtle) }
+            glyphPaint.color = subtle
+            toolbar.forEachIndexed { i, (glyph, _) ->
+                if (!KeyGlyphs.draw(canvas, glyph, tw * i + tw / 2, stripHeight / 2, 22f * density, glyphPaint)) {
+                    text(canvas, glyph, tw * i + tw / 2, stripHeight / 2, 19f, subtle)
+                }
+            }
             return
         }
         val w = width / suggestions.size.toFloat()
@@ -341,9 +352,16 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
                 textPaint.typeface = fontLight
                 text(canvas, spaceLabel, cx, cy, 14f, if (isPressed) Color.WHITE else subtle)
             }
-            KeyType.Emoji -> text(canvas, "☺", cx, cy, 22f, color)
+            KeyType.Emoji -> {
+                glyphPaint.color = color
+                KeyGlyphs.draw(canvas, "smiley", cx, cy, 22f * density, glyphPaint)
+            }
             KeyType.Language -> drawGlobe(canvas, p.rect, color)
             KeyType.SymbolsPage -> text(canvas, k.label, cx, cy, if (emojiMode) 20f else 15f, color)
+            KeyType.Action -> {
+                glyphPaint.color = color
+                if (!KeyGlyphs.draw(canvas, k.text, cx, cy, 22f * density, glyphPaint)) text(canvas, k.label, cx, cy, if (k.label.length > 1) 16f else 22f, color)
+            }
             else -> {
                 val size = if (emojiMode) 26f else if (k.label.length > 1) 16f else 25f
                 text(canvas, k.label, cx, cy, size, color)
@@ -657,4 +675,60 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
 
     @Suppress("unused")
     private fun clamp(v: Float, lo: Float, hi: Float) = min(max(v, lo), hi)
+}
+
+/**
+ * Metro line glyphs for the keyboard's own controls (24-unit SVG paths, drawn as thin
+ * strokes like the Windows Phone 8.1 keyboard), instead of colour emoji.
+ */
+internal object KeyGlyphs {
+    private val data = mapOf(
+        "clip" to "M8.5,4.5H6.5v16h11v-16h-2 M9,3h6v3H9z M9.5,11h5 M9.5,14.5h5",
+        "voice" to "M12,3.5a2.5,2.5 0 0,1 2.5,2.5v5.5a2.5,2.5 0 0,1 -5,0v-5.5a2.5,2.5 0 0,1 2.5,-2.5z M6.5,11a5.5,5.5 0 0,0 11,0 M12,16.5v4 M9,20.5h6",
+        "edit" to "M9.5,5h5 M12,5v14 M9.5,19h5 M5.5,9.5l-2.5,2.5 2.5,2.5 M18.5,9.5l2.5,2.5 -2.5,2.5",
+        "settings" to "M12.00,4.80 L13.79,2.98 L15.52,3.50 L16.00,6.01 L17.09,6.91 L19.65,6.89 L20.50,8.48 L19.06,10.60 L19.20,12.00 L21.02,13.79 L20.50,15.52 L17.99,16.00 L17.09,17.09 L17.11,19.65 L15.52,20.50 L13.40,19.06 L12.00,19.20 L10.21,21.02 L8.48,20.50 L8.00,17.99 L6.91,17.09 L4.35,17.11 L3.50,15.52 L4.94,13.40 L4.80,12.00 L2.98,10.21 L3.50,8.48 L6.01,8.00 L6.91,6.91 L6.89,4.35 L8.48,3.50 L10.60,4.94Z M12,8.8a3.2,3.2 0 1,0 0.01,0z",
+        "smiley" to "M12,3a9,9 0 1,0 0.01,0z M8.5,14.5a4.5,4.5 0 0,0 7,0 M9,9v1.5 M15,9v1.5",
+        "recent" to "M12,3a9,9 0 1,0 0.01,0z M12,7v5l3.5,2",
+        "people" to "M12,4a3.5,3.5 0 1,0 0.01,0z M5,20.5a7,7 0 0,1 14,0",
+        "heart" to "M12,20c0,0 -8,-5 -8,-10.5a4.3,4.3 0 0,1 8,-2.2a4.3,4.3 0 0,1 8,2.2c0,5.5 -8,10.5 -8,10.5z",
+        "nature" to "M5,19c0,-9 6,-14 15,-14c0,9 -5,15 -14,15z M5,19l8,-8",
+        "food" to "M5,8h12v6a5,5 0 0,1 -5,5h-2a5,5 0 0,1 -5,-5z M17,10h1.5a2,2 0 0,1 0,4H17 M8,3.5v2 M11,3.5v2 M14,3.5v2",
+        "sports" to "M12,3a9,9 0 1,0 0.01,0z M3,12h18 M12,3a13,13 0 0,1 0,18 M12,3a13,13 0 0,0 0,18",
+        "travel" to "M4,16v-4l2,-5h12l2,5v4z M4,16v2.5h3v-2.5 M17,16v2.5h3v-2.5 M4,12h16",
+        "objects" to "M9.5,18h5 M10.5,21h3 M12,3a6,6 0 0,1 3.5,10.9c-0.6,0.5 -1,1.2 -1,2v0.6h-5v-0.6c0,-0.8 -0.4,-1.5 -1,-2a6,6 0 0,1 3.5,-10.9z",
+        "symbols" to "M4,4h16v16H4z M8,12l3,3 5,-6",
+        "flags" to "M6,21V4 M6,4h11l-2.5,4 2.5,4H6",
+        "up" to "M6,15l6,-6 6,6",
+        "down" to "M6,9l6,6 6,-6",
+        "home" to "M17,6l-6,6 6,6 M7,5v14",
+        "left" to "M15,6l-6,6 6,6",
+        "right" to "M9,6l6,6 -6,6",
+        "end" to "M7,6l6,6 -6,6 M17,5v14",
+    )
+    private val cache = HashMap<String, android.graphics.Path>()
+
+    /** Emoji category labels (the first emoji of each page) → their glyph. */
+    val categories = mapOf(
+        "🕘" to "recent", "☺" to "smiley", "👍" to "people", "❤" to "heart", "🐱" to "nature", "🍔" to "food",
+        "⚽" to "sports", "🚗" to "travel", "💡" to "objects", "✅" to "symbols", "🏳" to "flags",
+    )
+
+    fun has(name: String) = name in data
+
+    private val matrix = android.graphics.Matrix()
+    private val tmp = android.graphics.Path()
+
+    /** Draws [name] centred at (cx, cy), [size] px across, with [paint] (a stroke paint). */
+    fun draw(canvas: android.graphics.Canvas, name: String, cx: Float, cy: Float, size: Float, paint: android.graphics.Paint): Boolean {
+        val d = data[name] ?: return false
+        val path = cache.getOrPut(name) { androidx.core.graphics.PathParser.createPathFromPathData(d) }
+        val k = size / 24f
+        matrix.reset()
+        matrix.setScale(k, k)
+        matrix.postTranslate(cx - size / 2, cy - size / 2)
+        tmp.reset()
+        path.transform(matrix, tmp)
+        canvas.drawPath(tmp, paint)
+        return true
+    }
 }

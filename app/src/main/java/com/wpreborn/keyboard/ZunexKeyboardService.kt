@@ -177,7 +177,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             override fun onEvent(eventType: Int, params: android.os.Bundle?) = Unit
             override fun onError(error: Int) { updateSuggestions() }
             override fun onPartialResults(partial: android.os.Bundle?) {
-                partial?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { view?.suggestions = listOf("🎤 $it") }
+                partial?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { view?.suggestions = listOf("$it…") }
             }
             override fun onResults(results: android.os.Bundle?) {
                 val text = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
@@ -269,7 +269,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             Page.Clipboard -> clipboardRows()
             Page.Edit -> editRows()
         }
-        v.toolbar = if (page == Page.Letters) listOf("📋" to "clip", "🎤" to "voice", "✂" to "edit", "⚙" to "settings") else emptyList()
+        v.toolbar = if (page == Page.Letters) listOf("clip" to "clip", "voice" to "voice", "edit" to "edit", "settings" to "settings") else emptyList()
         updateSuggestions()
     }
 

@@ -71,6 +71,12 @@ fun WpStatusBar(modifier: Modifier = Modifier, color: Color = Color.Unspecified)
             Spacer(Modifier.width(6.dp))
             WpIcon(WpIcons.Vibrate, tint = fg, size = 14.dp)
         }
+        // Music is playing (ZUNEX or another player).
+        val playback = com.wpreborn.data.media.rememberPlayback()
+        if (playback?.playing == true) {
+            Spacer(Modifier.width(8.dp))
+            WpIcon(WpIcons.MusicNote, tint = fg, size = 13.dp)
+        }
         Spacer(Modifier.weight(1f))
         BatteryGlyph(battery.level, battery.charging, fg)
         Spacer(Modifier.width(8.dp))

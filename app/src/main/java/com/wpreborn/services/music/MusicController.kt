@@ -172,7 +172,7 @@ class MusicController private constructor(private val context: Context) {
         .build()
 
     companion object {
-        private const val EXTRA_ART = "wp_art_uri"
+        const val EXTRA_ART = "wp_art_uri"
 
         @Volatile
         private var instance: MusicController? = null

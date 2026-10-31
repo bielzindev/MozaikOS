@@ -219,6 +219,36 @@ fun ActionCenter(state: ActionCenterState) {
                 }
             }
 
+            // Music: the same playback the Playing Now bar and the lock screen show.
+            val playback = com.wpreborn.data.media.rememberPlayback()
+            if (playback != null) {
+                Row(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
+                        .background(Color(0xFF1F1F1F))
+                        .wpClickable(tilt = false) { scope.launch { state.close() }; playback.openPlayer(context) }
+                        .padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    com.wpreborn.apps.common.PlaybackArt(playback, Modifier.size(52.dp))
+                    Spacer(Modifier.width(12.dp))
+                    Column(Modifier.weight(1f)) {
+                        WpText(playback.title, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        WpText(playback.artist, style = WpType.Small, color = Color(0xB3FFFFFF), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(2.dp).background(Color(0x33FFFFFF))) {
+                            Box(Modifier.fillMaxWidth(playback.progress.coerceAtLeast(0.001f)).height(2.dp).background(Wp.accent))
+                        }
+                    }
+                    Spacer(Modifier.width(6.dp))
+                    com.wpreborn.core.ui.RoundButton(WpIcons.Previous, size = 38.dp, color = Color.White) { playback.previous(context) }
+                    Spacer(Modifier.width(4.dp))
+                    com.wpreborn.core.ui.RoundButton(if (playback.playing) WpIcons.Pause else WpIcons.Play, size = 38.dp, color = Color.White) { playback.togglePlay(context) }
+                    Spacer(Modifier.width(4.dp))
+                    com.wpreborn.core.ui.RoundButton(WpIcons.Next, size = 38.dp, color = Color.White) { playback.next(context) }
+                }
+            }
+
             // Notifications
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 if (!connected) {

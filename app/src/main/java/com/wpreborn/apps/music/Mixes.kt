@@ -60,7 +60,7 @@ object MixBuilder {
 
     private fun colorFor(key: String) = palette[abs(key.hashCode()) % palette.size]
 
-    fun build(context: Context, col: MusicCollection, plays: Map<Long, Int>): List<Mix> {
+    fun build(context: Context, col: MusicCollection, plays: Map<Long, Int>, favorites: Set<String> = emptySet()): List<Mix> {
         val songs = col.songs
         if (songs.isEmpty()) return emptyList()
         val r = context.resources
@@ -70,6 +70,9 @@ object MixBuilder {
         val favourites = songs.filter { (plays[it.id] ?: 0) > 0 }.sortedByDescending { plays[it.id] ?: 0 }.take(40)
         val playMe = (favourites + songs.shuffled()).distinctBy { it.id }.take(60).shuffled()
         mixes += Mix("playme", r.getString(R.string.mix_play_me), r.getString(R.string.mix_play_me_sub), playMe, colorFor("playme"), featured = true)
+
+        val favs = songs.filter { it.id.toString() in favorites }
+        if (favs.isNotEmpty()) mixes += Mix("favorites", r.getString(R.string.mix_favorites), r.getQuantityString(R.plurals.songs_count, favs.size, favs.size), favs.shuffled(), colorFor("fav"))
 
         val recentCutoff = System.currentTimeMillis() / 1000 - 45L * 24 * 3600
         val recent = songs.filter { it.dateAdded >= recentCutoff }.ifEmpty { songs.sortedByDescending { it.dateAdded }.take(30) }

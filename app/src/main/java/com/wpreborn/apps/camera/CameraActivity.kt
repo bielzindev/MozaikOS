@@ -115,6 +115,7 @@ private enum class FlashMode(val capture: Int) { Auto(ImageCapture.FLASH_MODE_AU
 class CameraActivity : WpActivity() {
 
     override val showStatusBar: Boolean get() = false
+    override val showPlayingNow: Boolean get() = false
 
     /** Set by the composable; called by the hardware keys. */
     var shutter: (() -> Unit)? = null

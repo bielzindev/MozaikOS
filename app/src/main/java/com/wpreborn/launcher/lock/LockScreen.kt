@@ -45,6 +45,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
@@ -286,10 +287,16 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                 } else {
                     Spacer(Modifier.statusBarsPadding())
                 }
-                // Media controls when something is playing.
-                val title = if (player.hasMedia) player.title else external?.title
-                if (title != null && (player.playing || external?.playing == true)) {
-                    LockMedia(title, if (player.hasMedia) player.artist else external?.artist.orEmpty(), player.hasMedia)
+                // Music widget: the same playback state as the Playing Now bar and the player.
+                val playback = com.wpreborn.data.media.rememberPlayback()
+                val last = remember { arrayOfNulls<com.wpreborn.data.media.Playback>(1) }
+                if (playback != null) last[0] = playback
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = playback != null && (playback.playing || playback.own),
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+                ) {
+                    last[0]?.let { LockMedia(it) }
                 }
                 Spacer(Modifier.weight(1f))
                 Column(Modifier.padding(start = 24.dp, end = 24.dp)) {
@@ -344,28 +351,45 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
 }
 
 /** The 8.1 lock screen media strip: title, artist and transport buttons. */
+/** The lock screen music widget: cover, song, artist, transport and a seek bar. */
 @Composable
-private fun LockMedia(title: String, artist: String, own: Boolean) {
+private fun LockMedia(playback: com.wpreborn.data.media.Playback) {
     val context = LocalContext.current
-    val controller = remember { com.wpreborn.services.music.MusicController.get(context) }
-    Row(
-        Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.4f)).padding(horizontal = 20.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
+            .padding(14.dp),
     ) {
-        Column(Modifier.weight(1f)) {
-            WpText(title, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            WpText(artist, style = WpType.Small, color = Color.White.copy(alpha = 0.8f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.animation.AnimatedContent(playback.trackKey, label = "lockArt") { _ ->
+                com.wpreborn.apps.common.PlaybackArt(
+                    playback,
+                    Modifier.size(72.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
+                )
+            }
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.weight(1f)) {
+                WpText(playback.title, style = WpType.Large, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                WpText(playback.artist, style = WpType.Normal, color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Previous, size = 38.dp, color = Color.White) { playback.previous(context) }
+                    Spacer(Modifier.width(10.dp))
+                    com.wpreborn.core.ui.RoundButton(
+                        if (playback.playing) com.wpreborn.core.icons.WpIcons.Pause else com.wpreborn.core.icons.WpIcons.Play,
+                        size = 44.dp,
+                        color = Color.White,
+                    ) { playback.togglePlay(context) }
+                    Spacer(Modifier.width(10.dp))
+                    com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Next, size = 38.dp, color = Color.White) { playback.next(context) }
+                    if (playback.playing) com.wpreborn.apps.common.PlayingBars(Modifier.padding(start = 14.dp))
+                }
+            }
         }
-        com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Previous, size = 38.dp, color = Color.White) {
-            if (own) controller.previous() else com.wpreborn.data.media.ExternalMediaWatcher.previous()
-        }
-        Spacer(Modifier.width(8.dp))
-        com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Pause, size = 38.dp, color = Color.White) {
-            if (own) controller.togglePlay() else com.wpreborn.data.media.ExternalMediaWatcher.playPause()
-        }
-        Spacer(Modifier.width(8.dp))
-        com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Next, size = 38.dp, color = Color.White) {
-            if (own) controller.next() else com.wpreborn.data.media.ExternalMediaWatcher.next()
+        if (playback.durationMs > 0) {
+            Spacer(Modifier.height(6.dp))
+            com.wpreborn.apps.music.SeekBar(playback.positionMs, playback.durationMs, Wp.accent) { playback.seekTo(context, it) }
         }
     }
 }

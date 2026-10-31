@@ -53,6 +53,9 @@ abstract class WpActivity : ComponentActivity() {
     /** Some apps (the photo viewer) want the plain page without the status bar. */
     protected open val showStatusBar: Boolean get() = true
 
+    /** The camera and similar full-screen apps hide the Playing Now bar. */
+    protected open val showPlayingNow: Boolean get() = true
+
     /** Return true to hand the request over to another app and finish immediately. */
     protected open fun redirect(): Boolean = false
 
@@ -72,7 +75,7 @@ abstract class WpActivity : ComponentActivity() {
                 LaunchedEffect(trigger) {
                     turnstile.run(pendingMode)
                 }
-                WpChrome(chrome, showStatusBar = showStatusBar) {
+                WpChrome(chrome, showStatusBar = showStatusBar, showPlayingNow = showPlayingNow) {
                     CompositionLocalProvider(LocalTurnstile provides turnstile) {
                         Box(Modifier.fillMaxSize().turnstile(turnstile)) { Content() }
                     }

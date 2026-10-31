@@ -15,6 +15,11 @@ import androidx.compose.foundation.layout.displayCutout
 import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.layout.isImeVisible
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
@@ -34,6 +39,8 @@ import com.wpreborn.launcher.volume.VolumeState
 class ChromeState {
     val actionCenter = ActionCenterState()
     val volume = VolumeState()
+    /** Screens that already show the player (the full player, the camera) hide the Playing Now bar. */
+    var hidePlayingNow by androidx.compose.runtime.mutableStateOf(false)
 }
 
 val LocalChrome = staticCompositionLocalOf<ChromeState?> { null }
@@ -49,6 +56,7 @@ fun WpChrome(
     showStatusBar: Boolean = true,
     statusBarColor: Color = Color.Unspecified,
     imePadding: Boolean = true,
+    showPlayingNow: Boolean = true,
     content: @Composable () -> Unit,
 ) {
     val bg = if (background == Color.Unspecified) Wp.palette.background else background
@@ -71,7 +79,26 @@ fun WpChrome(
                 } else {
                     Box(Modifier.statusBarsPadding().topSystemPadding())
                 }
-                Box(Modifier.weight(1f).fillMaxWidth().navigationBarsPadding()) { content() }
+                // The system-wide Playing Now bar sits under every screen while music plays.
+                val playback = com.wpreborn.data.media.rememberPlayback()
+                @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+                val imeOpen = WindowInsets.isImeVisible
+                val bar = showPlayingNow && !chrome.hidePlayingNow && !imeOpen && playback != null
+                Box(
+                    Modifier.weight(1f).fillMaxWidth().then(
+                        if (bar) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier.navigationBarsPadding(),
+                    ),
+                ) { content() }
+                androidx.compose.animation.AnimatedVisibility(
+                    visible = bar,
+                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
+                ) {
+                    // Keep showing the last track while the bar slides away.
+                    val last = remember { arrayOfNulls<com.wpreborn.data.media.Playback>(1) }
+                    if (playback != null) last[0] = playback
+                    last[0]?.let { PlayingNowBar(it, Modifier.navigationBarsPadding()) }
+                }
             }
             if (wpBar) {
                 ActionCenterHandle(chrome.actionCenter, Modifier.align(Alignment.TopCenter).topSystemPadding())

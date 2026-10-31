@@ -36,6 +36,32 @@ class MusicService : MediaSessionService() {
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         session = MediaSession.Builder(this, player).setSessionActivity(open).build()
+
+        // Continue where the user left off, and keep the queue saved as it changes.
+        val queue = QueueStore(this)
+        queue.restore(player)
+        player.addListener(object : androidx.media3.common.Player.Listener {
+            override fun onEvents(p: androidx.media3.common.Player, events: androidx.media3.common.Player.Events) {
+                if (events.containsAny(
+                        androidx.media3.common.Player.EVENT_TIMELINE_CHANGED,
+                        androidx.media3.common.Player.EVENT_MEDIA_ITEM_TRANSITION,
+                        androidx.media3.common.Player.EVENT_IS_PLAYING_CHANGED,
+                        androidx.media3.common.Player.EVENT_POSITION_DISCONTINUITY,
+                        androidx.media3.common.Player.EVENT_SHUFFLE_MODE_ENABLED_CHANGED,
+                        androidx.media3.common.Player.EVENT_REPEAT_MODE_CHANGED,
+                    )
+                ) {
+                    queue.save(p)
+                }
+            }
+        })
+        // The equalizer follows the player's audio session.
+        AudioEffects.attach(this, player.audioSessionId)
+        player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
+            override fun onAudioSessionIdChanged(eventTime: androidx.media3.exoplayer.analytics.AnalyticsListener.EventTime, audioSessionId: Int) {
+                AudioEffects.attach(this@MusicService, audioSessionId)
+            }
+        })
     }
 
     override fun onGetSession(controllerInfo: MediaSession.ControllerInfo): MediaSession? = session
@@ -46,6 +72,8 @@ class MusicService : MediaSessionService() {
     }
 
     override fun onDestroy() {
+        session?.player?.let { QueueStore(this).save(it) }
+        AudioEffects.release()
         session?.run {
             player.release()
             release()

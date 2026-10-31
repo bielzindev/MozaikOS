@@ -2,9 +2,12 @@ package com.wpreborn.apps.weather
 
 import android.provider.Settings
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -54,6 +57,35 @@ private class Cloud(val x: Float, val y: Float, val scale: Float)
  */
 @Composable
 fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modifier: Modifier = Modifier) {
+    val photoRes = backgroundPhoto(Sky.of(code), skyPhase(isDay, sunrise, sunset))
+    androidx.compose.foundation.layout.Box(modifier) {
+        if (photoRes != null) {
+            // The photo of the current conditions, drifting slowly, cross-fading when they change.
+            androidx.compose.animation.Crossfade(photoRes, androidx.compose.ui.Modifier.matchParentSize(), animationSpec = tween(1200), label = "photo") { res ->
+                val drift = androidx.compose.animation.core.rememberInfiniteTransition(label = "drift")
+                val d by drift.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(40_000, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "d")
+                androidx.compose.foundation.Image(
+                    androidx.compose.ui.res.painterResource(res),
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                    modifier = androidx.compose.ui.Modifier.fillMaxSize().graphicsLayer {
+                        val s = 1.08f + 0.04f * d
+                        scaleX = s
+                        scaleY = s
+                        translationX = (d - 0.5f) * size.width * 0.05f
+                    },
+                )
+            }
+        }
+        SkyLayers(code, isDay, sunrise, sunset, photo = photoRes != null, modifier = androidx.compose.ui.Modifier.matchParentSize())
+    }
+}
+
+/** Background photos (public domain / CC0, see third_party/weather-photos). Null draws the sky. */
+fun backgroundPhoto(sky: Sky, phase: SkyPhase): Int? = WeatherPhotos.forSky(sky, phase)
+
+@Composable
+private fun SkyLayers(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, photo: Boolean, modifier: Modifier) {
     val context = LocalContext.current
     val sky = Sky.of(code)
     val phase = skyPhase(isDay, sunrise, sunset)
@@ -110,10 +142,10 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
         val w = size.width
         val h = size.height
 
-        drawRect(Brush.verticalGradient(listOf(top, bottom)))
+        if (!photo) drawRect(Brush.verticalGradient(listOf(top, bottom)))
 
         // Stars and moon.
-        if (moonAlpha > 0.01f) {
+        if (!photo && moonAlpha > 0.01f) {
             seeds.third.forEach { s ->
                 val tw = 0.55f + 0.45f * sin(t * 1.3f + s.phase)
                 drawCircle(Color.White.copy(alpha = moonAlpha * tw * 0.9f), s.r, Offset(s.x * w, s.y * h))
@@ -121,7 +153,7 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
             drawMoon(Offset(w * 0.78f, h * 0.16f), w * 0.07f, moonAlpha, t)
         }
         // Sun.
-        if (sunAlpha > 0.01f) {
+        if (!photo && sunAlpha > 0.01f) {
             val golden = phase == SkyPhase.Golden
             drawSun(Offset(w * 0.8f, if (golden) h * 0.34f else h * 0.14f), w * 0.09f, sunAlpha, t, golden)
         }
@@ -134,7 +166,7 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
             phase == SkyPhase.Golden -> Color(0xFFFFD9C2)
             else -> Color.White
         }
-        if (cloudiness > 0.02f) {
+        if (!photo && cloudiness > 0.02f) {
             clouds.forEachIndexed { layer, list ->
                 val speed = 0.004f + layer * 0.006f
                 val alpha = cloudiness * (0.35f + layer * 0.22f)
@@ -160,7 +192,7 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
         }
 
         // Landscape: two rows of hills; wet ground reflects the sky in the rain.
-        drawHills(w, h, phase, wet)
+        if (!photo) drawHills(w, h, phase, wet)
 
         // Rain.
         if (rain > 0.01f) {

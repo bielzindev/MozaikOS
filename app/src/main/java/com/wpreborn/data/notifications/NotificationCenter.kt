@@ -55,7 +55,17 @@ object NotificationCenter {
     }
 
     internal fun replaceAll(context: Context, sbns: Array<StatusBarNotification>?) {
-        _items.value = sbns.orEmpty().mapNotNull { it.toWp(context) }.sortedByDescending { it.postTime }
+        val all = sbns.orEmpty()
+        // Group summaries are skipped when their group's own notifications are there; some
+        // apps (WhatsApp at times) post only the summary, which then stands for the group.
+        val withChildren = all.filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 && it.groupKey != null }
+            .map { it.groupKey }.toSet()
+        _items.value = all.mapNotNull { sbn ->
+            val summary = sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
+            if (summary && sbn.groupKey in withChildren) null
+            // One unreadable notification must not stop the others.
+            else runCatching { sbn.toWp(context) }.getOrNull()
+        }.sortedByDescending { it.postTime }
     }
 
     fun dismiss(key: String) {
@@ -88,7 +98,6 @@ object NotificationCenter {
 
     private fun StatusBarNotification.toWp(context: Context): WpNotification? {
         val n = notification
-        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return null
         if (isOngoing && n.category != Notification.CATEGORY_CALL) {
             // Media and foreground service notifications are not "new" items.
             if (n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) return null
@@ -125,7 +134,7 @@ object NotificationCenter {
             packageName
         }
         @Suppress("DEPRECATION")
-        val picture = extras.getParcelable<Bitmap>(Notification.EXTRA_PICTURE)
+        val picture = runCatching { extras.get(Notification.EXTRA_PICTURE) as? Bitmap }.getOrNull()
         return WpNotification(
             key = key,
             packageName = packageName,

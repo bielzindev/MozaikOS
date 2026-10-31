@@ -681,4 +681,20 @@
     <string name="camera_scene_animal">animais</string>
     <string name="camera_scene_sunset">pôr do sol</string>
     <string name="camera_scene_night">noite</string>
+    <string name="app_news">Notícias</string>
+    <string name="news_top">principais</string>
+    <string name="news_brasil">brasil</string>
+    <string name="news_economia">economia</string>
+    <string name="news_mundo">mundo</string>
+    <string name="news_esportes">esportes</string>
+    <string name="news_tecnologia">tecnologia</string>
+    <string name="news_entretenimento">entretenimento</string>
+    <string name="news_empty">Nenhuma notícia agora. Verifique a conexão e atualize.</string>
+    <string name="news_refresh">atualizar</string>
+    <string name="news_sources">fontes</string>
+    <string name="news_sources_hint">As notícias vêm dos feeds públicos (RSS) dos próprios veículos; cada matéria abre numa visualização de leitura, com link para a página original.</string>
+    <string name="news_read_site">Ler a matéria completa no site</string>
+    <string name="news_open_site">site</string>
+    <string name="store_desc_news">Notícias do Brasil como o Bing Notícias do Windows Phone: principais, brasil, economia, mundo, esportes, tecnologia e entretenimento de g1, Folha, CNN Brasil, BBC News Brasil, Agência Brasil e outros; visualização de leitura; bloco dinâmico com as manchetes.</string>
+    <string name="store_new_news">Primeira versão.</string>
 </resources>

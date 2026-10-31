@@ -325,6 +325,18 @@
         </activity>
 
         <activity
+            android:name=".apps.news.NewsActivity"
+            android:exported="true"
+            android:taskAffinity="com.wpreborn.news"
+            android:icon="@mipmap/ic_news"
+            android:label="@string/app_news">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".apps.maps.MapsActivity"
             android:exported="true"
             android:taskAffinity="com.wpreborn.maps"

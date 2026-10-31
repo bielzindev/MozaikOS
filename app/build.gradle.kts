@@ -107,6 +107,8 @@ dependencies {
     // On-device AI for the camera (scene recognition, portrait segmentation); bundled models.
     implementation("com.google.mlkit:image-labeling:17.0.9")
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
+    // News: reading view (main text of an article page); MIT licence.
+    implementation("org.jsoup:jsoup:1.18.1")
     implementation("org.maplibre.gl:android-sdk:11.8.8")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

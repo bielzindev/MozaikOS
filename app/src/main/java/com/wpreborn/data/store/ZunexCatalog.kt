@@ -123,6 +123,11 @@ object ZunexCatalog {
             clearData = prefs("osmdroid"),
         ),
         CatalogApp(
+            BuiltInApp.News, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_news, R.string.store_new_news, Color(0xFFA20025),
+            permissions = listOf(R.string.perm_label_internet), featured = true,
+            clearData = prefs("news"),
+        ),
+        CatalogApp(
             BuiltInApp.Settings, "8.1.0", 1, StoreCategory.System, R.string.store_desc_settings, R.string.store_new_settings, Color(0xFF647687), required = true,
         ),
         CatalogApp(

@@ -95,6 +95,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Recorder -> IconTile(com.wpreborn.core.icons.Glyphs.Microphone, tile.size)
             BuiltInApp.Flashlight -> IconTile(WpIcons.Flashlight, tile.size)
             BuiltInApp.Maps -> IconTile(com.wpreborn.core.icons.Glyphs.MapPin, tile.size)
+            BuiltInApp.News -> NewsTile(tile.size, inputs.liveEnabled, seed)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
       }
@@ -471,5 +472,43 @@ private fun BoxScope.AlarmsTile(size: TileSize) {
         val time = android.text.format.DateFormat.getTimeFormat(context).format(java.util.Date(next.next()))
         WpText(time, style = WpType.Large, color = Color.White)
         if (next.label.isNotBlank()) WpText(next.label, style = WpType.Small, color = Color.White, maxLines = 1)
+    }
+}
+
+/** News: the top stories' pictures with their headlines, cycling like the Bing News tile. */
+@Composable
+private fun NewsTile(size: TileSize, live: Boolean, seed: Int) {
+    val context = LocalContext.current
+    val repo = remember { com.wpreborn.data.news.NewsRepository.get(context) }
+    val articles by repo.articles.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(live) {
+        if (!live) return@LaunchedEffect
+        while (true) {
+            runCatching { repo.refresh() }
+            kotlinx.coroutines.delay(20 * 60_000L)
+        }
+    }
+    val top = remember(articles) { repo.inCategory(articles, com.wpreborn.data.news.NewsCategory.Top).filter { it.image != null }.take(6) }
+    if (!live || top.isEmpty() || size == TileSize.Small) {
+        Box(Modifier.fillMaxSize()) { IconTile(com.wpreborn.core.icons.Glyphs.News, size) }
+        return
+    }
+    CycleTile(top, enabled = top.size > 1, seed = seed) { a ->
+        Box(Modifier.fillMaxSize()) {
+            com.wpreborn.apps.news.WebImage(a.image!!, Modifier.fillMaxSize(), if (size == TileSize.Medium) 360 else 720)
+            Box(
+                Modifier
+                    .fillMaxSize()
+                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))),
+            )
+            WpText(
+                a.title,
+                style = WpType.Normal.copy(fontSize = if (size == TileSize.Medium) 14.sp else 16.sp, lineHeight = if (size == TileSize.Medium) 17.sp else 20.sp, fontWeight = FontWeight.SemiBold),
+                color = Color.White,
+                maxLines = 3,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, end = 8.dp, bottom = 24.dp),
+            )
+        }
     }
 }

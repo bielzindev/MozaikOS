@@ -680,4 +680,20 @@
     <string name="camera_scene_animal">animals</string>
     <string name="camera_scene_sunset">sunset</string>
     <string name="camera_scene_night">night</string>
+    <string name="app_news">News</string>
+    <string name="news_top">top stories</string>
+    <string name="news_brasil">brazil</string>
+    <string name="news_economia">economy</string>
+    <string name="news_mundo">world</string>
+    <string name="news_esportes">sports</string>
+    <string name="news_tecnologia">technology</string>
+    <string name="news_entretenimento">entertainment</string>
+    <string name="news_empty">No news right now. Check your connection and refresh.</string>
+    <string name="news_refresh">refresh</string>
+    <string name="news_sources">sources</string>
+    <string name="news_sources_hint">News come from the outlets\' own public feeds (RSS); each story opens in a reading view, with a link to the original page.</string>
+    <string name="news_read_site">Read the full story on the website</string>
+    <string name="news_open_site">website</string>
+    <string name="store_desc_news">Brazilian news like Bing News on Windows Phone: top stories, Brazil, economy, world, sports, technology and entertainment from g1, Folha, CNN Brasil, BBC News Brasil, Agência Brasil and more; reading view; live tile with the headlines.</string>
+    <string name="store_new_news">First release.</string>
 </resources>

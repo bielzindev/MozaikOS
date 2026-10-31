@@ -58,6 +58,8 @@ import kotlinx.coroutines.withContext
 class SongActions internal constructor(
     val rename: (Song) -> Unit,
     val delete: (Song) -> Unit,
+    /** Deletes several songs after one confirmation (one system dialog on Android 11+). */
+    val deleteMany: (List<Song>, () -> Unit) -> Unit,
     /** The rename / delete / error dialogs: place it last in the screen so it draws on top. */
     val Dialogs: @Composable () -> Unit,
 )
@@ -69,6 +71,7 @@ fun rememberSongActions(onChanged: () -> Unit): SongActions {
     val scope = rememberCoroutineScope()
     var renaming by remember { mutableStateOf<Song?>(null) }
     var deleting by remember { mutableStateOf<Song?>(null) }
+    var deletingMany by remember { mutableStateOf<Pair<List<Song>, () -> Unit>?>(null) }
     // What to do once Android grants access to the file.
     var pending by remember { mutableStateOf<(suspend () -> Unit)?>(null) }
     var failed by remember { mutableStateOf(false) }
@@ -112,7 +115,36 @@ fun rememberSongActions(onChanged: () -> Unit): SongActions {
         }
     }
 
+    fun doDeleteMany(songs: List<Song>, done: () -> Unit) {
+        fun finish() {
+            val fav = Favorites.get(context)
+            songs.forEach { fav.remove(it.id.toString()) }
+            done()
+            onChanged()
+        }
+        scope.launch {
+            when (val r = SongFiles.deleteMany(context, songs)) {
+                is SongFiles.Result.Done -> finish()
+                // Android 11+: the system dialog deletes them all; Android 10: one grant per file.
+                is SongFiles.Result.NeedsConsent -> ask(r.sender) {
+                    if (Build.VERSION.SDK_INT >= 30) finish() else doDeleteMany(songs, done)
+                }
+                SongFiles.Result.Failed -> { failed = true; onChanged() }
+            }
+        }
+    }
+
     val dialogs: @Composable () -> Unit = {
+        deletingMany?.let { (list, done) ->
+            WpMessageBox(
+                title = stringResource(R.string.music_delete_many_title),
+                message = context.resources.getQuantityString(R.plurals.music_delete_many_message, list.size, list.size),
+                confirm = stringResource(R.string.delete),
+                onConfirm = { deletingMany = null; doDeleteMany(list, done) },
+                dismiss = stringResource(R.string.cancel),
+                onDismiss = { deletingMany = null },
+            )
+        }
         renaming?.let { s -> RenameDialog(s, onDismiss = { renaming = null }) { title -> renaming = null; doRename(s, title) } }
         deleting?.let { s ->
             WpMessageBox(
@@ -135,7 +167,14 @@ fun rememberSongActions(onChanged: () -> Unit): SongActions {
         }
     }
     val dialogsState = androidx.compose.runtime.rememberUpdatedState(dialogs)
-    return remember { SongActions(rename = { renaming = it }, delete = { deleting = it }, Dialogs = { dialogsState.value() }) }
+    return remember {
+        SongActions(
+            rename = { renaming = it },
+            delete = { deleting = it },
+            deleteMany = { list, done -> if (list.isNotEmpty()) deletingMany = list to done },
+            Dialogs = { dialogsState.value() },
+        )
+    }
 }
 
 @Composable
@@ -203,6 +242,28 @@ object SongFiles {
         } catch (_: Exception) {
             Result.Failed
         }
+    }
+
+    /**
+     * Deletes [songs]; files Android protects are gathered into one delete request
+     * (Android 11+), or asked for one at a time (Android 10). Already gone counts as deleted.
+     */
+    suspend fun deleteMany(context: Context, songs: List<Song>): Result = withContext(Dispatchers.IO) {
+        val protected = ArrayList<android.net.Uri>()
+        for (s in songs) {
+            try {
+                context.contentResolver.delete(s.uri, null, null)
+            } catch (e: SecurityException) {
+                if (Build.VERSION.SDK_INT >= 30) {
+                    protected += s.uri
+                } else {
+                    return@withContext consent(context, e, write = false, s)
+                }
+            } catch (_: Exception) {
+            }
+        }
+        if (protected.isEmpty()) Result.Done
+        else Result.NeedsConsent(MediaStore.createDeleteRequest(context.contentResolver, protected).intentSender)
     }
 
     private fun consent(context: Context, e: SecurityException, write: Boolean, song: Song): Result = when {

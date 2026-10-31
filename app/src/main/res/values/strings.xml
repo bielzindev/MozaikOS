@@ -701,4 +701,17 @@
     <string name="tile_color_saturation">saturation</string>
     <string name="tile_color_brightness">brightness</string>
     <string name="tile_color_use">use this colour</string>
+    <string name="music_select">select</string>
+    <string name="music_select_all">select all</string>
+    <string name="music_delete_many_title">delete songs?</string>
+    <string name="music_delete_playlists_title">delete playlists?</string>
+    <string name="music_remove_from_playlist">remove</string>
+    <plurals name="music_delete_many_message">
+        <item quantity="one">%d song will be deleted from the phone.</item>
+        <item quantity="other">%d songs will be deleted from the phone.</item>
+    </plurals>
+    <plurals name="music_delete_playlists_message">
+        <item quantity="one">%d playlist will be deleted. The songs stay on the phone.</item>
+        <item quantity="other">%d playlists will be deleted. The songs stay on the phone.</item>
+    </plurals>
 </resources>

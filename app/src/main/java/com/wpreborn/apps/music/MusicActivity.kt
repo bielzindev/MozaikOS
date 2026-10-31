@@ -16,6 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import com.wpreborn.core.ui.WpMessageBox
+import androidx.compose.foundation.border
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.itemsIndexed
@@ -137,7 +139,7 @@ class MusicActivity : WpActivity() {
                         is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { ArtistDetail(it, nav, controller) }
                         is MusicPage.AlbumPage -> col?.albums?.firstOrNull { it.id == page.id }?.let { AlbumDetail(it, controller, songActions) }
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
-                            PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() })
+                            PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
                         }
                         MusicPage.NowPlaying -> NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
@@ -183,6 +185,22 @@ private fun CollectionPage(
     var top by remember { mutableFloatStateOf(0f) }
     var addTo by remember { mutableStateOf<Song?>(null) }
     val scope = rememberCoroutineScope()
+    // Multi-selection (like the 8.1 Music app's "select"): the pivot page it belongs to
+    // (2 albums, 3 songs, 4 playlists, -1 none) and the chosen ids.
+    var selKind by remember { androidx.compose.runtime.mutableIntStateOf(-1) }
+    var selected by remember { mutableStateOf(emptySet<String>()) }
+    var confirmPlaylists by remember { mutableStateOf(false) }
+    var addMany by remember { mutableStateOf<List<Song>?>(null) }
+    val selecting = selKind >= 0
+    fun clearSel() {
+        selKind = -1
+        selected = emptySet()
+    }
+    fun toggle(id: String) {
+        selected = if (id in selected) selected - id else selected + id
+    }
+    androidx.activity.compose.BackHandler(enabled = selecting) { clearSel() }
+    androidx.compose.runtime.LaunchedEffect(pivot.selected) { if (selKind >= 0 && pivot.selected != selKind) clearSel() }
     Box(Modifier.fillMaxSize().onGloballyPositioned { top = it.boundsInWindow().top }) {
         Column(Modifier.fillMaxSize()) {
             WpPivot(
@@ -222,7 +240,12 @@ private fun CollectionPage(
                             )
                         }
                     }
-                    index == 1 -> AlbumGrid(col.albums) { nav.navigate(MusicPage.AlbumPage(it.id)) }
+                    index == 1 -> AlbumGrid(
+                        col.albums,
+                        selected = if (selKind == 2) selected else null,
+                        onToggle = { toggle(it) },
+                        onSelect = { selKind = 2; selected = setOf(it) },
+                    ) { nav.navigate(MusicPage.AlbumPage(it.id)) }
                     index == 2 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
                         item {
                             WpText(
@@ -238,10 +261,15 @@ private fun CollectionPage(
                                 s,
                                 Modifier.onGloballyPositioned { bottom = it.boundsInWindow().bottom }.slideInStaggered(i),
                                 current = ui.mediaId == s.id.toString(),
-                                onLongClick = { menuY = bottom - top; menuSong = s },
+                                checked = if (selKind == 3) s.id.toString() in selected else null,
+                                onLongClick = if (selKind == 3) null else ({ menuY = bottom - top; menuSong = s }),
                             ) {
-                                controller.playSongs(col.songs, i)
-                                nav.navigate(MusicPage.NowPlaying)
+                                if (selKind == 3) {
+                                    toggle(s.id.toString())
+                                } else {
+                                    controller.playSongs(col.songs, i)
+                                    nav.navigate(MusicPage.NowPlaying)
+                                }
                             }
                         }
                     }
@@ -254,23 +282,66 @@ private fun CollectionPage(
                         )
                         LazyColumn(Modifier.fillMaxSize()) {
                             itemsIndexed(col.playlists, key = { _, p -> p.id }) { i, p ->
-                                Column(
+                                Row(
                                     Modifier
                                         .fillMaxWidth()
                                         .slideInStaggered(i)
-                                        .wpClickable { nav.navigate(MusicPage.PlaylistPage(p.id)) }
+                                        .wpCombinedClickable(onLongClick = if (selKind == 4) null else ({ selKind = 4; selected = setOf(p.id) })) {
+                                            if (selKind == 4) toggle(p.id) else nav.navigate(MusicPage.PlaylistPage(p.id))
+                                        }
                                         .padding(vertical = 6.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
                                 ) {
-                                    WpText(p.name.lowercase(), style = WpType.ExtraLarge, maxLines = 1)
-                                    WpText(context.resources.getQuantityString(R.plurals.songs_count, p.songIds.size, p.songIds.size), style = WpType.Subtle, color = Wp.palette.subtle)
+                                    if (selKind == 4) {
+                                        SelectBox(p.id in selected)
+                                        Spacer(Modifier.width(14.dp))
+                                    }
+                                    Column {
+                                        WpText(p.name.lowercase(), style = WpType.ExtraLarge, maxLines = 1)
+                                        WpText(context.resources.getQuantityString(R.plurals.songs_count, p.songIds.size, p.songIds.size), style = WpType.Subtle, color = Wp.palette.subtle)
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
+            val page = pivot.selected
+            val userPlaylists = col?.playlists.orEmpty().filterNot { it.system }
             WpAppBar(
-                buttons = emptyList(),
+                buttons = if (selecting && col != null) buildList {
+                    add(
+                        AppBarButton(WpIcons.Delete, stringResource(R.string.delete), enabled = selected.isNotEmpty()) {
+                            when (selKind) {
+                                3 -> songActions.deleteMany(col.songs.filter { it.id.toString() in selected }) { clearSel() }
+                                2 -> songActions.deleteMany(col.albums.filter { it.id.toString() in selected }.flatMap { it.songs }) { clearSel() }
+                                4 -> confirmPlaylists = true
+                            }
+                        },
+                    )
+                    if (selKind == 3) {
+                        add(
+                            AppBarButton(WpIcons.Add, stringResource(R.string.music_add_to_playlist), enabled = selected.isNotEmpty() && userPlaylists.isNotEmpty()) {
+                                addMany = col.songs.filter { it.id.toString() in selected }
+                            },
+                        )
+                    }
+                    add(
+                        AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select_all)) {
+                            val all = when (selKind) {
+                                3 -> col.songs.map { it.id.toString() }
+                                2 -> col.albums.map { it.id.toString() }
+                                else -> col.playlists.map { it.id }
+                            }.toSet()
+                            selected = if (selected.size == all.size) emptySet() else all
+                        },
+                    )
+                    add(AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { clearSel() })
+                } else if (granted && col != null && page in 2..4) {
+                    listOf(AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select)) { selKind = page; selected = emptySet() })
+                } else {
+                    emptyList()
+                },
                 menuItems = listOf(AppBarMenuItem(stringResource(R.string.refresh)) { onReload() }),
             )
         }
@@ -281,9 +352,43 @@ private fun CollectionPage(
                     ContextMenuItem(stringResource(R.string.music_add_to_playlist), enabled = !col?.playlists.orEmpty().none { !it.system }) { addTo = s },
                     ContextMenuItem(stringResource(R.string.music_rename)) { songActions.rename(s) },
                     ContextMenuItem(stringResource(R.string.delete)) { songActions.delete(s) },
+                    ContextMenuItem(stringResource(R.string.music_select)) { selKind = 3; selected = setOf(s.id.toString()) },
                 ),
                 anchorY = menuY,
                 onDismiss = { menuSong = null },
+            )
+        }
+        addMany?.let { list ->
+            WpContextMenu(
+                items = col?.playlists.orEmpty().filterNot { it.system }.map { p ->
+                    ContextMenuItem(p.name) {
+                        scope.launch {
+                            MusicLibrary(context).addToPlaylist(p.id, list.map { it.id })
+                            clearSel()
+                            onReload()
+                        }
+                    }
+                },
+                anchorY = menuY,
+                onDismiss = { addMany = null },
+            )
+        }
+        if (confirmPlaylists) {
+            WpMessageBox(
+                title = stringResource(R.string.music_delete_playlists_title),
+                message = context.resources.getQuantityString(R.plurals.music_delete_playlists_message, selected.size, selected.size),
+                confirm = stringResource(R.string.delete),
+                onConfirm = {
+                    confirmPlaylists = false
+                    val ids = selected
+                    scope.launch {
+                        MusicLibrary(context).deletePlaylists(ids)
+                        clearSel()
+                        onReload()
+                    }
+                },
+                dismiss = stringResource(R.string.cancel),
+                onDismiss = { confirmPlaylists = false },
             )
         }
         addTo?.let { s ->
@@ -304,7 +409,7 @@ private fun CollectionPage(
 }
 
 @Composable
-private fun SongRow(s: Song, modifier: Modifier, current: Boolean = false, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
+private fun SongRow(s: Song, modifier: Modifier, current: Boolean = false, checked: Boolean? = null, onLongClick: (() -> Unit)? = null, onClick: () -> Unit) {
     Row(
         modifier
             .fillMaxWidth()
@@ -312,6 +417,10 @@ private fun SongRow(s: Song, modifier: Modifier, current: Boolean = false, onLon
             .padding(vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (checked != null) {
+            SelectBox(checked)
+            Spacer(Modifier.width(14.dp))
+        }
         Column(Modifier.weight(1f)) {
             WpText(s.title, style = WpType.Large, color = if (current) Wp.accent else Color.Unspecified, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WpText(s.artist, style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -322,7 +431,13 @@ private fun SongRow(s: Song, modifier: Modifier, current: Boolean = false, onLon
 }
 
 @Composable
-private fun AlbumGrid(albums: List<Album>, onOpen: (Album) -> Unit) {
+private fun AlbumGrid(
+    albums: List<Album>,
+    selected: Set<String>? = null,
+    onToggle: (String) -> Unit = {},
+    onSelect: (String) -> Unit = {},
+    onOpen: (Album) -> Unit,
+) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize(),
@@ -331,8 +446,19 @@ private fun AlbumGrid(albums: List<Album>, onOpen: (Album) -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         itemsIndexed(albums, key = { _, a -> a.id }) { i, a ->
-            Column(Modifier.slideInStaggered(i / 2).wpClickable { onOpen(a) }) {
-                AlbumCover(a.artUri, Modifier.fillMaxWidth().aspectRatio(1f))
+            val id = a.id.toString()
+            Column(
+                Modifier.slideInStaggered(i / 2).wpCombinedClickable(onLongClick = if (selected != null) null else ({ onSelect(id) })) {
+                    if (selected != null) onToggle(id) else onOpen(a)
+                },
+            ) {
+                Box {
+                    AlbumCover(a.artUri, Modifier.fillMaxWidth().aspectRatio(1f))
+                    if (selected != null) {
+                        if (id in selected) Box(Modifier.matchParentSize().border(3.dp, Wp.accent))
+                        SelectBox(id in selected, Modifier.align(Alignment.TopEnd).padding(6.dp), onImage = true)
+                    }
+                }
                 WpText(a.title, style = WpType.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                 WpText(a.artist, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
@@ -432,22 +558,58 @@ private fun AlbumDetail(album: Album, controller: MusicController, songActions: 
 }
 
 @Composable
-private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicController, onDeleted: () -> Unit) {
+private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicController, onDeleted: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
+    // Positions in the playlist (a song can be in it twice), for "remove".
+    val entries = remember(p, songs) { val byId = songs.associateBy { it.id }; p.songIds.mapIndexedNotNull { i, id -> byId[id]?.let { i to it } } }
+    var sel by remember(p.id) { mutableStateOf<Set<Int>?>(null) }
+    androidx.activity.compose.BackHandler(enabled = sel != null) { sel = null }
     Column(Modifier.fillMaxSize()) {
         WpPageHeader(stringResource(R.string.music_playlists), p.name)
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
             if (songs.isEmpty()) item { CenteredMessage(stringResource(R.string.music_playlist_empty)) }
-            itemsIndexed(songs, key = { i, s -> "$i-${s.id}" }) { i, s ->
-                SongRow(s, Modifier.slideInStaggered(i)) { controller.playSongs(songs, i) }
+            itemsIndexed(entries, key = { _, e -> "${e.first}-${e.second.id}" }) { i, (pos, s) ->
+                SongRow(
+                    s,
+                    Modifier.slideInStaggered(i),
+                    checked = sel?.let { pos in it },
+                    onLongClick = if (p.system || sel != null) null else ({ sel = setOf(pos) }),
+                ) {
+                    val cur = sel
+                    if (cur != null) {
+                        sel = if (pos in cur) cur - pos else cur + pos
+                    } else {
+                        controller.playSongs(entries.map { it.second }, i)
+                    }
+                }
             }
+        }
+        val selection = sel
+        if (selection != null) {
+            WpAppBar(
+                buttons = listOf(
+                    AppBarButton(WpIcons.Delete, stringResource(R.string.music_remove_from_playlist), enabled = selection.isNotEmpty()) {
+                        scope.launch {
+                            MusicLibrary(context).removeFromPlaylist(p.id, selection)
+                            sel = null
+                            onChanged()
+                        }
+                    },
+                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select_all)) {
+                        sel = if (selection.size == entries.size) emptySet() else entries.map { it.first }.toSet()
+                    },
+                    AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { sel = null },
+                ),
+            )
+            return@Column
         }
         WpAppBar(
             buttons = listOf(
                 AppBarButton(WpIcons.Play, stringResource(R.string.music_play), enabled = songs.isNotEmpty()) { controller.playSongs(songs) },
                 AppBarButton(WpIcons.Shuffle, stringResource(R.string.music_shuffle), enabled = songs.isNotEmpty()) { controller.playSongs(songs.shuffled(), shuffle = true) },
             ) + if (!p.system) listOf(
+                AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select), enabled = songs.isNotEmpty()) { sel = emptySet() },
                 AppBarButton(WpIcons.Delete, stringResource(R.string.delete)) {
                     scope.launch {
                         MusicLibrary(context).deletePlaylist(p.id)
@@ -482,3 +644,17 @@ private fun NewPlaylistPage(library: MusicLibrary, onCreated: () -> Unit) {
     }
 }
 
+
+/** Windows Phone check box for multi-selection (accent fill and a check when ticked). */
+@Composable
+private fun SelectBox(checked: Boolean, modifier: Modifier = Modifier, onImage: Boolean = false) {
+    Box(
+        modifier
+            .size(if (onImage) 24.dp else 26.dp)
+            .background(if (checked) Wp.accent else if (onImage) Color.Black.copy(alpha = 0.35f) else Color.Transparent)
+            .border(2.dp, if (onImage) Color.White else Wp.palette.foreground),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (checked) WpIcon(WpIcons.Check, tint = Color.White, size = 18.dp)
+    }
+}

@@ -161,6 +161,23 @@ class MusicLibrary(private val context: Context) {
         saveUserPlaylists(userPlaylists().filterNot { it.id == playlistId })
     }
 
+    /** Deletes several playlists: ZUNEX ones, and Android's (MediaStore) where allowed. */
+    @Suppress("DEPRECATION")
+    suspend fun deletePlaylists(ids: Set<String>) = withContext(Dispatchers.IO) {
+        saveUserPlaylists(userPlaylists().filterNot { it.id in ids })
+        ids.filter { it.startsWith("sys:") }.forEach { id ->
+            runCatching {
+                val n = id.removePrefix("sys:").toLong()
+                context.contentResolver.delete(android.content.ContentUris.withAppendedId(MediaStore.Audio.Playlists.EXTERNAL_CONTENT_URI, n), null, null)
+            }
+        }
+    }
+
+    /** Takes the songs at [positions] out of a ZUNEX playlist (the files stay). */
+    suspend fun removeFromPlaylist(playlistId: String, positions: Set<Int>) {
+        saveUserPlaylists(userPlaylists().map { p -> if (p.id == playlistId) p.copy(songIds = p.songIds.filterIndexed { i, _ -> i !in positions }) else p })
+    }
+
     companion object {
         const val UNKNOWN = "Unknown"
     }

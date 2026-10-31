@@ -16,6 +16,8 @@ android {
         val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = build
         versionName = "0.1.$build"
+        // Phones (ARM) and the x86_64 emulator; keeps the map engine's native code small.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
     }
 
     // One fixed key for every build: Android only accepts an update signed with the same key as
@@ -100,6 +102,6 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
-    implementation("org.osmdroid:osmdroid-android:6.1.20")
+    implementation("org.maplibre.gl:android-sdk:13.7.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

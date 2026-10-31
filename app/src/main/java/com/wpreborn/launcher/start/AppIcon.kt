@@ -96,11 +96,12 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
         brand?.let { Image(it.logo.asImageBitmap(), null, modifier.size(size), colorFilter = filter) }
         return
     }
-    var icon by remember(app.key, px) { mutableStateOf(if (builtIn == null) repo.cachedIcon(app, px) else null) }
+    // Original: the app's artwork without the rounded mask (the tile carries its colour).
+    var icon by remember(app.key, px) { mutableStateOf(if (builtIn == null) repo.cachedTileIcon(app, px) else null) }
     LaunchedEffect(app.key, px) {
         if (icon == null) {
             icon = if (builtIn == null) {
-                repo.icon(app, px)
+                repo.tileIcon(app, px) ?: repo.icon(app, px)
             } else {
                 // A ZUNEX app shown with its Android launcher icon.
                 withContext(Dispatchers.IO) {

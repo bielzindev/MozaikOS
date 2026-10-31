@@ -160,6 +160,46 @@ class AppRepository private constructor(private val context: Context) {
         }
     }
 
+    private val tileIconCache = object : LruCache<String, Bitmap>(200) {}
+
+    fun cachedTileIcon(entry: AppEntry, sizePx: Int): Bitmap? = tileIconCache.get("${entry.key}@$sizePx")
+
+    /**
+     * The original icon for a tile, without the launcher's rounded mask: the tile takes the
+     * icon's colour, so only the artwork is drawn. A coloured background → its foreground
+     * artwork; a white background → the white monochrome version (Android 13+ icons), else the
+     * foreground in its colours. Legacy (non-adaptive) icons stay as they are.
+     */
+    suspend fun tileIcon(entry: AppEntry, sizePx: Int): Bitmap? {
+        if (entry.builtIn != null) return null
+        val key = "${entry.key}@$sizePx"
+        tileIconCache.get(key)?.let { return it }
+        return withContext(Dispatchers.IO) {
+            try {
+                val info = launcherApps.resolveActivity(Intent().setComponent(entry.component), entry.user ?: Process.myUserHandle())
+                val d = info?.getIcon(context.resources.displayMetrics.densityDpi) ?: return@withContext null
+                val bmp = if (d is android.graphics.drawable.AdaptiveIconDrawable && d.foreground != null) {
+                    val bg = d.background?.let { averageColor(it) }
+                    val whiteBg = bg == null || isNearWhite(bg)
+                    val mono = if (android.os.Build.VERSION.SDK_INT >= 33) d.monochrome else null
+                    if (whiteBg && mono != null) {
+                        val m = mono.mutate()
+                        m.setTint(android.graphics.Color.WHITE)
+                        renderSafeZone(m, sizePx)
+                    } else {
+                        renderSafeZone(d.foreground, sizePx)
+                    }
+                } else {
+                    d.toBitmap(sizePx, sizePx)
+                }
+                tileIconCache.put(key, bmp)
+                bmp
+            } catch (_: Exception) {
+                null
+            }
+        }
+    }
+
     /** Draws the inner 72/108 of an adaptive layer (where the logo lives) at [sizePx]. */
     private fun renderSafeZone(layer: android.graphics.drawable.Drawable, sizePx: Int): Bitmap {
         val full = (sizePx * 108f / 72f).toInt()

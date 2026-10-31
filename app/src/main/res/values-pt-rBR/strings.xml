@@ -715,4 +715,19 @@
         <item quantity="one">%d playlist será excluída. As músicas continuam no celular.</item>
         <item quantity="other">%d playlists serão excluídas. As músicas continuam no celular.</item>
     </plurals>
+    <string name="music_edit_tags">editar tags</string>
+    <string name="music_tags_title">editar tags</string>
+    <string name="music_tags_many_hint">Só as caixas que você preencher mudam; as outras ficam como estão em cada música.</string>
+    <string name="music_tag_title">Título</string>
+    <string name="music_tag_artist">Artista</string>
+    <string name="music_tag_album">Álbum</string>
+    <string name="music_tag_genre">Gênero</string>
+    <string name="music_tag_year">Ano</string>
+    <string name="music_tag_track">Faixa</string>
+    <string name="music_hide_unknown">ocultar artista desconhecido</string>
+    <string name="music_show_unknown">mostrar artista desconhecido</string>
+    <plurals name="music_tags_many">
+        <item quantity="one">editar tags de %d música</item>
+        <item quantity="other">editar tags de %d músicas</item>
+    </plurals>
 </resources>

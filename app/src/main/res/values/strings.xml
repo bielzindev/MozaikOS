@@ -714,4 +714,19 @@
         <item quantity="one">%d playlist will be deleted. The songs stay on the phone.</item>
         <item quantity="other">%d playlists will be deleted. The songs stay on the phone.</item>
     </plurals>
+    <string name="music_edit_tags">edit tags</string>
+    <string name="music_tags_title">edit tags</string>
+    <string name="music_tags_many_hint">Only the boxes you fill in change; the others stay as they are in each song.</string>
+    <string name="music_tag_title">Title</string>
+    <string name="music_tag_artist">Artist</string>
+    <string name="music_tag_album">Album</string>
+    <string name="music_tag_genre">Genre</string>
+    <string name="music_tag_year">Year</string>
+    <string name="music_tag_track">Track</string>
+    <string name="music_hide_unknown">hide unknown artist</string>
+    <string name="music_show_unknown">show unknown artist</string>
+    <plurals name="music_tags_many">
+        <item quantity="one">edit tags of %d song</item>
+        <item quantity="other">edit tags of %d songs</item>
+    </plurals>
 </resources>

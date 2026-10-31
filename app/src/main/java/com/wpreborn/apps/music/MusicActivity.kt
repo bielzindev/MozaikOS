@@ -121,7 +121,8 @@ class MusicActivity : WpActivity() {
         LaunchedEffect(Unit) { controller.connect() }
         val ui by controller.ui.collectAsState()
         val external by com.wpreborn.data.media.ExternalMediaWatcher.state.collectAsState()
-        val songActions = rememberSongActions { reload++ }
+        // Deleted songs leave the queue too, so the player never points at a missing file.
+        val songActions = rememberSongActions(onDeleted = { controller.removeSongs(it) }) { reload++ }
 
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
         LaunchedEffect(nowPlayingRequests) {
@@ -136,11 +137,15 @@ class MusicActivity : WpActivity() {
                         MusicPage.Collection -> CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }) {
                             PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
                         }
+                        // When the artist, album or playlist no longer exists (its last song was
+                        // deleted or retagged) the page goes back instead of staying blank.
                         is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { ArtistDetail(it, nav, controller) }
+                            ?: GoneBack(col != null) { nav.pop() }
                         is MusicPage.AlbumPage -> col?.albums?.firstOrNull { it.id == page.id }?.let { AlbumDetail(it, controller, songActions) }
+                            ?: GoneBack(col != null) { nav.pop() }
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
-                        }
+                        } ?: GoneBack(col != null) { nav.pop() }
                         MusicPage.NowPlaying -> NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
@@ -319,6 +324,16 @@ private fun CollectionPage(
                             }
                         },
                     )
+                    if (selKind == 3 || selKind == 2) {
+                        add(
+                            AppBarButton(WpIcons.Edit, stringResource(R.string.music_edit_tags), enabled = selected.isNotEmpty()) {
+                                val list = if (selKind == 3) col.songs.filter { it.id.toString() in selected }
+                                else col.albums.filter { it.id.toString() in selected }.flatMap { it.songs }
+                                songActions.editTags(list)
+                                clearSel()
+                            },
+                        )
+                    }
                     if (selKind == 3) {
                         add(
                             AppBarButton(WpIcons.Add, stringResource(R.string.music_add_to_playlist), enabled = selected.isNotEmpty() && userPlaylists.isNotEmpty()) {
@@ -342,7 +357,14 @@ private fun CollectionPage(
                 } else {
                     emptyList()
                 },
-                menuItems = listOf(AppBarMenuItem(stringResource(R.string.refresh)) { onReload() }),
+                menuItems = listOf(
+                    AppBarMenuItem(stringResource(R.string.refresh)) { onReload() },
+                    AppBarMenuItem(stringResource(if (MusicLibrary(context).hideUnknown) R.string.music_show_unknown else R.string.music_hide_unknown)) {
+                        val lib = MusicLibrary(context)
+                        lib.hideUnknown = !lib.hideUnknown
+                        onReload()
+                    },
+                ),
             )
         }
         menuSong?.let { s ->
@@ -351,6 +373,7 @@ private fun CollectionPage(
                     ContextMenuItem(stringResource(R.string.music_play)) { controller.playSongs(listOf(s)) },
                     ContextMenuItem(stringResource(R.string.music_add_to_playlist), enabled = !col?.playlists.orEmpty().none { !it.system }) { addTo = s },
                     ContextMenuItem(stringResource(R.string.music_rename)) { songActions.rename(s) },
+                    ContextMenuItem(stringResource(R.string.music_edit_tags)) { songActions.editTags(listOf(s)) },
                     ContextMenuItem(stringResource(R.string.delete)) { songActions.delete(s) },
                     ContextMenuItem(stringResource(R.string.music_select)) { selKind = 3; selected = setOf(s.id.toString()) },
                 ),
@@ -548,6 +571,7 @@ private fun AlbumDetail(album: Album, controller: MusicController, songActions: 
             items = listOf(
                 ContextMenuItem(stringResource(R.string.music_play)) { controller.playSongs(listOf(song)) },
                 ContextMenuItem(stringResource(R.string.music_rename)) { songActions.rename(song) },
+                ContextMenuItem(stringResource(R.string.music_edit_tags)) { songActions.editTags(listOf(song)) },
                 ContextMenuItem(stringResource(R.string.delete)) { songActions.delete(song) },
             ),
             anchorY = menuY,
@@ -657,4 +681,10 @@ private fun SelectBox(checked: Boolean, modifier: Modifier = Modifier, onImage: 
     ) {
         if (checked) WpIcon(WpIcons.Check, tint = Color.White, size = 18.dp)
     }
+}
+
+/** A page whose artist / album / playlist is gone: go back (once the library is loaded). */
+@Composable
+private fun GoneBack(loaded: Boolean, back: () -> Unit) {
+    if (loaded) androidx.compose.runtime.LaunchedEffect(Unit) { back() }
 }

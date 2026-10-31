@@ -114,6 +114,14 @@ class MusicController private constructor(private val context: Context) {
         }
     }
 
+    /** Takes deleted songs out of the queue (and stops when nothing is left). */
+    fun removeSongs(ids: Set<String>) = withController { c ->
+        for (i in c.mediaItemCount - 1 downTo 0) {
+            if (c.getMediaItemAt(i).mediaId in ids) c.removeMediaItem(i)
+        }
+        if (c.mediaItemCount == 0) c.stop()
+    }
+
     fun togglePlay() = withController { if (it.isPlaying) it.pause() else it.play() }
     fun next() = withController { it.seekToNextMediaItem() }
     fun previous() = withController { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }

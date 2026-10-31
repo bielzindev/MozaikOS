@@ -27,8 +27,8 @@ data class Song(
     val albumArtUri: Uri get() = ContentUris.withAppendedId(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, albumId)
 }
 
-data class Album(val id: Long, val title: String, val artist: String, val songs: List<Song>) {
-    val artUri: Uri get() = ContentUris.withAppendedId(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, id)
+data class Album(val id: Long, val title: String, val artist: String, val songs: List<Song>, val artId: Long = id) {
+    val artUri: Uri get() = ContentUris.withAppendedId(MediaStore.Audio.Albums.EXTERNAL_CONTENT_URI, artId)
 }
 
 data class Artist(val name: String, val albums: List<Album>, val songs: List<Song>)
@@ -48,12 +48,22 @@ data class MusicCollection(
 /** Reads the local music collection from MediaStore. Requires READ_MEDIA_AUDIO. */
 class MusicLibrary(private val context: Context) {
 
+    /** "Unknown" artist hidden: such songs show no artist and don't form an artist. */
+    var hideUnknown: Boolean
+        get() = context.getSharedPreferences("music", Context.MODE_PRIVATE).getBoolean("hideUnknown", false)
+        set(v) = context.getSharedPreferences("music", Context.MODE_PRIVATE).edit().putBoolean("hideUnknown", v).apply()
+
     suspend fun load(): MusicCollection = withContext(Dispatchers.IO) {
-        val songs = querySongs()
-        val albums = songs.groupBy { it.albumId }.map { (id, list) ->
-            Album(id, list.first().album, list.first().artist, list.sortedBy { it.track })
-        }.sortedBy { it.title.lowercase() }
-        val artists = songs.groupBy { it.artist }.map { (name, list) ->
+        val tags = TagStore.get(context)
+        val hide = hideUnknown
+        val songs = querySongs().map { tags.apply(it) }.map { if (hide && it.artist == UNKNOWN) it.copy(artist = "") else it }
+            .sortedBy { it.title.lowercase() }
+        // Songs whose album was renamed in ZUNEX form an album of that name.
+        val albums = songs.groupBy { s -> if (tags.get(s.id)?.album.isNullOrBlank()) s.albumId else -(1L + ((s.album.lowercase() + "|" + s.artist.lowercase()).hashCode().toLong() and 0x7FFFFFFF)) }
+            .map { (id, list) ->
+                Album(id, list.first().album, list.first().artist, list.sortedBy { it.track }, artId = list.first().albumId)
+            }.sortedBy { it.title.lowercase() }
+        val artists = songs.filter { it.artist.isNotBlank() }.groupBy { it.artist }.map { (name, list) ->
             Artist(name, albums.filter { a -> a.songs.any { it.artist == name } }, list.sortedBy { it.title.lowercase() })
         }.sortedBy { it.name.lowercase() }
         MusicCollection(songs, albums, artists, systemPlaylists() + userPlaylists())

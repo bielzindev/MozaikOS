@@ -181,7 +181,7 @@ private fun NowSection(w: Weather, f: Boolean, loading: Boolean, failed: Boolean
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.slideInStaggered(0)) {
             WpText(deg(w.temp, f), style = WpType.PanoramaTitle.copy(fontSize = 110.sp, lineHeight = 116.sp), color = Color.White)
             Spacer(Modifier.width(12.dp))
-            WeatherGlyph(w.code, w.isDay, 84.dp)
+            WeatherIcon(w.code, w.isDay, 84.dp)
         }
         WpText(stringResource(Sky.of(w.code).label), style = WpType.ExtraLarge, color = Color.White, modifier = Modifier.slideInStaggered(1))
         if (today != null) {
@@ -199,7 +199,7 @@ private fun NowSection(w: Weather, f: Boolean, loading: Boolean, failed: Boolean
             w.hours.drop(1).filterIndexed { i, _ -> i % 3 == 0 }.take(4).forEach { h ->
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     WpText(DateFormat.getTimeFormat(context).format(Date(h.time)).replace(":00", "h"), style = WpType.Small, color = Color.White.copy(alpha = 0.8f))
-                    WeatherGlyph(h.code, h.isDay, 30.dp, Modifier.padding(vertical = 4.dp))
+                    WeatherIcon(h.code, h.isDay, 30.dp, Modifier.padding(vertical = 4.dp))
                     WpText(deg(h.temp, f), style = WpType.Normal, color = Color.White)
                 }
             }
@@ -225,7 +225,7 @@ private fun HourlySection(w: Weather, f: Boolean) {
         itemsIndexed(w.hours) { i, h ->
             Row(Modifier.fillMaxWidth().slideInStaggered(i).padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 WpText(DateFormat.getTimeFormat(context).format(Date(h.time)), style = WpType.Large, color = Color.White, maxLines = 1, softWrap = false, modifier = Modifier.width(124.dp))
-                WeatherGlyph(h.code, h.isDay, 32.dp)
+                WeatherIcon(h.code, h.isDay, 32.dp)
                 Spacer(Modifier.width(14.dp))
                 WpText(deg(h.temp, f), style = WpType.Large, color = Color.White, modifier = Modifier.weight(1f))
                 if (h.precipChance > 0) WpText("${h.precipChance}%", style = WpType.Normal, color = Color(0xFF9FD3FF))
@@ -249,7 +249,7 @@ private fun DailySection(w: Weather, f: Boolean) {
                     )
                     WpText(DateFormat.format("d MMM", d.date).toString(), style = WpType.Small, color = Color.White.copy(alpha = 0.7f))
                 }
-                WeatherGlyph(d.code, true, 36.dp)
+                WeatherIcon(d.code, true, 36.dp)
                 Spacer(Modifier.width(14.dp))
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.Bottom) {
@@ -392,7 +392,7 @@ private fun PlacesPage(repo: WeatherRepository, onOpen: (Place) -> Unit) {
                                 )
                             }
                             if (w != null) {
-                                Box(Modifier.background(Wp.accent).padding(6.dp)) { WeatherGlyph(w.code, w.isDay, 28.dp) }
+                                Box(Modifier.background(Wp.accent).padding(6.dp)) { WeatherIcon(w.code, w.isDay, 28.dp) }
                                 Spacer(Modifier.width(10.dp))
                                 WpText(deg(w.temp, f), style = WpType.ExtraLarge)
                             }

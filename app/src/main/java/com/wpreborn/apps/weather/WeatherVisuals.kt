@@ -58,7 +58,32 @@ fun skyColors(code: Int, isDay: Boolean): List<Color> = when (Sky.of(code)) {
     Sky.Storm -> listOf(Color(0xFF3A3550), Color(0xFF110F1A))
 }
 
-/** Line-art weather glyph in the Segoe style, drawn with the canvas. */
+/**
+ * Colour weather icon for the Weather app: Meteocons "fill" set by Bas Milius (MIT licence,
+ * see third_party/meteocons), rendered to PNG.
+ */
+@Composable
+fun WeatherIcon(code: Int, isDay: Boolean, size: Dp, modifier: Modifier = Modifier) {
+    androidx.compose.foundation.Image(
+        androidx.compose.ui.res.painterResource(weatherIconRes(code, isDay)),
+        contentDescription = null,
+        modifier = modifier.size(size),
+    )
+}
+
+fun weatherIconRes(code: Int, isDay: Boolean): Int = when (Sky.of(code)) {
+    Sky.Clear -> if (isDay) R.drawable.wx_clear_day else R.drawable.wx_clear_night
+    Sky.PartlyCloudy -> if (isDay) R.drawable.wx_partly_cloudy_day else R.drawable.wx_partly_cloudy_night
+    Sky.Cloudy -> if (code == 3) R.drawable.wx_overcast else R.drawable.wx_cloudy
+    Sky.Fog -> if (isDay) R.drawable.wx_fog_day else R.drawable.wx_fog_night
+    Sky.Drizzle -> R.drawable.wx_drizzle
+    Sky.Rain -> R.drawable.wx_rain
+    Sky.Showers -> if (isDay) R.drawable.wx_partly_cloudy_day_rain else R.drawable.wx_partly_cloudy_night_rain
+    Sky.Snow -> R.drawable.wx_snow
+    Sky.Storm -> R.drawable.wx_thunderstorms_rain
+}
+
+/** Monochrome line glyph, for live tiles (Windows Phone tiles are white on the tile colour). */
 @Composable
 fun WeatherGlyph(code: Int, isDay: Boolean, size: Dp, modifier: Modifier = Modifier, color: Color = Color.White) {
     Canvas(modifier.size(size)) { drawGlyph(Sky.of(code), isDay, color) }

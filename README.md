@@ -122,6 +122,7 @@ Teclado do sistema no estilo do Windows Phone 8.1. Abra o app **Teclado** e siga
 
 - Fonte Open Sans: SIL Open Font License (`third_party/opensans/OFL.txt`).
 - Listas de palavras: [FrequencyWords](https://github.com/hermitdave/FrequencyWords), de Hermit Dave. O código é MIT (`third_party/frequencywords/LICENSE`) e os dados vêm das legendas do OpenSubtitles (CC-BY-SA 4.0).
+- Ícones de clima: [Meteocons](https://github.com/basmilius/weather-icons), de Bas Milius, licença MIT (`third_party/meteocons/LICENSE`).
 
 ## Limitações do Android (e alternativas adotadas)
 

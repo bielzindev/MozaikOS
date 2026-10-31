@@ -125,6 +125,7 @@ class MusicActivity : WpActivity() {
         LaunchedEffect(nowPlayingRequests) {
             if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
         }
+        Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 WpNavHost(nav) { page ->
@@ -144,6 +145,9 @@ class MusicActivity : WpActivity() {
                     }
                 }
             }
+        }
+        // Dialogs last, so they cover the list instead of being covered by it.
+        songActions.Dialogs()
         }
     }
 

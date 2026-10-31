@@ -223,7 +223,13 @@ fun AllAppsScreen(
 
 @Composable
 private fun AppRow(app: AppEntry, repo: AppRepository, modifier: Modifier, onClick: () -> Unit, onLongClick: () -> Unit) {
-    val metro = Wp.settings.metroIcons || app.builtIn != null
+    // Each app follows its own icon pack (Start edit mode > icon), else the global one.
+    val custom = com.wpreborn.launcher.start.rememberIconCustom(app)
+    val metro = when (custom.pack) {
+        com.wpreborn.data.apps.IconPack.Metro -> true
+        com.wpreborn.data.apps.IconPack.Original -> false
+        com.wpreborn.data.apps.IconPack.Default -> Wp.settings.metroIcons || app.builtIn != null
+    }
     val onAccent = metro || Wp.settings.iconsOnAccent
     Row(
         modifier

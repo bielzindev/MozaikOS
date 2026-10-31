@@ -72,7 +72,10 @@ data class TileInputs(
 fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, seed: Int) {
     val small = tile.size == TileSize.Small
     val builtIn = app?.builtIn
+    // A ZUNEX app's glyph takes the colour chosen for its icon.
+    val iconTint = rememberIconCustom(app).tintColor()
     Box(Modifier.fillMaxSize()) {
+      androidx.compose.runtime.CompositionLocalProvider(LocalTileIconTint provides iconTint) {
         when (builtIn) {
             BuiltInApp.Phone -> CountTile(WpIcons.Phone, inputs.live.missedCalls, tile.size)
             BuiltInApp.Messaging -> CountTile(WpIcons.Messaging, inputs.live.unreadSms, tile.size)
@@ -94,6 +97,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Maps -> IconTile(com.wpreborn.core.icons.Glyphs.MapPin, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
+      }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&
             !(builtIn == BuiltInApp.Calendar && tile.size != TileSize.Medium && inputs.live.events.isNotEmpty() && inputs.liveEnabled)
         if (showLabel && app != null) {
@@ -118,7 +122,7 @@ private fun iconSizeFor(size: TileSize): Dp = when (size) {
 
 @Composable
 private fun BoxScope.IconTile(icon: androidx.compose.ui.graphics.vector.ImageVector, size: TileSize) {
-    WpIcon(icon, Modifier.align(Alignment.Center), tint = Color.White, size = iconSizeFor(size))
+    WpIcon(icon, Modifier.align(Alignment.Center), tint = LocalTileIconTint.current ?: Color.White, size = iconSizeFor(size))
 }
 
 /** Iconic tile with a counter to the right of the glyph (Phone, Messaging). */
@@ -129,7 +133,7 @@ private fun BoxScope.CountTile(icon: androidx.compose.ui.graphics.vector.ImageVe
         return
     }
     if (size == TileSize.Small) {
-        WpIcon(icon, Modifier.align(Alignment.Center), tint = Color.White, size = 26.dp)
+        WpIcon(icon, Modifier.align(Alignment.Center), tint = LocalTileIconTint.current ?: Color.White, size = 26.dp)
         WpText(
             count.coerceAtMost(99).toString(),
             style = WpType.Small.copy(fontSize = 12.sp),
@@ -139,7 +143,7 @@ private fun BoxScope.CountTile(icon: androidx.compose.ui.graphics.vector.ImageVe
         return
     }
     Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-        WpIcon(icon, tint = Color.White, size = iconSizeFor(size))
+        WpIcon(icon, tint = LocalTileIconTint.current ?: Color.White, size = iconSizeFor(size))
         Spacer(Modifier.width(8.dp))
         WpText(count.coerceAtMost(99).toString(), style = WpType.TileCount, color = Color.White)
     }
@@ -375,6 +379,15 @@ private fun BoxScope.WeatherTile(size: TileSize, live: Boolean) {
         IconTile(com.wpreborn.core.icons.Glyphs.Weather, size)
         return
     }
+    // A soft sky of the current conditions behind the tile (same colours as the Weather app),
+    // darkened at the bottom so the temperature, texts and label stay readable.
+    val sky = com.wpreborn.apps.weather.skyColors(w.code, w.isDay)
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(sky))
+            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.25f)))),
+    )
     fun deg(c: Double) = com.wpreborn.data.weather.WeatherRepository.toUnit(c, f).let { kotlin.math.round(it).toInt() }.toString() + "°"
     if (size == TileSize.Small) {
         Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {

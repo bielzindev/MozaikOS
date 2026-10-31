@@ -32,6 +32,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.key
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -97,6 +98,9 @@ fun startGeometry(width: Dp, moreTiles: Boolean): StartGeometry {
 
 class StartScreenState {
     var editId by mutableStateOf<String?>(null)
+
+    /** Tile whose app icon is being customised (pack and colour). */
+    var iconEditorFor by mutableStateOf<String?>(null)
     var dragId by mutableStateOf<String?>(null)
     var colorPickerFor by mutableStateOf<String?>(null)
     /** Tile being launched; it leaves last during the feather-out. */
@@ -266,6 +270,9 @@ fun StartScreen(
                         },
                 ) {
                     tiles.forEachIndexed { index, tile ->
+                      // Each tile keeps its own state (icon, colours, animations) by its
+                      // permanent id, not by its position, so moving tiles never mixes them up.
+                      key(tile.id) {
                         val pl = placements.getOrNull(index) ?: Placement(0, 0)
                         val app = appFor(tile)
                         val dragging = state.dragId == tile.id
@@ -334,11 +341,23 @@ fun StartScreen(
                                 EditButton(WpIcons.Palette, Modifier.align(Alignment.TopStart).offset((-12).dp, (-12).dp)) {
                                     state.colorPickerFor = tile.id
                                 }
+                                if (app != null) {
+                                    EditButton(WpIcons.Edit, Modifier.align(Alignment.BottomStart).offset((-12).dp, 12.dp)) {
+                                        state.iconEditorFor = tile.id
+                                    }
+                                }
                             }
                         }
+                      }
                     }
                 }
             }
+        }
+
+        state.iconEditorFor?.let { id ->
+            tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
+                IconCustomizer(app, tileColor = tiles.first { it.id == id }.color?.color, onDismiss = { state.iconEditorFor = null })
+            } ?: run { state.iconEditorFor = null }
         }
 
         state.colorPickerFor?.let { id ->

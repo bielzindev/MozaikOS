@@ -1,69 +1,116 @@
 package com.wpreborn.launcher.start
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.TextUnit
-import androidx.compose.ui.unit.TextUnitType
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.drawable.toBitmap
 import com.wpreborn.core.icons.MetroIconPack
 import com.wpreborn.core.theme.Wp
-import com.wpreborn.core.theme.WpType
 import com.wpreborn.core.ui.WpIcon
-import com.wpreborn.core.ui.WpText
 import com.wpreborn.data.apps.AppEntry
 import com.wpreborn.data.apps.AppRepository
+import com.wpreborn.data.apps.IconCustom
+import com.wpreborn.data.apps.IconPack
+import com.wpreborn.data.apps.IconPrefs
+import com.wpreborn.data.apps.IconTint
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+/** Icon tint chosen for the app whose tile is being drawn (used by built-in live tiles). */
+val LocalTileIconTint = staticCompositionLocalOf<Color?> { null }
+
+/** The app's icon settings (per app, by its permanent key). */
+@Composable
+fun rememberIconCustom(app: AppEntry?): IconCustom {
+    val context = LocalContext.current
+    val all by remember { IconPrefs.get(context) }.all.collectAsState()
+    return app?.let { all[it.key] } ?: IconCustom()
+}
+
+/** The colour to draw the icon in, or null to keep its own colours. */
+fun IconCustom.tintColor(): Color? = when (tint) {
+    IconTint.Default -> null
+    IconTint.White -> Color.White
+    IconTint.Black -> Color.Black
+    IconTint.Custom -> Color(color)
+}
+
+/** Whether this app uses the Metro pack (its own choice, else the global one). */
+@Composable
+fun IconCustom.usesMetro(): Boolean = when (pack) {
+    IconPack.Metro -> true
+    IconPack.Original -> false
+    IconPack.Default -> Wp.settings.metroIcons
+}
 
 /**
- * The icon of an app on a tile or in the app list.
+ * The icon of an app on a tile or in the app list, following the app's own icon settings.
  *
- * Metro style (default): a ZUNEX glyph from [MetroIconPack]; otherwise the app's own
- * monochrome/silhouette icon in white; otherwise the first letter of its name, Metro-style.
- * Original style: the Android launcher icon.
+ * Metro: a ZUNEX glyph from [MetroIconPack] (white, or the chosen colour); apps outside the
+ * pack show their own logo without the round mask. Original: the Android launcher icon.
+ * A chosen colour recolours the artwork; "default" keeps its own colours.
+ *
+ * All loaded artwork is remembered per app ([AppEntry.key]), never per position, so tiles
+ * that move keep their own icons.
  */
 @Composable
 fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color = Color.White) {
+    val custom = rememberIconCustom(app)
+    val metro = custom.usesMetro()
+    val chosen = custom.tintColor()
     val builtIn = app.builtIn
-    if (builtIn != null) {
-        WpIcon(builtIn.icon, modifier, tint = tint, size = size)
+    if (builtIn != null && metro) {
+        WpIcon(builtIn.icon, modifier, tint = chosen ?: tint, size = size)
         return
     }
-    val metro = Wp.settings.metroIcons
     val glyph = remember(app.packageName, app.label, app.category) {
-        MetroIconPack.glyphFor(app.packageName, app.label, app.category)
+        if (builtIn != null) null else MetroIconPack.glyphFor(app.packageName, app.label, app.category)
     }
     if (metro && glyph != null) {
-        WpIcon(glyph, modifier, tint = tint, size = size)
+        WpIcon(glyph, modifier, tint = chosen ?: tint, size = size)
         return
     }
     val context = LocalContext.current
     val repo = remember { AppRepository.get(context) }
     val px = with(LocalDensity.current) { size.roundToPx() }
+    val filter = chosen?.let { ColorFilter.tint(it) }
     if (metro) {
         // Not in the pack: the app's own logo, without the round mask.
-        val brand by produceState(repo.cachedBrandIcon(app, px), app.key, px) {
-            if (value == null) value = repo.brandIcon(app, px)
-        }
-        brand?.let { Image(it.logo.asImageBitmap(), null, modifier.size(size)) }
+        var brand by remember(app.key, px) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
+        LaunchedEffect(app.key, px) { if (brand == null) brand = repo.brandIcon(app, px) }
+        brand?.let { Image(it.logo.asImageBitmap(), null, modifier.size(size), colorFilter = filter) }
         return
     }
-    val icon by produceState<ImageBitmap?>(repo.cachedIcon(app, px)?.asImageBitmap(), app.key, px) {
-        if (value == null) value = repo.icon(app, px)?.asImageBitmap()
+    var icon by remember(app.key, px) { mutableStateOf(if (builtIn == null) repo.cachedIcon(app, px) else null) }
+    LaunchedEffect(app.key, px) {
+        if (icon == null) {
+            icon = if (builtIn == null) {
+                repo.icon(app, px)
+            } else {
+                // A ZUNEX app shown with its Android launcher icon.
+                withContext(Dispatchers.IO) {
+                    runCatching { app.component?.let { context.packageManager.getActivityIcon(it).toBitmap(px, px) } }.getOrNull()
+                }
+            }
+        }
     }
-    icon?.let { Image(it, null, modifier.size(size)) }
+    icon?.let { bmp: Bitmap -> Image(bmp.asImageBitmap(), null, modifier.size(size), colorFilter = filter) }
 }
 
 /**
@@ -72,13 +119,13 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
  */
 @Composable
 fun rememberBrandColor(app: AppEntry?): Color? {
-    if (app == null || app.builtIn != null || !Wp.settings.metroIcons || !Wp.settings.brandColors) return null
+    val custom = rememberIconCustom(app)
+    if (app == null || app.builtIn != null || !custom.usesMetro() || !Wp.settings.brandColors) return null
     if (remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null) return null
     val context = LocalContext.current
     val repo = remember { AppRepository.get(context) }
     val px = with(LocalDensity.current) { 48.dp.roundToPx() }
-    val brand by produceState(repo.cachedBrandIcon(app, px), app.key) {
-        if (value == null) value = repo.brandIcon(app, px)
-    }
+    var brand by remember(app.key) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
+    LaunchedEffect(app.key) { if (brand == null) brand = repo.brandIcon(app, px) }
     return brand?.color?.let { Color(it) }
 }

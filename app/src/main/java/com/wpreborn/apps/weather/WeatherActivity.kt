@@ -177,58 +177,84 @@ private fun WeatherHub(repo: WeatherRepository, placeId: String?, onPlaces: () -
 private fun NowSection(w: Weather, f: Boolean, loading: Boolean, failed: Boolean) {
     val context = LocalContext.current
     val today = w.days.firstOrNull()
-    Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.slideInStaggered(0)) {
-            WpText(deg(w.temp, f), style = WpType.PanoramaTitle.copy(fontSize = 110.sp, lineHeight = 116.sp), color = Color.White)
-            Spacer(Modifier.width(12.dp))
-            WeatherIcon(w.code, w.isDay, 84.dp)
-        }
-        WpText(stringResource(Sky.of(w.code).label), style = WpType.ExtraLarge, color = Color.White, modifier = Modifier.slideInStaggered(1))
-        if (today != null) {
-            WpText(
-                stringResource(R.string.weather_high_low, deg(today.max, f), deg(today.min, f)),
-                style = WpType.Large,
-                color = Color.White,
-                modifier = Modifier.slideInStaggered(2).padding(top = 4.dp),
-            )
-        }
-        WpText(stringResource(R.string.weather_feels_like, deg(w.feelsLike, f)), style = WpType.Large, color = Color.White.copy(alpha = 0.8f), modifier = Modifier.slideInStaggered(3))
-        Spacer(Modifier.height(18.dp))
-        // The next few hours at a glance.
-        Row(Modifier.fillMaxWidth().slideInStaggered(4), horizontalArrangement = Arrangement.SpaceBetween) {
-            w.hours.drop(1).filterIndexed { i, _ -> i % 3 == 0 }.take(4).forEach { h ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    WpText(DateFormat.getTimeFormat(context).format(Date(h.time)).replace(":00", "h"), style = WpType.Small, color = Color.White.copy(alpha = 0.8f))
-                    WeatherIcon(h.code, h.isDay, 30.dp, Modifier.padding(vertical = 4.dp))
-                    WpText(deg(h.temp, f), style = WpType.Normal, color = Color.White)
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        // The big temperature scales with the section so "-12°" also fits on small screens.
+        val tempSize = (maxWidth.value * 0.30f).coerceIn(72f, 110f).sp
+        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.slideInStaggered(0)) {
+                WpText(
+                    deg(w.temp, f),
+                    style = WpType.PanoramaTitle.copy(fontSize = tempSize, lineHeight = tempSize * 1.05f),
+                    color = Color.White,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+                Spacer(Modifier.width(12.dp))
+                WeatherIcon(w.code, w.isDay, (tempSize.value * 0.7f).dp)
+            }
+            WpText(stringResource(Sky.of(w.code).label), style = WpType.ExtraLarge, color = Color.White, modifier = Modifier.slideInStaggered(1).padding(top = 4.dp))
+            Column(Modifier.slideInStaggered(2).padding(top = 6.dp)) {
+                if (today != null) {
+                    WpText(stringResource(R.string.weather_high_low, deg(today.max, f), deg(today.min, f)), style = WpType.Large, color = Color.White)
+                }
+                WpText(stringResource(R.string.weather_feels_like, deg(w.feelsLike, f)), style = WpType.Large, color = Color.White.copy(alpha = 0.8f))
+            }
+            Spacer(Modifier.height(24.dp))
+            // The next hours at a glance: four equal columns, aligned on their centres.
+            Row(Modifier.fillMaxWidth().slideInStaggered(3)) {
+                w.hours.drop(1).filterIndexed { i, _ -> i % 3 == 0 }.take(4).forEach { h ->
+                    Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+                        WpText(hourLabel(context, h.time), style = WpType.Small, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+                        WeatherIcon(h.code, h.isDay, 32.dp, Modifier.padding(vertical = 6.dp))
+                        WpText(deg(h.temp, f), style = WpType.Normal, color = Color.White)
+                    }
                 }
             }
+            Spacer(Modifier.weight(1f))
+            WpText(
+                when {
+                    loading -> stringResource(R.string.weather_updating)
+                    failed -> stringResource(R.string.weather_offline_cached, DateFormat.getTimeFormat(context).format(Date(w.updated)))
+                    else -> stringResource(R.string.weather_updated, DateFormat.getTimeFormat(context).format(Date(w.updated)))
+                },
+                style = WpType.Small,
+                color = Color.White.copy(alpha = 0.75f),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(bottom = 12.dp),
+            )
         }
-        Spacer(Modifier.weight(1f))
-        WpText(
-            when {
-                loading -> stringResource(R.string.weather_updating)
-                failed -> stringResource(R.string.weather_offline_cached, DateFormat.getTimeFormat(context).format(Date(w.updated)))
-                else -> stringResource(R.string.weather_updated, DateFormat.getTimeFormat(context).format(Date(w.updated)))
-            },
-            style = WpType.Small,
-            color = Color.White.copy(alpha = 0.7f),
-            modifier = Modifier.padding(bottom = 8.dp),
-        )
     }
 }
+
+/** "15h" on 24-hour phones, "3 PM" on 12-hour ones. */
+private fun hourLabel(context: android.content.Context, time: Long): String =
+    DateFormat.format(if (DateFormat.is24HourFormat(context)) "HH'h'" else "h a", time).toString()
 
 @Composable
 private fun HourlySection(w: Weather, f: Boolean) {
     val context = LocalContext.current
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, bottom = 12.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 12.dp)) {
         itemsIndexed(w.hours) { i, h ->
-            Row(Modifier.fillMaxWidth().slideInStaggered(i).padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
-                WpText(DateFormat.getTimeFormat(context).format(Date(h.time)), style = WpType.Large, color = Color.White, maxLines = 1, softWrap = false, modifier = Modifier.width(124.dp))
+            Row(Modifier.fillMaxWidth().slideInStaggered(i).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                WpText(
+                    DateFormat.getTimeFormat(context).format(Date(h.time)),
+                    style = WpType.Large,
+                    color = Color.White,
+                    maxLines = 1,
+                    softWrap = false,
+                    modifier = Modifier.weight(1.3f),
+                )
                 WeatherIcon(h.code, h.isDay, 32.dp)
-                Spacer(Modifier.width(14.dp))
-                WpText(deg(h.temp, f), style = WpType.Large, color = Color.White, modifier = Modifier.weight(1f))
-                if (h.precipChance > 0) WpText("${h.precipChance}%", style = WpType.Normal, color = Color(0xFF9FD3FF))
+                WpText(deg(h.temp, f), style = WpType.Large, color = Color.White, textAlign = androidx.compose.ui.text.style.TextAlign.End, modifier = Modifier.weight(0.8f))
+                // Fixed column so the percentages line up.
+                WpText(
+                    if (h.precipChance > 0) "${h.precipChance}%" else "",
+                    style = WpType.Normal,
+                    color = Color(0xFF9FD3FF),
+                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
+                    modifier = Modifier.width(56.dp),
+                )
             }
         }
     }

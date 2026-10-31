@@ -58,6 +58,8 @@ import kotlinx.coroutines.withContext
 class SongActions internal constructor(
     val rename: (Song) -> Unit,
     val delete: (Song) -> Unit,
+    /** The rename / delete / error dialogs: place it last in the screen so it draws on top. */
+    val Dialogs: @Composable () -> Unit,
 )
 
 /** Remembers the dialogs and permission flow for rename / delete; [onChanged] reloads the library. */
@@ -110,27 +112,30 @@ fun rememberSongActions(onChanged: () -> Unit): SongActions {
         }
     }
 
-    renaming?.let { s -> RenameDialog(s, onDismiss = { renaming = null }) { title -> renaming = null; doRename(s, title) } }
-    deleting?.let { s ->
-        WpMessageBox(
-            title = stringResource(R.string.music_delete_title),
-            message = stringResource(R.string.music_delete_message, s.title),
-            confirm = stringResource(R.string.delete),
-            onConfirm = { deleting = null; doDelete(s) },
-            dismiss = stringResource(R.string.cancel),
-            onDismiss = { deleting = null },
-        )
+    val dialogs: @Composable () -> Unit = {
+        renaming?.let { s -> RenameDialog(s, onDismiss = { renaming = null }) { title -> renaming = null; doRename(s, title) } }
+        deleting?.let { s ->
+            WpMessageBox(
+                title = stringResource(R.string.music_delete_title),
+                message = stringResource(R.string.music_delete_message, s.title),
+                confirm = stringResource(R.string.delete),
+                onConfirm = { deleting = null; doDelete(s) },
+                dismiss = stringResource(R.string.cancel),
+                onDismiss = { deleting = null },
+            )
+        }
+        if (failed) {
+            WpMessageBox(
+                title = stringResource(R.string.music_edit_failed_title),
+                message = stringResource(R.string.music_edit_failed),
+                confirm = stringResource(R.string.ok),
+                onConfirm = { failed = false },
+                onDismiss = { failed = false },
+            )
+        }
     }
-    if (failed) {
-        WpMessageBox(
-            title = stringResource(R.string.music_edit_failed_title),
-            message = stringResource(R.string.music_edit_failed),
-            confirm = stringResource(R.string.ok),
-            onConfirm = { failed = false },
-            onDismiss = { failed = false },
-        )
-    }
-    return remember { SongActions(rename = { renaming = it }, delete = { deleting = it }) }
+    val dialogsState = androidx.compose.runtime.rememberUpdatedState(dialogs)
+    return remember { SongActions(rename = { renaming = it }, delete = { deleting = it }, Dialogs = { dialogsState.value() }) }
 }
 
 @Composable

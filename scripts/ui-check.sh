@@ -62,6 +62,13 @@ tap_text() {
   fi
 }
 start() { adb shell am start -W -n "$PKG/$1" >/dev/null; }
+# Long-presses the first view whose text matches $1.
+long_text() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  local b
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -iE "(text|content-desc)=\"$1\"" | head -1 | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | grep -oE '[0-9]+' | tr '\n' ' ')
+  if [ -n "$b" ]; then set -- $b; local x=$(( ($1 + $3) / 2 )) y=$(( ($2 + $4) / 2 )); adb shell input swipe $x $y $x $y 1000; echo "long-pressed $*"; else echo "text not found: $1"; fi
+}
 # Like tap_text, but the last match (e.g. the button of a dialog drawn over the page).
 tap_text_last() {
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
@@ -152,6 +159,12 @@ swipe_left; sleep 1
 shot 43-music-albums 2
 swipe_left; sleep 1
 shot 44-music-songs 2
+long_text "Turnstile"
+sleep 1
+tap_text "delete"
+shot 44b-music-delete-dialog 2
+tap_text_last "cancel"
+sleep 1
 tap_text "Lumia Song"
 shot 45-music-now-playing 4
 adb shell input tap 980 2240; sleep 1; tap_text "equalizer"
@@ -266,6 +279,14 @@ swipe_left
 shot 70-weather-daily 2
 adb shell input keyevent KEYCODE_HOME
 shot 71-start-weather-tile 4
+
+# Start: per-app icon settings from edit mode (press and hold a tile)
+adb shell input keyevent KEYCODE_HOME; sleep 2
+long_text "Notes"
+sleep 1
+shot 70b-start-edit 1
+adb shell input keyevent KEYCODE_BACK; sleep 1
+adb shell input keyevent KEYCODE_HOME; sleep 1
 
 # ZUNEX Store: turn Camera off for real, check it left the app list, turn it back on
 start com.wpreborn.apps.store.StoreActivity

@@ -568,4 +568,14 @@
     <string name="store_new_flashlight">Primeira versão.</string>
     <string name="store_desc_maps">Mapas do OpenStreetMap com sua localização, busca de lugares, mapa escuro e rotas no seu app de navegação.</string>
     <string name="store_new_maps">Primeira versão.</string>
+    <string name="icon_title">ícone · %1$s</string>
+    <string name="icon_pack">pacote de ícones</string>
+    <string name="icon_pack_default">como em Personalizar</string>
+    <string name="icon_color">cor do ícone</string>
+    <string name="icon_color_default">cor do app</string>
+    <string name="icon_white">branco</string>
+    <string name="icon_black">preto</string>
+    <string name="icon_custom">personalizada</string>
+    <string name="icon_done">pronto</string>
+    <string name="icon_reset">redefinir</string>
 </resources>

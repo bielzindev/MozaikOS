@@ -270,6 +270,7 @@ private fun RecordingsPage(refresh: Int) {
                 onDismiss = { menu = null },
             )
         }
+        actions.Dialogs()
     }
 }
 

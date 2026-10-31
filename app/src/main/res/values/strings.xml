@@ -567,4 +567,14 @@
     <string name="store_new_flashlight">First release.</string>
     <string name="store_desc_maps">OpenStreetMap maps with your location, place search, dark map and directions in your navigation app.</string>
     <string name="store_new_maps">First release.</string>
+    <string name="icon_title">icon · %1$s</string>
+    <string name="icon_pack">icon pack</string>
+    <string name="icon_pack_default">as in Personalize</string>
+    <string name="icon_color">icon colour</string>
+    <string name="icon_color_default">app\'s colour</string>
+    <string name="icon_white">white</string>
+    <string name="icon_black">black</string>
+    <string name="icon_custom">custom</string>
+    <string name="icon_done">done</string>
+    <string name="icon_reset">reset</string>
 </resources>

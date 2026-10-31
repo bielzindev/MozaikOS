@@ -217,6 +217,52 @@ suspend fun saveAiPhoto(
     }
 }
 
+/**
+ * Saves a ZUNEX Fusion picture (already merged, tone-mapped and upright): scene colour,
+ * sharpening and, for portraits, the background blur, then Pictures/ZUNEX.
+ */
+suspend fun saveFusedPhoto(context: Context, upright: Bitmap, scene: Scene, portrait: Boolean, name: String): Uri? = withContext(Dispatchers.Default) {
+    val resolver = context.contentResolver
+    val values = ContentValues().apply {
+        put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+        put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/ZUNEX")
+        put(MediaStore.MediaColumns.IS_PENDING, 1)
+    }
+    val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext null
+    try {
+        val t = tuning(scene)
+        // The tone map already lifted the shadows and set the exposure: colour and detail only.
+        val fused = Tuning(t.wb, 0.46f, t.contrast * 0.8f, 0f, t.vibrance, t.sharpen * 1.2f, t.warmth, t.skin)
+        val mask = if (portrait) personMask(upright) else null
+        val out = try {
+            enhance(upright, fused, mask)
+        } catch (_: Throwable) {
+            upright
+        }
+        resolver.openOutputStream(uri)?.use { os -> out.compress(Bitmap.CompressFormat.JPEG, 95, os) }
+        if (out !== upright) out.recycle()
+        runCatching {
+            resolver.openFileDescriptor(uri, "rw")?.use { fd ->
+                val exif = ExifInterface(fd.fileDescriptor)
+                val now = java.text.SimpleDateFormat("yyyy:MM:dd HH:mm:ss", java.util.Locale.US).format(java.util.Date())
+                exif.setAttribute(ExifInterface.TAG_DATETIME, now)
+                exif.setAttribute(ExifInterface.TAG_DATETIME_ORIGINAL, now)
+                exif.setAttribute(ExifInterface.TAG_MAKE, android.os.Build.MANUFACTURER)
+                exif.setAttribute(ExifInterface.TAG_MODEL, android.os.Build.MODEL)
+                exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
+                exif.setAttribute(ExifInterface.TAG_SOFTWARE, "ZUNEX Camera Fusion")
+                exif.saveAttributes()
+            }
+        }
+        resolver.update(uri, ContentValues().apply { put(MediaStore.MediaColumns.IS_PENDING, 0) }, null, null)
+        uri
+    } catch (_: Throwable) {
+        runCatching { resolver.delete(uri, null, null) }
+        null
+    }
+}
+
 private val EXIF_TAGS = listOf(
     ExifInterface.TAG_DATETIME, ExifInterface.TAG_DATETIME_ORIGINAL, ExifInterface.TAG_DATETIME_DIGITIZED,
     ExifInterface.TAG_OFFSET_TIME, ExifInterface.TAG_OFFSET_TIME_ORIGINAL,

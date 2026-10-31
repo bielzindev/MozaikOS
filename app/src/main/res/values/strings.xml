@@ -669,7 +669,7 @@
     <string name="camera_set_resolution_hint">12 MP combines the pixels of high-resolution sensors (50-108 MP) for cleaner, brighter photos, like the phone\'s own camera. Maximum keeps every pixel but is noisier in low light.</string>
     <string name="camera_ai">ZUNEX AI</string>
     <string name="camera_ai_short">AI</string>
-    <string name="camera_ai_hint">Recognises the scene (people, food, landscape, sky, plants, animals, sunset, night) and processes each photo for it: colour, exposure, contrast, sharpness. Works on the phone, without internet.</string>
+    <string name="camera_ai_hint">ZUNEX Fusion: each photo is a burst of 6 to 8 frames, aligned and merged (less noise, sky and shadows kept, like HDR+ and Deep Fusion), then the AI recognises the scene (people, food, landscape, sky, plants, animals, sunset, night) and tunes colour and sharpness. On the phone, without internet.</string>
     <string name="camera_ai_processing">AI processing…</string>
     <string name="camera_scene_general">auto</string>
     <string name="camera_scene_people">people</string>

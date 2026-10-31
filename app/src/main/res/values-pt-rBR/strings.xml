@@ -670,7 +670,7 @@
     <string name="camera_set_resolution_hint">12 MP junta os pixels de sensores de alta resolução (50-108 MP) para fotos mais limpas e claras, como a câmera do próprio celular. Máxima mantém todos os pixels, mas tem mais ruído com pouca luz.</string>
     <string name="camera_ai">IA ZUNEX</string>
     <string name="camera_ai_short">IA</string>
-    <string name="camera_ai_hint">Reconhece a cena (pessoas, comida, paisagem, céu, plantas, animais, pôr do sol, noite) e processa cada foto para ela: cor, exposição, contraste, nitidez. Funciona no celular, sem internet.</string>
+    <string name="camera_ai_hint">Fusão ZUNEX: cada foto é uma rajada de 6 a 8 quadros, alinhados e combinados (menos ruído, céu e sombras preservados, como HDR+ e Deep Fusion); depois a IA reconhece a cena (pessoas, comida, paisagem, céu, plantas, animais, pôr do sol, noite) e ajusta cor e nitidez. No celular, sem internet.</string>
     <string name="camera_ai_processing">IA processando…</string>
     <string name="camera_scene_general">auto</string>
     <string name="camera_scene_people">pessoas</string>

@@ -357,9 +357,13 @@ private fun CameraScreen(activity: CameraActivity) {
     var processing by remember { mutableIntStateOf(0) }
     val analysisExecutor = remember { java.util.concurrent.Executors.newSingleThreadExecutor() }
     val sceneDetector = remember { SceneDetector { s -> scene = s } }
+    val fusion = remember { FusionAnalyzer { s -> scene = s } }
+    var fusionOn by remember { mutableStateOf(false) }
+    var analysisUse by remember { mutableStateOf<ImageAnalysis?>(null) }
     DisposableEffect(Unit) {
         onDispose {
             sceneDetector.close()
+            fusion.close()
             analysisExecutor.shutdown()
         }
     }
@@ -391,6 +395,7 @@ private fun CameraScreen(activity: CameraActivity) {
                     else -> Surface.ROTATION_0
                 }
                 imageCapture?.targetRotation = rotation
+                analysisUse?.targetRotation = rotation
                 videoCapture?.targetRotation = rotation
             }
         }
@@ -504,6 +509,38 @@ private fun CameraScreen(activity: CameraActivity) {
             bound = runCatching { bind(extSelector) }.getOrNull()
             if (bound != null) usedLook = look
         }
+        // ZUNEX Fusion: preview + full-resolution frames for the multi-frame merge.
+        var fused = false
+        analysisUse = null
+        if (bound == null && !video && settings.ai && !settings.fullRes && (look == Look.Normal || look == Look.AiPortrait)) {
+            bound = runCatching {
+                provider.unbindAll()
+                val ia = ImageAnalysis.Builder()
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setAspectRatioStrategy(ratio)
+                            .setResolutionStrategy(ResolutionStrategy.HIGHEST_AVAILABLE_STRATEGY)
+                            .setResolutionFilter { sizes, _ -> sizes.filter { it.width.toLong() * it.height <= 16_800_000L }.ifEmpty { sizes } }
+                            .build(),
+                    )
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_YUV_420_888)
+                    .setTargetRotation(rotation)
+                    .build()
+                ia.setAnalyzer(analysisExecutor, fusion)
+                val cam = provider.bindToLifecycle(lifecycle, base, preview, ia)
+                // Only worth it at (near) photo resolution; else the single-shot pipeline.
+                val res = ia.resolutionInfo?.resolution
+                if (res == null || res.width.toLong() * res.height < 6_000_000L) {
+                    provider.unbindAll()
+                    throw IllegalStateException("fusion stream too small")
+                }
+                analysisUse = ia
+                cam
+            }.getOrNull()
+            fused = bound != null
+        }
+        fusionOn = fused
         if (bound == null && !video && settings.ai) bound = runCatching { bind(base, analysis = true) }.getOrNull()
         if (bound == null) bound = runCatching { bind(base) }.getOrNull()
         if (bound != null && usedLook == Look.Normal && look == Look.AiPortrait) usedLook = Look.AiPortrait
@@ -559,7 +596,71 @@ private fun CameraScreen(activity: CameraActivity) {
     }
     LaunchedEffect(Unit) { lastUri = latestCapture(context) }
 
+    /** ZUNEX Fusion: a burst of frames, merged and tone-mapped, then the scene AI. */
+    fun fusionShot(name: String, portraitAi: Boolean) {
+        val shotScene = if (portraitAi && scene == Scene.General) Scene.People else scene
+        val mirror = isFront && settings.mirror
+        val night = fusion.brightness < 0.22f
+        val count = if (night) 8 else 6
+        // Highlights burning out: a darker burst (-1 EV) for the tone map to lift (HDR).
+        val under = !night && fusion.clipped > 0.015f
+        val torch = flash == FlashMode.On
+        val c = camera
+        scope.launch {
+            blink.snapTo(1f)
+            blink.animateTo(0f, tween(250))
+        }
+        sound(android.media.MediaActionSound.SHUTTER_CLICK)
+        processing++
+        scope.launch {
+            var restore: Int? = null
+            val st = c?.cameraInfo?.exposureState
+            if (under && st != null && st.isExposureCompensationSupported && manualAllowed && iso < AUTO_ZONE && shutter < AUTO_ZONE) {
+                val step = st.exposureCompensationStep.toFloat()
+                val target = (st.exposureCompensationIndex + (-1f / step).roundToInt()).coerceIn(st.exposureCompensationRange.lower, st.exposureCompensationRange.upper)
+                restore = st.exposureCompensationIndex
+                runCatching { kotlinx.coroutines.withTimeoutOrNull(800) { c.cameraControl.setExposureCompensationIndex(target).awaitOn(context) } }
+            }
+            if (torch) {
+                c?.cameraControl?.enableTorch(true)
+                delay(400)
+            }
+            var done = false
+            fusion.burst(count) { frames ->
+                aiScope.launch {
+                    if (done) return@launch
+                    done = true
+                    restore?.let { c?.cameraControl?.setExposureCompensationIndex(it) }
+                    if (torch) c?.cameraControl?.enableTorch(false)
+                    val uri = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+                        runCatching {
+                            val merged = fuse(frames)
+                            val bmp = renderFused(merged, mirror, under)
+                            saveFusedPhoto(context, bmp, shotScene, portraitAi, name).also { bmp.recycle() }
+                        }.getOrNull()
+                    }
+                    processing--
+                    if (uri != null) lastUri = uri else error = context.getString(R.string.camera_save_failed)
+                }
+            }
+            // The stream stopped (camera closed, error): give up after a while.
+            delay(4000)
+            if (!done) {
+                done = true
+                fusion.burst(0) {}
+                restore?.let { c?.cameraControl?.setExposureCompensationIndex(it) }
+                if (torch) c?.cameraControl?.enableTorch(false)
+                processing--
+                error = context.getString(R.string.camera_save_failed)
+            }
+        }
+    }
+
     fun takePhoto() {
+        if (fusionOn) {
+            fusionShot("ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()), activeLook == Look.AiPortrait)
+            return
+        }
         val ic = imageCapture ?: return
         val name = "ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val portraitAi = activeLook == Look.AiPortrait

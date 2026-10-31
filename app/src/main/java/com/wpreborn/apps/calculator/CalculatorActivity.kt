@@ -224,7 +224,7 @@ private fun RowScope.Key(
             .weight(1f)
             .height(if (small) 46.dp else 68.dp)
             .background(bg)
-            .then(if (onLongClick != null) Modifier.wpCombinedClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.wpClickable(onClick = onClick))
+            .then(if (onLongClick != null) Modifier.wpCombinedClickable(onLongClick = onLongClick, onClick = onClick) else Modifier.wpClickable(onClick = onClick)),
         contentAlignment = Alignment.Center,
     ) {
         if (icon) {

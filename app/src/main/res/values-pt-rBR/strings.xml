@@ -501,4 +501,6 @@
     <string name="store_desc_store">Obtenha, atualize, desative e remova os apps da família ZUNEX.</string>
     <string name="store_new_store">Primeira versão.</string>
     <string name="store_short">loja</string>
+    <string name="music_favorite">adicionar às favoritas</string>
+    <string name="music_unfavorite">remover das favoritas</string>
 </resources>

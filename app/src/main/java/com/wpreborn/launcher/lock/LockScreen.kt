@@ -351,45 +351,29 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
 }
 
 /** The 8.1 lock screen media strip: title, artist and transport buttons. */
-/** The lock screen music widget: cover, song, artist, transport and a seek bar. */
+/**
+ * Music on the lock screen, the Windows Phone way: the song and artist in plain white type
+ * and the three round transport buttons, no card or artwork.
+ */
 @Composable
 private fun LockMedia(playback: com.wpreborn.data.media.Playback) {
     val context = LocalContext.current
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
-            .background(Color.Black.copy(alpha = 0.45f), androidx.compose.foundation.shape.RoundedCornerShape(10.dp))
-            .padding(14.dp),
+    Row(
+        Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.animation.AnimatedContent(playback.trackKey, label = "lockArt") { _ ->
-                com.wpreborn.apps.common.PlaybackArt(
-                    playback,
-                    Modifier.size(72.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(6.dp)),
-                )
-            }
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                WpText(playback.title, style = WpType.Large, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                WpText(playback.artist, style = WpType.Normal, color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Previous, size = 38.dp, color = Color.White) { playback.previous(context) }
-                    Spacer(Modifier.width(10.dp))
-                    com.wpreborn.core.ui.RoundButton(
-                        if (playback.playing) com.wpreborn.core.icons.WpIcons.Pause else com.wpreborn.core.icons.WpIcons.Play,
-                        size = 44.dp,
-                        color = Color.White,
-                    ) { playback.togglePlay(context) }
-                    Spacer(Modifier.width(10.dp))
-                    com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Next, size = 38.dp, color = Color.White) { playback.next(context) }
-                    if (playback.playing) com.wpreborn.apps.common.PlayingBars(Modifier.padding(start = 14.dp))
-                }
-            }
+        Column(Modifier.weight(1f)) {
+            WpText(playback.title, style = WpType.Normal.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(playback.artist, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        if (playback.durationMs > 0) {
-            Spacer(Modifier.height(6.dp))
-            com.wpreborn.apps.music.SeekBar(playback.positionMs, playback.durationMs, Wp.accent) { playback.seekTo(context, it) }
-        }
+        com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Previous, size = 40.dp, color = Color.White) { playback.previous(context) }
+        Spacer(Modifier.width(8.dp))
+        com.wpreborn.core.ui.RoundButton(
+            if (playback.playing) com.wpreborn.core.icons.WpIcons.Pause else com.wpreborn.core.icons.WpIcons.Play,
+            size = 40.dp,
+            color = Color.White,
+        ) { playback.togglePlay(context) }
+        Spacer(Modifier.width(8.dp))
+        com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Next, size = 40.dp, color = Color.White) { playback.next(context) }
     }
 }

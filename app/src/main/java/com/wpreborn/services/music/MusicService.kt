@@ -32,7 +32,8 @@ class MusicService : MediaSessionService() {
             .build()
         val open = PendingIntent.getActivity(
             this, 0,
-            Intent(this, MusicActivity::class.java).putExtra(MusicActivity.EXTRA_NOW_PLAYING, true),
+            Intent(this, MusicActivity::class.java).putExtra(MusicActivity.EXTRA_NOW_PLAYING, true)
+                .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         session = MediaSession.Builder(this, player).setSessionActivity(open).build()

@@ -154,7 +154,7 @@ swipe_left; sleep 1
 shot 44-music-songs 2
 tap_text "Lumia Song"
 shot 45-music-now-playing 4
-tap_text "equalizer"
+adb shell input tap 980 2240; sleep 1; tap_text "equalizer"
 shot 45b-equalizer 3
 tap_text "Rock"
 shot 45c-equalizer-rock 2

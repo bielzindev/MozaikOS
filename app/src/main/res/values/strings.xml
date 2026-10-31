@@ -500,4 +500,6 @@
     <string name="store_desc_store">Get, update, turn off and remove the apps of the ZUNEX family.</string>
     <string name="store_new_store">First release.</string>
     <string name="store_short">store</string>
+    <string name="music_favorite">add to favorites</string>
+    <string name="music_unfavorite">remove from favorites</string>
 </resources>

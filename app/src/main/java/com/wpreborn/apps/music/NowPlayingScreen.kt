@@ -1,21 +1,13 @@
 package com.wpreborn.apps.music
 
-import android.graphics.Bitmap
-import android.os.Build
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
-import androidx.compose.foundation.basicMarquee
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -24,39 +16,26 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
@@ -69,12 +48,13 @@ import androidx.media3.common.Player
 import com.wpreborn.R
 import com.wpreborn.apps.common.LocalChrome
 import com.wpreborn.apps.common.PlaybackArt
-import com.wpreborn.core.icons.Glyphs
 import com.wpreborn.core.icons.WpIcons
+import com.wpreborn.core.motion.slideInStaggered
 import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
-import com.wpreborn.core.ui.ImageLoader
+import com.wpreborn.core.ui.AppBarMenuItem
 import com.wpreborn.core.ui.RoundButton
+import com.wpreborn.core.ui.WpAppBar
 import com.wpreborn.core.ui.WpFormat
 import com.wpreborn.core.ui.WpIcon
 import com.wpreborn.core.ui.WpText
@@ -88,213 +68,131 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * The full player. The album cover is the centre of the screen; the background takes its
- * colours, the title and artist sit under it with clear hierarchy, then the seek bar and the
- * transport. Shuffle, repeat, favourite, the queue and the equalizer are one tap away. The
- * cover swipes to change song and everything cross-fades when the track changes. It plays
- * ZUNEX's own queue or controls Spotify / any other player through the same [Playback].
+ * Now playing, as Windows Phone 8.1 drew it: the app title, the lowercase "now playing"
+ * header, a square cover, the song in large light type, the artist in the accent colour and
+ * the album dimmed, a thin accent progress bar with the times, and the transport row
+ * (repeat, previous, play/pause in its circle, next, shuffle). The app bar's "..." holds
+ * favourite, up next and the equalizer. The cover swipes to change song, like Xbox Music.
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun NowPlayingScreen(onEqualizer: () -> Unit) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val controller = remember { MusicController.get(context) }
     val playback = rememberPlayback()
     val favorites by remember { Favorites.get(context) }.ids.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
 
-    // The bar would repeat what this screen shows.
+    // The Playing Now bar would repeat this screen.
     val chrome = LocalChrome.current
     DisposableEffect(chrome) {
         chrome?.hidePlayingNow = true
         onDispose { chrome?.hidePlayingNow = false }
     }
 
-    val tint = rememberArtColor(playback)
-    val top by animateColorAsState(lerp(Color.Black, tint, 0.75f), tween(700), label = "top")
-    val bottom by animateColorAsState(lerp(Color.Black, tint, 0.18f), tween(700), label = "bottom")
+    val appTitle = when {
+        playback == null || playback.own -> stringResource(R.string.music_title)
+        playback.isSpotify -> "SPOTIFY"
+        else -> stringResource(R.string.music_other_app)
+    }
 
-    Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(top, bottom)))) {
+    Column(Modifier.fillMaxSize()) {
+        WpText(appTitle.uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
+        WpText(
+            stringResource(if (showQueue) R.string.music_up_next else R.string.music_now_playing),
+            style = WpType.Header,
+            maxLines = 1,
+            modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
+        )
         if (playback == null) {
-            Column(Modifier.padding(start = 20.dp, top = 14.dp)) {
-                WpText(stringResource(R.string.music_now_playing).uppercase(), style = WpType.AppTitle, color = Color.White)
-                WpText(stringResource(R.string.music_nothing_playing), style = WpType.Large, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(top = 24.dp))
-            }
-            return@Box
-        }
-        // A soft, blurred copy of the cover gives depth where the system can blur.
-        if (Build.VERSION.SDK_INT >= 31) {
-            PlaybackArt(
-                playback,
-                Modifier.fillMaxSize().graphicsLayer { alpha = 0.35f; scaleX = 1.4f; scaleY = 1.4f }.blur(40.dp),
-                sizePx = 256,
-            )
-            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Transparent, bottom.copy(alpha = 0.9f)))))
+            WpText(stringResource(R.string.music_nothing_playing), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(start = 20.dp, top = 12.dp))
+            return@Column
         }
 
-        Column(Modifier.fillMaxSize().navigationBarsPadding().padding(horizontal = 28.dp)) {
-            Row(Modifier.fillMaxWidth().padding(top = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                WpText(
-                    stringResource(R.string.music_now_playing).uppercase() + if (!playback.own) "  ·  " + (if (playback.isSpotify) "SPOTIFY" else stringResource(R.string.music_other_app).uppercase()) else "",
-                    style = WpType.AppTitle,
-                    color = Color.White.copy(alpha = 0.85f),
-                    modifier = Modifier.weight(1f),
-                )
-            }
-
-            BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) {
-                val side = minOf(maxWidth, maxHeight * 0.92f)
-                Cover(playback, Modifier.size(side)) { forward -> if (forward) playback.next(context) else playback.previous(context) }
-            }
-
-            // Title, artist and the heart.
-            Row(verticalAlignment = Alignment.CenterVertically) {
+        if (showQueue && playback.own) {
+            Queue(playback, Modifier.weight(1f)) { i -> controller.skipAhead(i + 1); showQueue = false }
+        } else {
+            Column(Modifier.weight(1f).padding(horizontal = 20.dp)) {
+                BoxWithConstraints(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopStart) {
+                    val side = minOf(maxWidth, maxHeight)
+                    Cover(playback, Modifier.size(side)) { forward -> if (forward) playback.next(context) else playback.previous(context) }
+                }
+                Spacer(Modifier.height(12.dp))
                 AnimatedContent(
                     playback.trackKey,
-                    transitionSpec = { (slideInVertically { it / 3 } + fadeIn(tween(300))) togetherWith fadeOut(tween(150)) },
-                    modifier = Modifier.weight(1f),
-                    label = "title",
+                    transitionSpec = { (slideInHorizontally { it / 4 } + fadeIn(tween(250))) togetherWith fadeOut(tween(120)) },
+                    label = "track",
                 ) { _ ->
                     Column {
-                        WpText(
-                            playback.title,
-                            style = WpType.ExtraLarge.copy(fontWeight = FontWeight.SemiBold),
-                            color = Color.White,
-                            maxLines = 1,
-                            softWrap = false,
-                            modifier = Modifier.basicMarquee(iterations = Int.MAX_VALUE, initialDelayMillis = 2500),
-                        )
-                        WpText(
-                            listOf(playback.artist, playback.album).filter { it.isNotBlank() }.joinToString("  ·  "),
-                            style = WpType.Normal,
-                            color = Color.White.copy(alpha = 0.7f),
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
-                val id = playback.mediaId
-                if (playback.own && id != null) {
-                    val fav = id in favorites
-                    Box(
-                        Modifier.size(44.dp).wpClickable { Favorites.get(context).toggle(id) },
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        AnimatedContent(fav, transitionSpec = { scaleIn() togetherWith fadeOut() }, label = "heart") { on ->
-                            WpIcon(Glyphs.Heart, tint = if (on) Color(0xFFFF4F6A) else Color.White.copy(alpha = 0.55f), size = 26.dp)
+                        WpText(playback.title, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        WpText(playback.artist, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Wp.accent, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (playback.album.isNotBlank()) {
+                            WpText(playback.album, style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
+                Spacer(Modifier.height(10.dp))
+                ProgressBar(playback) { playback.seekTo(context, it) }
             }
-            Spacer(Modifier.height(10.dp))
-            SeekBar(playback.positionMs, playback.durationMs, tint) { playback.seekTo(context, it) }
-
             // Transport.
             Row(
-                Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                ToggleIcon(WpIcons.Shuffle, playback.own && playback.shuffle, enabled = playback.own, description = stringResource(R.string.music_shuffle)) { controller.toggleShuffle() }
-                RoundButton(WpIcons.Previous, size = 54.dp, color = Color.White, contentDescription = stringResource(R.string.music_previous)) { playback.previous(context) }
-                Box(
-                    Modifier.size(76.dp).shadow(10.dp, CircleShape).background(Color.White, CircleShape).wpClickable { playback.togglePlay(context) },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    AnimatedContent(playback.playing, transitionSpec = { scaleIn(tween(180)) togetherWith fadeOut(tween(120)) }, label = "play") { playing ->
-                        WpIcon(if (playing) WpIcons.Pause else WpIcons.Play, tint = Color.Black, size = 32.dp)
-                    }
-                }
-                RoundButton(WpIcons.Next, size = 54.dp, color = Color.White, contentDescription = stringResource(R.string.music_next)) { playback.next(context) }
-                ToggleIcon(
+                Toggle(
                     if (playback.repeatMode == Player.REPEAT_MODE_ONE) WpIcons.RepeatOne else WpIcons.Repeat,
-                    playback.own && playback.repeatMode != Player.REPEAT_MODE_OFF,
+                    on = playback.repeatMode != Player.REPEAT_MODE_OFF,
                     enabled = playback.own,
-                    description = stringResource(R.string.music_repeat),
                 ) { controller.cycleRepeat() }
-            }
-
-            // Secondary actions.
-            Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
-                if (playback.own) {
-                    SmallAction(WpIcons.Playlist, stringResource(R.string.music_up_next)) { showQueue = true }
-                    SmallAction(Glyphs.Grid, stringResource(R.string.eq_title)) { onEqualizer() }
-                } else {
-                    SmallAction(WpIcons.ArrowRightCircle, stringResource(R.string.music_open_app)) {
-                        playback.packageName?.let { openPackage(context, it) }
-                    }
-                }
+                Glyph(WpIcons.Previous) { playback.previous(context) }
+                RoundButton(
+                    if (playback.playing) WpIcons.Pause else WpIcons.Play,
+                    size = 64.dp,
+                    contentDescription = stringResource(if (playback.playing) R.string.music_pause else R.string.music_play),
+                ) { playback.togglePlay(context) }
+                Glyph(WpIcons.Next) { playback.next(context) }
+                Toggle(WpIcons.Shuffle, on = playback.shuffle, enabled = playback.own) { controller.toggleShuffle() }
             }
         }
 
-        // The queue slides up over the player.
-        AnimatedVisibility(
-            showQueue && playback.own,
-            enter = slideInVertically { it } + fadeIn(),
-            exit = slideOutVertically { it } + fadeOut(),
-        ) {
-            Column(
-                Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.92f))
-                    .navigationBarsPadding()
-                    .padding(horizontal = 24.dp, vertical = 14.dp),
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    WpText(stringResource(R.string.music_up_next), style = WpType.PivotHeader, color = Color.White, modifier = Modifier.weight(1f))
-                    RoundButton(WpIcons.Close, size = 40.dp, color = Color.White) { showQueue = false }
-                }
-                Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-                    if (playback.nextTitles.isEmpty()) {
-                        WpText(stringResource(R.string.music_queue_end), style = WpType.Large, color = Color.White.copy(alpha = 0.6f), modifier = Modifier.padding(top = 12.dp))
-                    }
-                    playback.nextTitles.forEachIndexed { i, title ->
-                        WpText(
-                            title,
-                            style = WpType.Large,
-                            color = Color.White,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.fillMaxWidth().wpClickable { controller.skipAhead(i + 1); showQueue = false }.padding(vertical = 8.dp),
-                        )
-                    }
-                }
-            }
-        }
+        // Mini app bar: "..." opens the menu, as in the 8.1 player.
+        val id = playback.mediaId
+        WpAppBar(
+            buttons = emptyList(),
+            menuItems = if (playback.own) {
+                listOfNotNull(
+                    id?.let { AppBarMenuItem(stringResource(if (it in favorites) R.string.music_unfavorite else R.string.music_favorite)) { Favorites.get(context).toggle(it) } },
+                    AppBarMenuItem(stringResource(if (showQueue) R.string.music_now_playing else R.string.music_up_next)) { showQueue = !showQueue },
+                    AppBarMenuItem(stringResource(R.string.eq_title)) { onEqualizer() },
+                )
+            } else {
+                listOf(AppBarMenuItem(stringResource(R.string.music_open_app)) { playback.packageName?.let { openPackage(context, it) } })
+            },
+        )
     }
 }
 
-/** The cover: rounded, lifted, cross-fading between songs; swipe for next / previous. */
+/** Square cover; swipe left / right for next / previous. */
 @Composable
 private fun Cover(playback: Playback, modifier: Modifier, onSwipe: (forward: Boolean) -> Unit) {
     val scope = rememberCoroutineScope()
     val swipe = remember { Animatable(0f) }
     var widthPx by remember { mutableFloatStateOf(1f) }
-    val pressed = remember { Animatable(1f) }
     Box(
         modifier
             .onGloballyPositioned { widthPx = it.size.width.toFloat() }
             .offset { IntOffset(swipe.value.roundToInt(), 0) }
-            .graphicsLayer {
-                alpha = 1f - (abs(swipe.value) / (widthPx * 1.5f)).coerceIn(0f, 0.7f)
-                rotationZ = swipe.value / widthPx * 6f
-                // Slightly smaller while paused, like the cover "resting".
-                val s = pressed.value * if (playback.playing) 1f else 0.92f
-                scaleX = s
-                scaleY = s
-            }
             .pointerInput(Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         scope.launch {
                             val v = swipe.value
-                            if (abs(v) > widthPx * 0.28f) {
-                                swipe.animateTo(if (v < 0) -widthPx * 1.2f else widthPx * 1.2f, tween(150))
+                            if (abs(v) > widthPx * 0.3f) {
+                                swipe.animateTo(if (v < 0) -widthPx * 1.2f else widthPx * 1.2f, tween(160))
                                 onSwipe(v < 0)
-                                swipe.snapTo(if (v < 0) widthPx * 0.5f else -widthPx * 0.5f)
+                                swipe.snapTo(if (v < 0) widthPx else -widthPx)
                             }
-                            swipe.animateTo(0f, tween(260))
+                            swipe.animateTo(0f, tween(220))
                         }
                     },
                 ) { change, dx ->
@@ -302,56 +200,93 @@ private fun Cover(playback: Playback, modifier: Modifier, onSwipe: (forward: Boo
                     scope.launch { swipe.snapTo(swipe.value + dx) }
                 }
             },
-        contentAlignment = Alignment.Center,
     ) {
-        AnimatedContent(playback.trackKey, transitionSpec = { fadeIn(tween(350)) togetherWith fadeOut(tween(350)) }, label = "cover") { _ ->
-            PlaybackArt(
-                playback,
-                Modifier.fillMaxSize().shadow(24.dp, RoundedCornerShape(10.dp)).clip(RoundedCornerShape(10.dp)),
-                sizePx = 768,
+        PlaybackArt(playback, Modifier.fillMaxSize(), sizePx = 768)
+    }
+}
+
+/** The 8.1 progress bar: a thin accent line on a dim track, elapsed and total time under it. */
+@Composable
+private fun ProgressBar(playback: Playback, onSeek: (Long) -> Unit) {
+    val duration = playback.durationMs
+    var dragging by remember { mutableStateOf<Float?>(null) }
+    val fraction = dragging ?: playback.progress
+    Column {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(24.dp)
+                .pointerInput(duration) { detectTapGestures { if (duration > 0) onSeek((it.x / size.width * duration).toLong()) } }
+                .pointerInput(duration) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragging = (it.x / size.width).coerceIn(0f, 1f) },
+                        onDragEnd = {
+                            dragging?.let { if (duration > 0) onSeek((it * duration).toLong()) }
+                            dragging = null
+                        },
+                        onDragCancel = { dragging = null },
+                    ) { change, _ ->
+                        change.consume()
+                        dragging = (change.position.x / size.width).coerceIn(0f, 1f)
+                    }
+                },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Wp.palette.raised))
+            Box(Modifier.fillMaxWidth(fraction.coerceAtLeast(0.001f)).height(4.dp).background(Wp.accent))
+        }
+        Row(Modifier.fillMaxWidth()) {
+            val shown = if (dragging != null) (dragging!! * duration).toLong() else playback.positionMs
+            WpText(WpFormat.duration(shown), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.weight(1f))
+            WpText(if (duration > 0) WpFormat.duration(duration) else "", style = WpType.Small, color = Wp.palette.subtle)
+        }
+    }
+}
+
+@Composable
+private fun Glyph(icon: androidx.compose.ui.graphics.vector.ImageVector, onClick: () -> Unit) {
+    Box(Modifier.size(56.dp).wpClickable(onClick = onClick), contentAlignment = Alignment.Center) {
+        WpIcon(icon, size = 30.dp)
+    }
+}
+
+/** Repeat / shuffle: full foreground when on, dimmed when off. */
+@Composable
+private fun Toggle(icon: androidx.compose.ui.graphics.vector.ImageVector, on: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Box(Modifier.size(48.dp).wpClickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
+        WpIcon(icon, tint = if (on && enabled) Wp.accent else Wp.palette.subtle.copy(alpha = if (enabled) 1f else 0.4f), size = 24.dp)
+    }
+}
+
+@Composable
+private fun Queue(playback: Playback, modifier: Modifier, onPick: (Int) -> Unit) {
+    LazyColumn(modifier.fillMaxWidth().padding(start = 20.dp, end = 16.dp)) {
+        if (playback.nextTitles.isEmpty()) {
+            item { WpText(stringResource(R.string.music_queue_end), style = WpType.Large, color = Wp.palette.subtle) }
+        }
+        itemsIndexed(playback.nextTitles) { i, title ->
+            WpText(
+                title,
+                style = WpType.ExtraLarge,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { onPick(i) }.padding(vertical = 6.dp),
             )
         }
     }
-    androidx.compose.runtime.LaunchedEffect(playback.playing) {
-        pressed.animateTo(1f, tween(300))
-    }
 }
 
-@Composable
-private fun ToggleIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, on: Boolean, enabled: Boolean, description: String, onClick: () -> Unit) {
-    Box(
-        Modifier.size(44.dp).wpClickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        WpIcon(icon, tint = if (!enabled) Color.White.copy(alpha = 0.25f) else if (on) Color.White else Color.White.copy(alpha = 0.5f), size = 24.dp)
-        if (on) Box(Modifier.align(Alignment.BottomCenter).size(4.dp).background(Color.White, CircleShape))
-    }
-}
-
-@Composable
-private fun SmallAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
-    Column(
-        Modifier.widthIn(min = 72.dp).wpClickable(onClick = onClick).padding(4.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        WpIcon(icon, tint = Color.White.copy(alpha = 0.85f), size = 22.dp)
-        WpText(label, style = WpType.Small, color = Color.White.copy(alpha = 0.7f))
-    }
-}
-
-/** Thin bar with a round thumb: tap or drag to seek; elapsed and total time below. */
+/** Thin bar with times, for other screens (lock screen): tap or drag to seek. */
 @Composable
 fun SeekBar(positionMs: Long, durationMs: Long, accent: Color, onSeek: (Long) -> Unit) {
     var dragging by remember { mutableStateOf<Float?>(null) }
     val fraction = dragging ?: if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     Column {
-        BoxWithConstraints(
+        Box(
             Modifier
                 .fillMaxWidth()
-                .height(28.dp)
-                .pointerInput(durationMs) {
-                    detectTapGestures { if (durationMs > 0) onSeek((it.x / size.width * durationMs).toLong()) }
-                }
+                .height(24.dp)
+                .pointerInput(durationMs) { detectTapGestures { if (durationMs > 0) onSeek((it.x / size.width * durationMs).toLong()) } }
                 .pointerInput(durationMs) {
                     detectHorizontalDragGestures(
                         onDragStart = { dragging = (it.x / size.width).coerceIn(0f, 1f) },
@@ -367,51 +302,16 @@ fun SeekBar(positionMs: Long, durationMs: Long, accent: Color, onSeek: (Long) ->
                 },
             contentAlignment = Alignment.CenterStart,
         ) {
-            val w = maxWidth
-            val thumb = if (dragging != null) 16.dp else 12.dp
-            Box(Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(Color.White.copy(alpha = 0.25f)))
-            Box(Modifier.fillMaxWidth(fraction.coerceAtLeast(0.001f)).height(4.dp).clip(RoundedCornerShape(2.dp)).background(lerp(accent, Color.White, 0.55f)))
-            Box(Modifier.offset(x = (w - thumb) * fraction).size(thumb).background(Color.White, CircleShape))
+            Box(Modifier.fillMaxWidth().height(4.dp).background(Color.White.copy(alpha = 0.3f)))
+            Box(Modifier.fillMaxWidth(fraction.coerceAtLeast(0.001f)).height(4.dp).background(accent))
         }
         Row(Modifier.fillMaxWidth()) {
             val shown = if (dragging != null) (dragging!! * durationMs).toLong() else positionMs
-            WpText(WpFormat.duration(shown), style = WpType.Small, color = Color.White.copy(alpha = 0.7f), modifier = Modifier.weight(1f))
-            WpText(if (durationMs > 0) "-" + WpFormat.duration((durationMs - shown).coerceAtLeast(0)) else "", style = WpType.Small, color = Color.White.copy(alpha = 0.7f))
+            WpText(WpFormat.duration(shown), style = WpType.Small, color = Color.White.copy(alpha = 0.75f), modifier = Modifier.weight(1f))
+            WpText(if (durationMs > 0) WpFormat.duration(durationMs) else "", style = WpType.Small, color = Color.White.copy(alpha = 0.75f))
         }
     }
 }
-
-/** A vivid colour taken from the album art, used to tint the player. */
-@Composable
-fun rememberArtColor(playback: Playback?): Color {
-    val context = LocalContext.current
-    val accent = Wp.accent
-    val color by produceState(accent, playback?.trackKey, playback?.artBitmap) {
-        val bmp: Bitmap? = playback?.artBitmap ?: playback?.artUri?.let { ImageLoader.thumbnail(context, it, 96) }
-        value = bmp?.let { dominantColor(it) } ?: accent
-    }
-    return color
-}
-
-/** Weighted average of the most saturated, mid-bright pixels of a small copy of [bmp]. */
-fun dominantColor(bmp: Bitmap): Color? = runCatching {
-    val small = Bitmap.createScaledBitmap(if (bmp.config == Bitmap.Config.HARDWARE) bmp.copy(Bitmap.Config.ARGB_8888, false) else bmp, 24, 24, true)
-    var r = 0.0
-    var g = 0.0
-    var b = 0.0
-    var total = 0.0
-    val hsv = FloatArray(3)
-    for (y in 0 until small.height) for (x in 0 until small.width) {
-        val p = small.getPixel(x, y)
-        android.graphics.Color.colorToHSV(p, hsv)
-        val weight = (hsv[1] * hsv[1]) * (1f - abs(hsv[2] - 0.6f)) + 0.02f
-        r += android.graphics.Color.red(p) * weight
-        g += android.graphics.Color.green(p) * weight
-        b += android.graphics.Color.blue(p) * weight
-        total += weight
-    }
-    if (total <= 0) null else Color((r / total).toInt(), (g / total).toInt(), (b / total).toInt())
-}.getOrNull()
 
 internal fun openPackage(context: android.content.Context, pkg: String) {
     context.packageManager.getLaunchIntentForPackage(pkg)?.let {

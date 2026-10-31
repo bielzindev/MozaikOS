@@ -57,7 +57,10 @@ data class Playback(
         } else {
             context.packageManager.getLaunchIntentForPackage(packageName) ?: return
         }
-        runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        // SINGLE_TOP + CLEAR_TOP: an already open Music app receives the request (onNewIntent)
+        // and goes to the player instead of only coming to the front.
+        val flags = if (own || packageName == null) Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP else Intent.FLAG_ACTIVITY_NEW_TASK
+        runCatching { context.startActivity(intent.addFlags(flags)) }
     }
 
     companion object {

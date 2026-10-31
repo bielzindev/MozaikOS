@@ -104,6 +104,9 @@ private sealed interface MusicPage {
  */
 class MusicActivity : WpActivity() {
 
+    /** Bumped when the Playing Now bar (or the notification) asks for the player again. */
+    private var nowPlayingRequests by mutableStateOf(0)
+
     @Composable
     override fun Content() {
         val context = LocalContext.current
@@ -119,6 +122,9 @@ class MusicActivity : WpActivity() {
         val songActions = rememberSongActions { reload++ }
 
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
+        LaunchedEffect(nowPlayingRequests) {
+            if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
+        }
         Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 WpNavHost(nav) { page ->
@@ -144,6 +150,7 @@ class MusicActivity : WpActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.getBooleanExtra(EXTRA_NOW_PLAYING, false)) nowPlayingRequests++
     }
 
     companion object {

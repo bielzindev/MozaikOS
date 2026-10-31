@@ -73,7 +73,7 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
                 .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            PlaybackArt(playback, Modifier.size(44.dp).clip(RoundedCornerShape(4.dp)))
+            PlaybackArt(playback, Modifier.size(44.dp))
             Spacer(Modifier.width(12.dp))
             AnimatedContent(
                 targetState = playback.trackKey,
@@ -91,9 +91,6 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
                         overflow = TextOverflow.Ellipsis,
                     )
                 }
-            }
-            if (playback.playing) {
-                PlayingBars(Modifier.padding(horizontal = 8.dp), color = Wp.accent)
             }
             RoundButton(
                 if (playback.playing) WpIcons.Pause else WpIcons.Play,

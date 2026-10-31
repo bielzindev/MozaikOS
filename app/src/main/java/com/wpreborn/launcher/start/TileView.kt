@@ -291,78 +291,99 @@ private fun CalendarTile(size: TileSize, live: LiveData, enabled: Boolean, seed:
     }
 }
 
+/**
+ * Android apps, in the Windows Phone 8 tile templates that messaging apps (WhatsApp,
+ * Messaging, mail) used:
+ * - Iconic: the app's glyph with the unread count to its right (small and medium);
+ * - medium flips to its back: the conversation and its latest message (Flip template);
+ * - wide shows the latest conversation in three lines of text, with the small glyph and
+ *   count in the bottom-right corner (Iconic wide);
+ * - large lists the latest three conversations.
+ */
 @Composable
 private fun AndroidAppTile(app: AppEntry?, size: TileSize, inputs: TileInputs, seed: Int) {
-    val iconDp = iconSizeFor(size) + if (size == TileSize.Small) 0.dp else 4.dp
-    val front: @Composable () -> Unit = {
-        Box(Modifier.fillMaxSize()) {
-            if (app != null) AppIcon(app, iconDp, Modifier.align(Alignment.Center))
-            if (inputs.notificationCount > 0) {
-                WpText(
-                    inputs.notificationCount.coerceAtMost(99).toString(),
-                    style = if (size == TileSize.Small) WpType.Small.copy(fontSize = 12.sp) else WpType.Large,
-                    color = Color.White,
-                    modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = if (size == TileSize.Small) 2.dp else 4.dp),
-                )
-            }
+    val count = inputs.notificationCount
+    val recent = if (inputs.liveEnabled) inputs.recent else emptyList()
+    when {
+        size == TileSize.Small -> Box(Modifier.fillMaxSize()) { IconicFace(app, size, count) }
+        recent.isEmpty() -> Box(Modifier.fillMaxSize()) { IconicFace(app, size, count) }
+        size == TileSize.Medium -> FlipTile(enabled = true, seed = seed, front = {
+            Box(Modifier.fillMaxSize()) { IconicFace(app, size, count) }
+        }, back = {
+            FlipBack(recent.first())
+        })
+        size == TileSize.Wide -> WideIconic(app, recent.first(), count)
+        else -> LargeIconic(app, recent, count)
+    }
+}
+
+private fun countText(count: Int) = if (count > 99) "99+" else count.toString()
+
+/** Glyph, and the count to its right in light numerals, centred as one group. */
+@Composable
+private fun BoxScope.IconicFace(app: AppEntry?, size: TileSize, count: Int) {
+    val icon = when (size) {
+        TileSize.Small -> if (count > 0) 26.dp else 32.dp
+        TileSize.Medium -> 54.dp
+        else -> 60.dp
+    }
+    Row(Modifier.align(Alignment.Center).padding(bottom = if (size == TileSize.Small) 0.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (app != null) AppIcon(app, icon)
+        if (count > 0) {
+            Spacer(Modifier.width(if (size == TileSize.Small) 3.dp else 8.dp))
+            WpText(
+                countText(count),
+                style = if (size == TileSize.Small) WpType.Normal.copy(fontSize = 16.sp, lineHeight = 18.sp) else WpType.TileCount.copy(fontSize = 40.sp, lineHeight = 42.sp, fontWeight = FontWeight.Light),
+                color = Color.White,
+            )
         }
     }
-    val recent = inputs.recent
-    if (recent.isEmpty() || size == TileSize.Small || !inputs.liveEnabled) {
-        front()
-        return
+}
+
+/** Back of the medium tile: who wrote and what, in the tile's own text style. */
+@Composable
+private fun FlipBack(n: WpNotification) {
+    Column(Modifier.fillMaxSize().padding(start = 9.dp, top = 7.dp, end = 9.dp, bottom = 24.dp)) {
+        WpText(n.title, style = WpType.Normal.copy(fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        WpText(n.text, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 19.sp), color = Color.White, maxLines = 4, overflow = TextOverflow.Ellipsis)
     }
-    // Social live tile: the front shows the icon and counter; the back cycles through the
-    // latest notifications with the sender's picture, like the WP People-style app tiles.
-    FlipTile(enabled = true, seed = seed, front = front, back = {
-        CycleTile(recent, enabled = recent.size > 1, seed = seed + 7) { n -> SocialFace(n, size) }
-    })
+}
+
+/** Corner group of the wide/large tiles: count, then the small glyph. */
+@Composable
+private fun BoxScope.CornerCount(app: AppEntry?, count: Int) {
+    Row(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (count > 0) {
+            WpText(countText(count), style = WpType.Large.copy(fontSize = 20.sp, lineHeight = 22.sp), color = Color.White)
+            Spacer(Modifier.width(5.dp))
+        }
+        if (app != null) AppIcon(app, 26.dp)
+    }
 }
 
 @Composable
-private fun SocialFace(n: WpNotification, size: TileSize) {
-    val context = LocalContext.current
-    val avatar by produceState<ImageBitmap?>(null, n.key) {
-        value = n.picture?.asImageBitmap() ?: try {
-            n.largeIcon?.loadDrawable(context)?.let { d ->
-                val w = d.intrinsicWidth.coerceIn(48, 256)
-                val h = d.intrinsicHeight.coerceIn(48, 256)
-                android.graphics.Bitmap.createBitmap(w, h, android.graphics.Bitmap.Config.ARGB_8888).also { b ->
-                    val c = android.graphics.Canvas(b)
-                    d.setBounds(0, 0, w, h)
-                    d.draw(c)
-                }.asImageBitmap()
-            }
-        } catch (_: Exception) {
-            null
+private fun WideIconic(app: AppEntry?, n: WpNotification, count: Int) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth().padding(start = 10.dp, top = 6.dp, end = 12.dp)) {
+            WpText(n.title, style = WpType.Large.copy(fontSize = 21.sp, lineHeight = 26.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(n.text, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 19.sp), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
+        CornerCount(app, count)
     }
-    val image = avatar
-    if (size == TileSize.Medium && image != null) {
-        // Medium: the sender's photo fills the tile, name and message on a scrim.
-        Box(Modifier.fillMaxSize()) {
-            Image(image, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-            Column(
-                Modifier
-                    .align(Alignment.BottomStart)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(horizontal = 8.dp, vertical = 5.dp),
-            ) {
-                WpText(n.title, style = WpType.Small.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                WpText(n.text, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+}
+
+@Composable
+private fun LargeIconic(app: AppEntry?, recent: List<WpNotification>, count: Int) {
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxWidth().padding(start = 10.dp, top = 6.dp, end = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            recent.take(3).forEach { n ->
+                Column {
+                    WpText(n.title, style = WpType.Large.copy(fontSize = 19.sp, lineHeight = 23.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    WpText(n.text, style = WpType.Normal.copy(fontSize = 14.sp, lineHeight = 18.sp), color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
             }
         }
-        return
-    }
-    Row(Modifier.fillMaxSize()) {
-        if (image != null) {
-            Image(image, null, Modifier.fillMaxHeight().aspectRatio(1f), contentScale = ContentScale.Crop)
-        }
-        Column(Modifier.weight(1f).fillMaxHeight().padding(8.dp)) {
-            WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            WpText(n.text, style = WpType.Small, color = Color.White, maxLines = if (size == TileSize.Medium) 4 else 3, overflow = TextOverflow.Ellipsis)
-        }
+        CornerCount(app, count)
     }
 }
 

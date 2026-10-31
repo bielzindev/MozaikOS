@@ -119,7 +119,7 @@ class MainActivity : ComponentActivity() {
         }
         // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
         val appsByKey = remember(apps) { apps.associateBy { it.key } }
-        val counts = remember(notifications) { notifications.groupingBy { it.packageName }.eachCount() }
+        val counts = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { (_, l) -> l.sumOf { it.messageCount } } }
         val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.take(3) } }
         val nowPlaying = when {
             player.hasMedia -> com.wpreborn.data.media.NowPlaying(player.title, player.artist, player.album, null, player.playing, packageName)

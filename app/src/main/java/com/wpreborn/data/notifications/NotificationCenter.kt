@@ -26,6 +26,10 @@ data class WpNotification(
     val contentIntent: PendingIntent?,
     val largeIcon: Icon?,
     val picture: Bitmap?,
+    /** Messages it stands for (a chat notification can hold several). */
+    val messageCount: Int = 1,
+    /** The person who wrote the latest message, when it's a conversation. */
+    val sender: String = "",
 )
 
 /**
@@ -41,7 +45,7 @@ object NotificationCenter {
     val connected: StateFlow<Boolean> = _connected.asStateFlow()
 
     /** Unread counts per package (ongoing/foreground notifications excluded). */
-    val counts: Map<String, Int> get() = _items.value.groupingBy { it.packageName }.eachCount()
+    val counts: Map<String, Int> get() = _items.value.groupBy { it.packageName }.mapValues { (_, l) -> l.sumOf { it.messageCount } }
 
     internal var listener: WpNotificationListener? = null
 
@@ -91,9 +95,28 @@ object NotificationCenter {
             if (n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0) return null
         }
         val extras = n.extras
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
-        val text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))
+        var title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty()
+        var text = (extras.getCharSequence(Notification.EXTRA_BIG_TEXT) ?: extras.getCharSequence(Notification.EXTRA_TEXT))
             ?.toString().orEmpty()
+        // Chats (WhatsApp, Telegram, Messages...): the conversation, its latest message and
+        // how many messages are waiting, instead of "3 new messages".
+        var count = 1
+        var sender = ""
+        runCatching {
+            androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)?.let { style ->
+                val msgs = style.messages
+                val last = msgs.lastOrNull()
+                if (last != null) {
+                    sender = last.person?.name?.toString().orEmpty()
+                    val conv = style.conversationTitle?.toString()
+                    title = conv?.takeIf { it.isNotBlank() } ?: sender.ifBlank { title }
+                    val body = last.text?.toString().orEmpty()
+                    text = if (!conv.isNullOrBlank() && sender.isNotBlank()) "$sender: $body" else body
+                    count = msgs.size.coerceAtLeast(1)
+                }
+            }
+        }
+        if (count == 1 && n.number > 1) count = n.number
         if (title.isBlank() && text.isBlank()) return null
         val label = try {
             val pm = context.packageManager
@@ -114,6 +137,8 @@ object NotificationCenter {
             contentIntent = n.contentIntent,
             largeIcon = n.getLargeIcon(),
             picture = picture,
+            messageCount = count,
+            sender = sender,
         )
     }
 }

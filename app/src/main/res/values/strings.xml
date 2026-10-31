@@ -499,4 +499,5 @@
     <string name="store_new_settings">Status bar choice.</string>
     <string name="store_desc_store">Get, update, turn off and remove the apps of the ZUNEX family.</string>
     <string name="store_new_store">First release.</string>
+    <string name="store_short">store</string>
 </resources>

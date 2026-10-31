@@ -120,7 +120,7 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             WpPanorama(
-                title = stringResource(R.string.app_store).lowercase(),
+                title = stringResource(R.string.store_short),
                 sections = listOf(
                     PanoramaSection(null) {
                         // Spotlight: the featured apps as big tiles.

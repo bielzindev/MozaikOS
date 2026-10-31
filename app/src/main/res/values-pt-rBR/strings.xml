@@ -500,4 +500,5 @@
     <string name="store_new_settings">Escolha da barra de status.</string>
     <string name="store_desc_store">Obtenha, atualize, desative e remova os apps da família ZUNEX.</string>
     <string name="store_new_store">Primeira versão.</string>
+    <string name="store_short">loja</string>
 </resources>

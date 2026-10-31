@@ -103,6 +103,10 @@ dependencies {
     implementation("androidx.camera:camera-video:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     implementation("androidx.camera:camera-extensions:$camerax")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
+    // On-device AI for the camera (scene recognition, portrait segmentation); bundled models.
+    implementation("com.google.mlkit:image-labeling:17.0.9")
+    implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     implementation("org.maplibre.gl:android-sdk:11.8.8")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

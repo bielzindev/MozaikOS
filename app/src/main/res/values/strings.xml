@@ -667,4 +667,17 @@
     <string name="camera_res_binned">12 MP (best)</string>
     <string name="camera_res_full">maximum</string>
     <string name="camera_set_resolution_hint">12 MP combines the pixels of high-resolution sensors (50-108 MP) for cleaner, brighter photos, like the phone\'s own camera. Maximum keeps every pixel but is noisier in low light.</string>
+    <string name="camera_ai">ZUNEX AI</string>
+    <string name="camera_ai_short">AI</string>
+    <string name="camera_ai_hint">Recognises the scene (people, food, landscape, sky, plants, animals, sunset, night) and processes each photo for it: colour, exposure, contrast, sharpness. Works on the phone, without internet.</string>
+    <string name="camera_ai_processing">AI processing…</string>
+    <string name="camera_scene_general">auto</string>
+    <string name="camera_scene_people">people</string>
+    <string name="camera_scene_food">food</string>
+    <string name="camera_scene_landscape">landscape</string>
+    <string name="camera_scene_sky">sky</string>
+    <string name="camera_scene_plants">plants</string>
+    <string name="camera_scene_animal">animals</string>
+    <string name="camera_scene_sunset">sunset</string>
+    <string name="camera_scene_night">night</string>
 </resources>

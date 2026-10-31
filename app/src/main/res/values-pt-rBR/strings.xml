@@ -668,4 +668,17 @@
     <string name="camera_res_binned">12 MP (melhor)</string>
     <string name="camera_res_full">máxima</string>
     <string name="camera_set_resolution_hint">12 MP junta os pixels de sensores de alta resolução (50-108 MP) para fotos mais limpas e claras, como a câmera do próprio celular. Máxima mantém todos os pixels, mas tem mais ruído com pouca luz.</string>
+    <string name="camera_ai">IA ZUNEX</string>
+    <string name="camera_ai_short">IA</string>
+    <string name="camera_ai_hint">Reconhece a cena (pessoas, comida, paisagem, céu, plantas, animais, pôr do sol, noite) e processa cada foto para ela: cor, exposição, contraste, nitidez. Funciona no celular, sem internet.</string>
+    <string name="camera_ai_processing">IA processando…</string>
+    <string name="camera_scene_general">auto</string>
+    <string name="camera_scene_people">pessoas</string>
+    <string name="camera_scene_food">comida</string>
+    <string name="camera_scene_landscape">paisagem</string>
+    <string name="camera_scene_sky">céu</string>
+    <string name="camera_scene_plants">plantas</string>
+    <string name="camera_scene_animal">animais</string>
+    <string name="camera_scene_sunset">pôr do sol</string>
+    <string name="camera_scene_night">noite</string>
 </resources>

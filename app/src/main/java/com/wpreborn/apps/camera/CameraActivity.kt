@@ -19,6 +19,8 @@ import androidx.camera.camera2.interop.Camera2CameraInfo
 import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
+import androidx.camera.core.ImageAnalysis
+import androidx.camera.core.ImageProxy
 import androidx.camera.core.MirrorMode
 import androidx.camera.core.resolutionselector.ResolutionStrategy
 import androidx.camera.extensions.ExtensionMode
@@ -123,6 +125,8 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.roundToInt
 
+private val aiScope = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.Main)
+
 private enum class FlashMode(val capture: Int) { Auto(ImageCapture.FLASH_MODE_AUTO), On(ImageCapture.FLASH_MODE_ON), Off(ImageCapture.FLASH_MODE_OFF) }
 
 /**
@@ -177,13 +181,15 @@ private data class CamSettings(
     val mirror: Boolean = false,
     val sound: Boolean = true,
     val grid: Boolean = false,
+    /** ZUNEX AI: scene recognition and per-scene processing of photos. */
+    val ai: Boolean = true,
     val look: Look = Look.Auto,
 ) {
     fun save(context: Context) {
         context.getSharedPreferences("camera", Context.MODE_PRIVATE).edit()
             .putBoolean("wide", wide).putBoolean("fullRes", fullRes).putBoolean("fast", fast).putInt("videoRes", videoRes)
             .putBoolean("stabilize", stabilize).putBoolean("mirror", mirror).putBoolean("sound", sound)
-            .putBoolean("grid", grid).putString("look", look.name)
+            .putBoolean("grid", grid).putBoolean("ai", ai).putString("look", look.name)
             .apply()
     }
 
@@ -199,6 +205,7 @@ private data class CamSettings(
                 mirror = p.getBoolean("mirror", false),
                 sound = p.getBoolean("sound", true),
                 grid = p.getBoolean("grid", false),
+                ai = p.getBoolean("ai", true),
                 look = runCatching { Look.valueOf(p.getString("look", null) ?: "") }.getOrDefault(Look.Auto),
             )
         }
@@ -216,6 +223,8 @@ private enum class Look(val ext: Int, val label: Int) {
     Hdr(ExtensionMode.HDR, R.string.camera_mode_hdr),
     Night(ExtensionMode.NIGHT, R.string.camera_mode_night),
     Portrait(ExtensionMode.BOKEH, R.string.camera_mode_portrait),
+    /** ZUNEX AI portrait (person segmentation + background blur), where the phone has none. */
+    AiPortrait(ExtensionMode.NONE, R.string.camera_mode_portrait),
     Retouch(ExtensionMode.FACE_RETOUCH, R.string.camera_mode_retouch),
 }
 
@@ -344,6 +353,16 @@ private fun CameraScreen(activity: CameraActivity) {
     var focus by remember { mutableFloatStateOf(0f) }
     var rotation by remember { mutableIntStateOf(Surface.ROTATION_0) }
     var error by remember { mutableStateOf<String?>(null) }
+    var scene by remember { mutableStateOf(Scene.General) }
+    var processing by remember { mutableIntStateOf(0) }
+    val analysisExecutor = remember { java.util.concurrent.Executors.newSingleThreadExecutor() }
+    val sceneDetector = remember { SceneDetector { s -> scene = s } }
+    DisposableEffect(Unit) {
+        onDispose {
+            sceneDetector.close()
+            analysisExecutor.shutdown()
+        }
+    }
     val blink = remember { Animatable(0f) }
 
     val shutterSound = remember {
@@ -388,7 +407,7 @@ private fun CameraScreen(activity: CameraActivity) {
     }
 
     // (Re)binds the camera when the lens, the mode or a capture setting changes.
-    LaunchedEffect(front, video, settings.look, settings.wide, settings.fullRes, settings.fast, settings.videoRes, settings.stabilize, settings.mirror) {
+    LaunchedEffect(front, video, settings.look, settings.wide, settings.fullRes, settings.ai, settings.fast, settings.videoRes, settings.stabilize, settings.mirror) {
         val provider = try {
             ProcessCameraProvider.getInstance(context).awaitOn(context)
         } catch (e: Exception) {
@@ -398,7 +417,8 @@ private fun CameraScreen(activity: CameraActivity) {
         val ext = extensions ?: runCatching { ExtensionsManager.getInstanceAsync(context, provider).awaitOn(context) }.getOrNull()?.also { extensions = it }
         hasFront = runCatching { provider.hasCamera(CameraSelector.DEFAULT_FRONT_CAMERA) }.getOrDefault(false)
         val base = if (front && hasFront) CameraSelector.DEFAULT_FRONT_CAMERA else CameraSelector.DEFAULT_BACK_CAMERA
-        looks = listOf(Look.Normal) + Look.entries.filter { it != Look.Normal && runCatching { ext?.isExtensionAvailable(base, it.ext) == true }.getOrDefault(false) }
+        val vendor = Look.entries.filter { it.ext != ExtensionMode.NONE && runCatching { ext?.isExtensionAvailable(base, it.ext) == true }.getOrDefault(false) }
+        looks = Look.entries.filter { it == Look.Normal || it in vendor || (it == Look.AiPortrait && Look.Portrait !in vendor) }
         val look = if (!video && settings.look in looks) settings.look else Look.Normal
 
         val ratio = if (video || settings.wide) AspectRatioStrategy.RATIO_16_9_FALLBACK_AUTO_STRATEGY else AspectRatioStrategy.RATIO_4_3_FALLBACK_AUTO_STRATEGY
@@ -431,7 +451,7 @@ private fun CameraScreen(activity: CameraActivity) {
             )
             .setFlashMode(flash.capture)
             .setTargetRotation(rotation)
-        if (!settings.fast && look == Look.Normal) {
+        if (!settings.fast && look.ext == ExtensionMode.NONE) {
             // The sensor's best still processing: high-quality noise reduction, sharpening and
             // lens aberration correction (only the modes this camera lists).
             runCatching {
@@ -459,18 +479,35 @@ private fun CameraScreen(activity: CameraActivity) {
         videoCapture = vc
         val useCase = if (video) vc else ic
 
-        fun bind(selector: CameraSelector): Camera {
+        fun bind(selector: CameraSelector, analysis: Boolean = false): Camera {
             provider.unbindAll()
+            if (analysis) {
+                // A small frame about once a second for the AI's scene recognition.
+                val ia = ImageAnalysis.Builder()
+                    .setResolutionSelector(
+                        ResolutionSelector.Builder()
+                            .setResolutionStrategy(ResolutionStrategy(android.util.Size(640, 480), ResolutionStrategy.FALLBACK_RULE_CLOSEST_LOWER_THEN_HIGHER))
+                            .build(),
+                    )
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .build()
+                ia.setAnalyzer(analysisExecutor, sceneDetector)
+                return provider.bindToLifecycle(lifecycle, selector, preview, useCase, ia)
+            }
             return provider.bindToLifecycle(lifecycle, selector, preview, useCase)
         }
-        val extSelector = if (look != Look.Normal && ext != null) runCatching { ext.getExtensionEnabledCameraSelector(base, look.ext) }.getOrNull() else null
+        val extSelector = if (look.ext != ExtensionMode.NONE && ext != null) runCatching { ext.getExtensionEnabledCameraSelector(base, look.ext) }.getOrNull() else null
         var bound: Camera? = null
         var usedLook = Look.Normal
         if (extSelector != null) {
             bound = runCatching { bind(extSelector) }.getOrNull()
             if (bound != null) usedLook = look
         }
+        if (bound == null && !video && settings.ai) bound = runCatching { bind(base, analysis = true) }.getOrNull()
         if (bound == null) bound = runCatching { bind(base) }.getOrNull()
+        if (bound != null && usedLook == Look.Normal && look == Look.AiPortrait) usedLook = Look.AiPortrait
+        if (video || !settings.ai) scene = Scene.General
         // No back camera (tablets, some emulators): whatever exists.
         if (bound == null) bound = runCatching { bind(CameraSelector.Builder().build()) }.getOrNull()
         camera = bound
@@ -525,6 +562,54 @@ private fun CameraScreen(activity: CameraActivity) {
     fun takePhoto() {
         val ic = imageCapture ?: return
         val name = "ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val portraitAi = activeLook == Look.AiPortrait
+        if ((settings.ai && activeLook == Look.Normal || portraitAi) && !settings.fullRes) {
+            // ZUNEX AI: the picture comes to memory, is processed for its scene and saved.
+            val shotScene = if (portraitAi && scene == Scene.General) Scene.People else scene
+            val mirror = isFront && settings.mirror
+            scope.launch {
+                blink.snapTo(1f)
+                blink.animateTo(0f, tween(250))
+            }
+            sound(android.media.MediaActionSound.SHUTTER_CLICK)
+            processing++
+            ic.takePicture(analysisExecutor, object : ImageCapture.OnImageCapturedCallback() {
+                override fun onCaptureSuccess(image: ImageProxy) {
+                    val rotation = image.imageInfo.rotationDegrees
+                    val bytes = try {
+                        if (image.format == android.graphics.ImageFormat.JPEG) {
+                            val buf = image.planes[0].buffer
+                            buf.rewind()
+                            ByteArray(buf.remaining()).also { buf.get(it) }
+                        } else {
+                            val bmp = image.toBitmap()
+                            java.io.ByteArrayOutputStream().use { os ->
+                                bmp.compress(android.graphics.Bitmap.CompressFormat.JPEG, 97, os)
+                                os.toByteArray()
+                            }
+                        }
+                    } catch (_: Throwable) {
+                        null
+                    } finally {
+                        image.close()
+                    }
+                    // Not tied to the screen: the photo is finished even if the camera is closed.
+                    aiScope.launch {
+                        val uri = bytes?.let { saveAiPhoto(context, it, rotation, mirror, shotScene, portraitAi, name) }
+                        processing--
+                        if (uri != null) lastUri = uri else error = context.getString(R.string.camera_save_failed)
+                    }
+                }
+
+                override fun onError(exception: ImageCaptureException) {
+                    aiScope.launch {
+                        processing--
+                        error = context.getString(R.string.camera_save_failed)
+                    }
+                }
+            })
+            return
+        }
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
@@ -693,6 +778,9 @@ private fun CameraScreen(activity: CameraActivity) {
             if (hasFront) {
                 TopButton(stringResource(R.string.camera_switch), iconAngle, label = null, icon = WpIcons.Sync) { if (recording == null) front = !front }
             }
+            if (!video) {
+                AiButton(settings.ai, iconAngle) { update(settings.copy(ai = !settings.ai)) }
+            }
             TopButton(stringResource(R.string.camera_pro), iconAngle, label = null, icon = Glyphs.Grid, selected = pro) {
                 pro = !pro
                 if (pro) {
@@ -707,6 +795,21 @@ private fun CameraScreen(activity: CameraActivity) {
                 }
             }
             TopButton(stringResource(R.string.camera_settings), iconAngle, label = null, icon = WpIcons.Settings) { if (recording == null) showSettings = true }
+        }
+
+        if (!video && settings.ai && (activeLook == Look.Normal || activeLook == Look.AiPortrait) || processing > 0) {
+            // What the AI sees, and when it's working on a picture.
+            Row(
+                Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 62.dp).background(Color.Black.copy(alpha = 0.5f)).padding(horizontal = 10.dp, vertical = 3.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WpText(
+                    if (processing > 0) stringResource(R.string.camera_ai_processing) else "IA · " + stringResource(scene.label),
+                    style = WpType.Small,
+                    color = Color.White,
+                    modifier = Modifier.rotate(iconAngle),
+                )
+            }
         }
 
         if (recording != null) {
@@ -894,6 +997,8 @@ private fun CameraSettingsPage(s: CamSettings, soundForced: Boolean, onChange: (
         WpText(stringResource(R.string.camera_set_mirror_hint), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 8.dp))
         WpToggle(stringResource(R.string.camera_set_sound), s.sound || soundForced, onText = on, offText = off, enabled = !soundForced) { onChange(s.copy(sound = it)) }
         if (soundForced) WpText(stringResource(R.string.camera_set_sound_forced), style = WpType.Subtle, color = Wp.palette.subtle)
+        WpToggle(stringResource(R.string.camera_ai), s.ai, onText = on, offText = off) { onChange(s.copy(ai = it)) }
+        WpText(stringResource(R.string.camera_ai_hint), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 8.dp))
         WpToggle(stringResource(R.string.camera_grid), s.grid, onText = on, offText = off) { onChange(s.copy(grid = it)) }
         WpText(stringResource(R.string.camera_processing_info), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 16.dp))
     }
@@ -918,6 +1023,29 @@ private fun Options(header: String, options: List<String>, selected: Int, onSele
                     WpText(label, style = WpType.Small, color = if (sel) Color.White else Wp.palette.foreground, maxLines = 1)
                 }
             }
+        }
+    }
+}
+
+/** The "AI" switch: accent when on, like the camera apps of today's phones but in Metro style. */
+@Composable
+private fun AiButton(on: Boolean, angle: Float, onClick: () -> Unit) {
+    val desc = stringResource(R.string.camera_ai)
+    Box(
+        Modifier
+            .size(48.dp)
+            .semantics { contentDescription = desc }
+            .wpClickable(onClick = onClick)
+            .rotate(angle),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            Modifier
+                .border(2.dp, Color.White)
+                .background(if (on) Wp.accent else Color.Transparent)
+                .padding(horizontal = 5.dp, vertical = 1.dp),
+        ) {
+            WpText(stringResource(R.string.camera_ai_short), style = WpType.Small, color = Color.White)
         }
     }
 }

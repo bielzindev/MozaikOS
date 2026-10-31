@@ -80,9 +80,42 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
 
     /** Emoji mode: grid of emoji instead of rows. */
     var emojiMode = false
-        set(v) { field = v; emojiPage = 0; layoutKeys(); invalidate() }
+        set(v) {
+            field = v
+            // Open on recents when there are some, like the WP keyboard.
+            emojiCategory = 0
+            emojiPage = 0
+            dragX = 0f
+            layoutKeys(); invalidate()
+        }
     private var emojiCategory = 0
     private var emojiPage = 0
+    /** Horizontal offset of the emoji pages while the finger drags them. */
+    private var dragX = 0f
+    private var pageDrag = false
+    private var settle: android.animation.ValueAnimator? = null
+
+    private val recents = EmojiRecents(context)
+
+    /** Recently used emoji first (when there are some), then the categories. */
+    private fun cats(): List<Pair<String, List<String>>> {
+        val r = recents.list()
+        return if (r.isEmpty()) EmojiData.categories else listOf("🕘" to r) + EmojiData.categories
+    }
+
+    private val emojiCols = 8
+    private val emojiRows = 4
+    private val perPage get() = emojiCols * emojiRows
+    private fun pagesOf(cat: Int) = max(1, (cats()[cat].second.size + perPage - 1) / perPage)
+
+    /** The page before/after (cat, page), flowing across categories; null at the ends. */
+    private fun neighbour(cat: Int, page: Int, forward: Boolean): Pair<Int, Int>? = when {
+        forward && page + 1 < pagesOf(cat) -> cat to page + 1
+        forward && cat + 1 < cats().size -> cat + 1 to 0
+        !forward && page > 0 -> cat to page - 1
+        !forward && cat > 0 -> cat - 1 to pagesOf(cat - 1) - 1
+        else -> null
+    }
 
     private val stripHeight get() = 44f * density
     private val keyHeight get() = 50f * density
@@ -154,11 +187,11 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
     }
 
     private fun layoutEmoji() {
-        val emojis = EmojiData.categories[emojiCategory].second
-        val cols = 8
-        val perPage = cols * 4
-        val pages = (emojis.size + perPage - 1) / perPage
-        emojiPage = emojiPage.coerceIn(0, max(0, pages - 1))
+        val categories = cats()
+        emojiCategory = emojiCategory.coerceIn(0, categories.lastIndex)
+        val emojis = categories[emojiCategory].second
+        val cols = emojiCols
+        emojiPage = emojiPage.coerceIn(0, pagesOf(emojiCategory) - 1)
         val cell = width / cols.toFloat()
         emojis.drop(emojiPage * perPage).take(perPage).forEachIndexed { i, e ->
             val r = i / cols
@@ -166,22 +199,30 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             val top = stripHeight + r * keyHeight
             placed += Placed(Key(e), RectF(c * cell, top, (c + 1) * cell, top + keyHeight))
         }
-        // Bottom row: abc, categories, backspace.
-        val y = stripHeight + 4 * keyHeight
-        val n = EmojiData.categories.size + 2
-        val w = width / n.toFloat()
-        placed += Placed(Key("abc", KeyType.Letters), RectF(gap / 2, y + gap, w - gap / 2, y + keyHeight))
-        EmojiData.categories.forEachIndexed { i, (icon, _) ->
-            placed += Placed(Key(icon, KeyType.SymbolsPage, text = "cat:$i"), RectF((i + 1) * w + gap / 2, y + gap, (i + 2) * w - gap / 2, y + keyHeight))
-        }
-        placed += Placed(Key("del", KeyType.Backspace), RectF((n - 1) * w + gap / 2, y + gap, n * w - gap / 2, y + keyHeight))
+        // Bottom row: abc, space, backspace (categories are tabs in the strip above).
+        val y = stripHeight + emojiRows * keyHeight
+        val u = width / 10f
+        placed += Placed(Key("abc", KeyType.Letters), RectF(gap / 2, y + gap, 2 * u - gap / 2, y + keyHeight))
+        placed += Placed(Key(" ", KeyType.Space), RectF(2 * u + gap / 2, y + gap, 8 * u - gap / 2, y + keyHeight))
+        placed += Placed(Key("del", KeyType.Backspace), RectF(8 * u + gap / 2, y + gap, 10 * u - gap / 2, y + keyHeight))
     }
 
     // --- Drawing ----------------------------------------------------------------------------
     override fun onDraw(canvas: Canvas) {
         canvas.drawColor(bg)
         drawStrip(canvas)
-        placed.forEach { drawKey(canvas, it) }
+        if (emojiMode) {
+            // The grid is drawn page by page so it can follow the finger; the bottom row is keys.
+            canvas.save()
+            canvas.clipRect(0f, stripHeight, width.toFloat(), stripHeight + emojiRows * keyHeight)
+            drawEmojiPage(canvas, emojiCategory, emojiPage, dragX)
+            if (dragX < 0) neighbour(emojiCategory, emojiPage, true)?.let { (c, pg) -> drawEmojiPage(canvas, c, pg, dragX + width) }
+            if (dragX > 0) neighbour(emojiCategory, emojiPage, false)?.let { (c, pg) -> drawEmojiPage(canvas, c, pg, dragX - width) }
+            canvas.restore()
+            placed.forEach { if (it.key.type != KeyType.Char) drawKey(canvas, it) }
+        } else {
+            placed.forEach { drawKey(canvas, it) }
+        }
         if (swiping) {
             trailPaint.color = accent
             trailPaint.strokeWidth = 6f * density
@@ -193,13 +234,50 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
         if (alternates.isNotEmpty()) drawAlternates(canvas)
     }
 
+    private fun drawEmojiPage(canvas: Canvas, cat: Int, page: Int, offsetX: Float) {
+        val emojis = cats()[cat].second
+        val cell = width / emojiCols.toFloat()
+        textPaint.typeface = font
+        textPaint.textSize = 26f * density
+        textPaint.color = fg
+        emojis.drop(page * perPage).take(perPage).forEachIndexed { i, e ->
+            val r = i / emojiCols
+            val c = i % emojiCols
+            val cx = offsetX + c * cell + cell / 2
+            val cy = stripHeight + r * keyHeight + keyHeight / 2
+            if (!pageDrag && pressed?.key?.label == e && cat == emojiCategory && page == emojiPage) {
+                keyPaint.color = accent
+                canvas.drawRect(cx - cell / 2, cy - keyHeight / 2, cx + cell / 2, cy + keyHeight / 2, keyPaint)
+            }
+            canvas.drawText(e, cx, cy + textPaint.textSize * 0.35f, textPaint)
+        }
+    }
+
     private fun drawStrip(canvas: Canvas) {
         textPaint.typeface = fontLight
         textPaint.textSize = 19f * density
         if (emojiMode) {
-            val pages = (EmojiData.categories[emojiCategory].second.size + 31) / 32
-            textPaint.color = subtle
-            canvas.drawText("${emojiPage + 1} / $pages  ‹ ›", width / 2f, stripHeight * 0.66f, textPaint)
+            // Category tabs (current one on an accent block) and one dot per page below them.
+            val categories = cats()
+            val w = width / categories.size.toFloat()
+            categories.forEachIndexed { i, (icon, _) ->
+                if (i == emojiCategory) {
+                    keyPaint.color = accent
+                    canvas.drawRect(i * w + gap / 2, gap, (i + 1) * w - gap / 2, stripHeight - 8 * density, keyPaint)
+                }
+                text(canvas, icon, i * w + w / 2, (stripHeight - 8 * density) / 2 + gap / 2, 18f, fg)
+            }
+            val pages = pagesOf(emojiCategory)
+            if (pages > 1) {
+                val r = 2f * density
+                val step = 9f * density
+                var x = width / 2f - (pages - 1) * step / 2
+                for (i in 0 until pages) {
+                    keyPaint.color = if (i == emojiPage) accent else subtle
+                    canvas.drawCircle(x, stripHeight - 4 * density, r, keyPaint)
+                    x += step
+                }
+            }
             return
         }
         if (suggestions.isEmpty()) return
@@ -398,6 +476,18 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
                     return true
                 }
                 val dist = hypot(mx - downX, my - downY)
+                // Emoji grid: a sideways drag moves the pages.
+                if (emojiMode && p.key.type == KeyType.Char && (pageDrag || (abs(mx - downX) > 14 * density && abs(mx - downX) > abs(my - downY)))) {
+                    handler.removeCallbacks(longPress)
+                    pageDrag = true
+                    val raw = mx - downX
+                    val hasNext = neighbour(emojiCategory, emojiPage, true) != null
+                    val hasPrev = neighbour(emojiCategory, emojiPage, false) != null
+                    // Resist at the first and last page.
+                    dragX = if ((raw < 0 && !hasNext) || (raw > 0 && !hasPrev)) raw * 0.25f else raw
+                    invalidate()
+                    return true
+                }
                 when {
                     p.key.type == KeyType.Space && (spaceDragging || abs(mx - downX) > 16 * density) -> {
                         handler.removeCallbacks(longPress)
@@ -450,6 +540,13 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             invalidate()
             return
         }
+        if (pageDrag) {
+            pageDrag = false
+            settlePages(upX - downX)
+            alternates = emptyList()
+            invalidate()
+            return
+        }
         if (commit && p != null) {
             when {
                 alternates.isNotEmpty() -> {
@@ -459,11 +556,16 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
                 spaceDragging -> {}
                 p.key.type == KeyType.Backspace && upX - downX < -40 * density -> listener.onDeleteWord()
                 p.key.type == KeyType.SymbolsPage && emojiMode -> {
+                    settle?.cancel()
+                    dragX = 0f
                     emojiCategory = p.key.text.removePrefix("cat:").toIntOrNull() ?: 0
                     emojiPage = 0
                     layoutKeys()
                 }
-                emojiMode && p.key.type == KeyType.Char -> listener.onText(p.key.text)
+                emojiMode && p.key.type == KeyType.Char -> {
+                    listener.onText(p.key.text)
+                    recents.add(p.key.text)
+                }
                 else -> listener.onKey(p.key)
             }
         }
@@ -474,11 +576,39 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
         invalidate()
     }
 
+    /** Finishes a page drag: snaps to the next/previous page (or back) with a short slide. */
+    private fun settlePages(dx: Float) {
+        val forward = dx < 0
+        val target = neighbour(emojiCategory, emojiPage, forward)?.takeIf { abs(dx) > width * 0.18f }
+        val end = if (target == null) 0f else if (forward) -width.toFloat() else width.toFloat()
+        settle?.cancel()
+        settle = android.animation.ValueAnimator.ofFloat(dragX, end).apply {
+            duration = 180
+            interpolator = android.view.animation.DecelerateInterpolator()
+            addUpdateListener { dragX = it.animatedValue as Float; invalidate() }
+            addListener(object : android.animation.AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: android.animation.Animator) {
+                    if (target != null) {
+                        emojiCategory = target.first
+                        emojiPage = target.second
+                    }
+                    dragX = 0f
+                    layoutKeys()
+                    invalidate()
+                }
+            })
+            start()
+        }
+    }
+
     private fun stripTap(x: Float) {
         if (emojiMode) {
-            // Left/right half of the strip flips emoji pages.
-            emojiPage += if (x > width / 2f) 1 else -1
-            if (emojiPage < 0) emojiPage = 0
+            // The strip holds the category tabs.
+            settle?.cancel()
+            dragX = 0f
+            emojiCategory = (x / (width / cats().size.toFloat())).toInt().coerceIn(0, cats().lastIndex)
+            emojiPage = 0
+            feedback(this)
             layoutKeys()
             invalidate()
             return

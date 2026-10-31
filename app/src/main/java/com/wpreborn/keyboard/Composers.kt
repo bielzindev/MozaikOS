@@ -183,3 +183,17 @@ class KanaComposer {
         putAll(mapOf("sha" to "しゃ", "shu" to "しゅ", "sho" to "しょ", "cha" to "ちゃ", "chu" to "ちゅ", "cho" to "ちょ", "ja" to "じゃ", "ju" to "じゅ", "jo" to "じょ"))
     }
 }
+
+/** The last emoji used (newest first), kept across sessions. */
+class EmojiRecents(context: android.content.Context) {
+    private val prefs = context.getSharedPreferences("zunex_keyboard", android.content.Context.MODE_PRIVATE)
+    private var cache: List<String>? = null
+
+    fun list(): List<String> = cache ?: (prefs.getString("recent_emoji", "") ?: "").split(" ").filter { it.isNotBlank() }.also { cache = it }
+
+    fun add(emoji: String) {
+        val next = (listOf(emoji) + list().filterNot { it == emoji }).take(32)
+        cache = next
+        prefs.edit().putString("recent_emoji", next.joinToString(" ")).apply()
+    }
+}

@@ -578,4 +578,5 @@
     <string name="icon_custom">personalizada</string>
     <string name="icon_done">pronto</string>
     <string name="icon_reset">redefinir</string>
+    <string name="kb_emoji_recent">recentes</string>
 </resources>

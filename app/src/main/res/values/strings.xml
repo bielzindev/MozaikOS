@@ -577,4 +577,5 @@
     <string name="icon_custom">custom</string>
     <string name="icon_done">done</string>
     <string name="icon_reset">reset</string>
+    <string name="kb_emoji_recent">recent</string>
 </resources>

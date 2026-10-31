@@ -43,13 +43,12 @@ fun rememberIconCustom(app: AppEntry?): IconCustom {
     return app?.let { all[it.key] } ?: IconCustom()
 }
 
-/** The colour to draw the icon in, or null to keep its own colours. */
-fun IconCustom.tintColor(): Color? = when (tint) {
-    IconTint.Default -> null
-    IconTint.White -> Color.White
-    IconTint.Black -> Color.Black
-    IconTint.Custom -> Color(color)
-}
+/**
+ * The colour to draw the icon in, or null to keep its own colours. Icons keep their colours:
+ * colour belongs to the tile (palette button in edit mode), so a saved tint is ignored.
+ */
+@Suppress("UnusedReceiverParameter")
+fun IconCustom.tintColor(): Color? = null
 
 /** Whether this app uses the Metro pack (its own choice, else the global one). */
 @Composable

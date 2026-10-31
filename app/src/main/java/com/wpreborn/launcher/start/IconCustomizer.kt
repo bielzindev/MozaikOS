@@ -52,8 +52,8 @@ import com.wpreborn.data.apps.IconTint
 
 /**
  * Per-app icon settings, opened from a tile in Start's edit mode: the icon pack (Metro or the
- * original Android icon, independent for each app) and the icon colour (its own, white, black
- * or any colour from the picker). Changes apply at once and are saved for that app.
+ * original Android icon), independent for each app. The tile's colour stays on the palette
+ * button. Changes apply at once and are saved for that app.
  */
 @Composable
 fun IconCustomizer(app: AppEntry, tileColor: Color?, onDismiss: () -> Unit) {
@@ -87,18 +87,6 @@ fun IconCustomizer(app: AppEntry, tileColor: Color?, onDismiss: () -> Unit) {
             Choice(stringResource(R.string.icons_original), custom.pack == IconPack.Original, Modifier.weight(1f)) { prefs.set(app.key, custom.copy(pack = IconPack.Original)) }
         }
 
-        Section(stringResource(R.string.icon_color))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Choice(stringResource(R.string.icon_color_default), custom.tint == IconTint.Default, Modifier.weight(1f)) { prefs.set(app.key, custom.copy(tint = IconTint.Default)) }
-            Choice(stringResource(R.string.icon_white), custom.tint == IconTint.White, Modifier.weight(1f)) { prefs.set(app.key, custom.copy(tint = IconTint.White)) }
-            Choice(stringResource(R.string.icon_black), custom.tint == IconTint.Black, Modifier.weight(1f)) { prefs.set(app.key, custom.copy(tint = IconTint.Black)) }
-            Choice(stringResource(R.string.icon_custom), custom.tint == IconTint.Custom, Modifier.weight(1f)) { prefs.set(app.key, custom.copy(tint = IconTint.Custom)) }
-        }
-        if (custom.tint == IconTint.Custom) {
-            Spacer(Modifier.height(16.dp))
-            ColorPicker(Color(custom.color)) { prefs.set(app.key, custom.copy(tint = IconTint.Custom, color = it.toArgb())) }
-        }
-
         Spacer(Modifier.height(24.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             WpButton(stringResource(R.string.icon_done), onClick = onDismiss)
@@ -125,73 +113,4 @@ private fun Choice(label: String, selected: Boolean, modifier: Modifier, onClick
     ) {
         WpText(label, style = WpType.Small, color = if (selected) Color.White else Wp.palette.foreground, maxLines = 2)
     }
-}
-
-/** Saturation/brightness square and a hue bar; the chosen colour is shown with its hex code. */
-@Composable
-private fun ColorPicker(initial: Color, onChange: (Color) -> Unit) {
-    val hsv = remember { FloatArray(3).also { android.graphics.Color.colorToHSV(initial.toArgb(), it) } }
-    var hue by remember { mutableFloatStateOf(hsv[0]) }
-    var sat by remember { mutableFloatStateOf(hsv[1]) }
-    var value by remember { mutableFloatStateOf(hsv[2]) }
-    val emit by rememberUpdatedState(onChange)
-    fun current() = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, sat, value)))
-    val pureHue = Color(android.graphics.Color.HSVToColor(floatArrayOf(hue, 1f, 1f)))
-
-    Row(verticalAlignment = Alignment.Top) {
-        // Saturation (x) and brightness (y).
-        Canvas(
-            Modifier
-                .size(200.dp)
-                .pointerInput(Unit) {
-                    fun pick(o: Offset) {
-                        sat = (o.x / size.width).coerceIn(0f, 1f)
-                        value = 1f - (o.y / size.height).coerceIn(0f, 1f)
-                        emit(current())
-                    }
-                    detectTapGestures { pick(it) }
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        sat = (change.position.x / size.width).coerceIn(0f, 1f)
-                        value = 1f - (change.position.y / size.height).coerceIn(0f, 1f)
-                        emit(current())
-                    }
-                },
-        ) {
-            drawRect(Brush.horizontalGradient(listOf(Color.White, pureHue)))
-            drawRect(Brush.verticalGradient(listOf(Color.Transparent, Color.Black)))
-            val c = Offset(sat * size.width, (1f - value) * size.height)
-            drawCircle(Color.White, 9.dp.toPx(), c, style = Stroke(3.dp.toPx()))
-            drawCircle(Color.Black, 11.dp.toPx(), c, style = Stroke(1.dp.toPx()))
-        }
-        Spacer(Modifier.width(16.dp))
-        // Hue.
-        Canvas(
-            Modifier
-                .width(36.dp)
-                .height(200.dp)
-                .pointerInput(Unit) {
-                    detectTapGestures { hue = (it.y / size.height).coerceIn(0f, 1f) * 360f; emit(current()) }
-                }
-                .pointerInput(Unit) {
-                    detectDragGestures { change, _ ->
-                        change.consume()
-                        hue = (change.position.y / size.height).coerceIn(0f, 1f) * 360f
-                        emit(current())
-                    }
-                },
-        ) {
-            drawRect(Brush.verticalGradient((0..6).map { Color(android.graphics.Color.HSVToColor(floatArrayOf(it * 60f, 1f, 1f))) }))
-            val y = hue / 360f * size.height
-            drawRect(Color.White, Offset(0f, y - 3.dp.toPx()), androidx.compose.ui.geometry.Size(size.width, 6.dp.toPx()), style = Stroke(2.dp.toPx()))
-        }
-        Spacer(Modifier.width(16.dp))
-        Column {
-            Box(Modifier.size(56.dp).background(current()).border(1.dp, Wp.palette.foreground))
-            WpText("#%06X".format(current().toArgb() and 0xFFFFFF), style = WpType.Small, modifier = Modifier.padding(top = 6.dp))
-        }
-    }
-    Spacer(Modifier.fillMaxWidth().height(4.dp))
 }

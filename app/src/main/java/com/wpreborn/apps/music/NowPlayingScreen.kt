@@ -232,7 +232,7 @@ fun NowPlayingScreen(ui: PlayerUi, external: NowPlaying?, controller: MusicContr
                 }
 
                 // The queue slides over the art.
-                AnimatedVisibility(showQueue && useOwn, enter = fadeIn(), exit = fadeOut()) {
+                if (showQueue && useOwn) {
                     Column(
                         Modifier
                             .fillMaxSize()

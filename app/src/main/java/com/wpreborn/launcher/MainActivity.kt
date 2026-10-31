@@ -252,6 +252,7 @@ class MainActivity : ComponentActivity() {
         super.onResume()
         WpActivity.applySystemBars(this)
         vm.refreshLive()
+        com.wpreborn.data.weather.WeatherRepository.get(this).refreshIfStale()
         if (returning) {
             returning = false
             lifecycleScope.launch(AndroidUiDispatcher.Main) {

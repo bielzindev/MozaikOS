@@ -32,7 +32,8 @@ enum class BuiltInApp(
     Keyboard("keyboard", R.string.app_keyboard, WpIcons.Keypad, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java, TileSize.Small),
     Camera("camera", R.string.app_camera, WpIcons.Camera, com.wpreborn.apps.camera.CameraActivity::class.java, TileSize.Small),
     Calculator("calculator", R.string.app_calculator, com.wpreborn.core.icons.Glyphs.Calculator, com.wpreborn.apps.calculator.CalculatorActivity::class.java, TileSize.Small),
-    Notes("notes", R.string.app_notes, com.wpreborn.core.icons.Glyphs.Note, com.wpreborn.apps.notes.NotesActivity::class.java, TileSize.Medium);
+    Notes("notes", R.string.app_notes, com.wpreborn.core.icons.Glyphs.Note, com.wpreborn.apps.notes.NotesActivity::class.java, TileSize.Medium),
+    Weather("weather", R.string.app_weather, com.wpreborn.core.icons.Glyphs.Weather, com.wpreborn.apps.weather.WeatherActivity::class.java, TileSize.Wide);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

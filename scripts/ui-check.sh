@@ -231,6 +231,23 @@ shot 66-camera-shot 4
 adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell input keyevent KEYCODE_HOME
 
+# Weather: add a city through the search (Open-Meteo)
+start com.wpreborn.apps.weather.WeatherActivity
+sleep 2
+shot 67-weather-places 1
+tap_text "Add a city"
+sleep 1
+adb shell input text "London"
+sleep 5
+tap_text "England, United Kingdom"
+shot 68-weather-hub 6
+swipe_left
+shot 69-weather-hourly 2
+swipe_left
+shot 70-weather-daily 2
+adb shell input keyevent KEYCODE_HOME
+shot 71-start-weather-tile 4
+
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true
 shot 30-lock 3

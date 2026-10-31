@@ -24,6 +24,7 @@ object Calc {
 
     fun append(expr: String, token: String): String {
         val last = expr.lastOrNull()
+        val l = last ?: ' '
         return when {
             token == "." -> {
                 val number = expr.takeLastWhile { it.isDigit() || it == '.' }
@@ -36,16 +37,16 @@ object Calc {
             token.length == 1 && token[0] in BINARY -> when {
                 // A leading minus is a sign; other operators start from 0.
                 last == null -> if (token == "−") token else "0$token"
-                token == "−" && last in "×÷^(" -> expr + token
-                last in BINARY -> if (expr.length == 1) expr else expr.dropLast(1) + token
-                last == '.' -> expr + "0" + token
+                token == "−" && l in "×÷^(" -> expr + token
+                l in BINARY -> if (expr.length == 1) expr else expr.dropLast(1) + token
+                l == '.' -> expr + "0" + token
                 else -> expr + token
             }
-            token.startsWith("^") && (last == null || last in BINARY || last == '(') -> expr
-            token == "%" || token == "!" -> if (last == null || last in BINARY || last == '(') expr else expr + token
+            token.startsWith("^") && (last == null || l in BINARY || l == '(') -> expr
+            token == "%" || token == "!" -> if (last == null || l in BINARY || l == '(') expr else expr + token
             token == ")" -> {
                 val open = expr.count { it == '(' } - expr.count { it == ')' }
-                if (open <= 0 || last == '(' || last in BINARY) expr else expr + token
+                if (open <= 0 || l == '(' || l in BINARY) expr else expr + token
             }
             // Avoid "007": a lone leading zero is replaced by the next digit.
             token.length == 1 && token[0].isDigit() && expr.takeLastWhile { it.isDigit() || it == '.' } == "0" -> expr.dropLast(1) + token

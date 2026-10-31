@@ -129,6 +129,7 @@ class TileRepository private constructor(private val context: Context) {
             maps?.let { add(TileSpec(appKey = it.key, size = TileSize.Small)) }
             add(TileSpec(appKey = builtin(BuiltInApp.Photos), size = TileSize.Wide))
             add(TileSpec(appKey = builtin(BuiltInApp.Music), size = TileSize.Wide))
+            add(TileSpec(appKey = builtin(BuiltInApp.Weather), size = TileSize.Wide))
             add(TileSpec(appKey = builtin(BuiltInApp.Notes), size = TileSize.Medium))
             add(TileSpec(appKey = builtin(BuiltInApp.Calculator), size = TileSize.Small))
             store?.let { add(TileSpec(appKey = it.key, size = TileSize.Medium)) }

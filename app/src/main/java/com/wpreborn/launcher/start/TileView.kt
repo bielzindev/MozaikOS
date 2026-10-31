@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -84,6 +85,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Camera -> IconTile(WpIcons.Camera, tile.size)
             BuiltInApp.Calculator -> IconTile(com.wpreborn.core.icons.Glyphs.Calculator, tile.size)
             BuiltInApp.Notes -> IconTile(com.wpreborn.core.icons.Glyphs.Note, tile.size)
+            BuiltInApp.Weather -> WeatherTile(tile.size, inputs.liveEnabled)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&
@@ -350,6 +352,55 @@ private fun SocialFace(n: WpNotification, size: TileSize) {
         Column(Modifier.weight(1f).fillMaxHeight().padding(8.dp)) {
             WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WpText(n.text, style = WpType.Small, color = Color.White, maxLines = if (size == TileSize.Medium) 4 else 3, overflow = TextOverflow.Ellipsis)
+        }
+    }
+}
+
+/** Weather: temperature, sky and place; wide and large add the next days, like MSN Weather. */
+@Composable
+private fun BoxScope.WeatherTile(size: TileSize, live: Boolean) {
+    val context = LocalContext.current
+    val repo = remember { com.wpreborn.data.weather.WeatherRepository.get(context) }
+    val forecasts by repo.forecasts.collectAsState()
+    val places by repo.places.collectAsState()
+    val f by repo.fahrenheit.collectAsState()
+    val w = places.firstOrNull()?.let { forecasts[it.id] }
+    if (!live || w == null) {
+        IconTile(com.wpreborn.core.icons.Glyphs.Weather, size)
+        return
+    }
+    fun deg(c: Double) = com.wpreborn.data.weather.WeatherRepository.toUnit(c, f).let { kotlin.math.round(it).toInt() }.toString() + "°"
+    if (size == TileSize.Small) {
+        Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+            com.wpreborn.apps.weather.WeatherGlyph(w.code, w.isDay, 26.dp)
+            WpText(deg(w.temp), style = WpType.Small, color = Color.White)
+        }
+        return
+    }
+    Row(Modifier.fillMaxSize().padding(start = 10.dp, top = 8.dp, end = 8.dp, bottom = 24.dp)) {
+        Column(Modifier.weight(1f)) {
+            WpText(deg(w.temp), style = WpType.TileCount.copy(fontSize = 40.sp, lineHeight = 44.sp), color = Color.White)
+            com.wpreborn.apps.weather.WeatherGlyph(w.code, w.isDay, if (size == TileSize.Medium) 40.dp else 44.dp)
+            w.days.firstOrNull()?.let { d ->
+                WpText(deg(d.max) + " / " + deg(d.min), style = WpType.Small, color = Color.White)
+            }
+        }
+        if (size != TileSize.Medium) {
+            Column(Modifier.weight(1.4f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                w.days.drop(1).take(if (size == TileSize.Large) 6 else 3).forEach { d ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        WpText(
+                            android.text.format.DateFormat.format("EEE", d.date).toString(),
+                            style = WpType.Small,
+                            color = Color.White,
+                            modifier = Modifier.width(40.dp),
+                        )
+                        com.wpreborn.apps.weather.WeatherGlyph(d.code, true, 18.dp)
+                        Spacer(Modifier.width(6.dp))
+                        WpText(deg(d.max) + " " + deg(d.min), style = WpType.Small, color = Color.White, maxLines = 1)
+                    }
+                }
+            }
         }
     }
 }

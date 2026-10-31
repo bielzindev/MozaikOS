@@ -16,6 +16,7 @@ import android.util.Range
 import androidx.activity.compose.BackHandler
 import androidx.camera.camera2.interop.Camera2CameraControl
 import androidx.camera.camera2.interop.Camera2CameraInfo
+import androidx.camera.camera2.interop.Camera2Interop
 import androidx.camera.camera2.interop.CaptureRequestOptions
 import androidx.camera.camera2.interop.ExperimentalCamera2Interop
 import androidx.camera.core.MirrorMode
@@ -404,7 +405,7 @@ private fun CameraScreen(activity: CameraActivity) {
             .also { it.setSurfaceProvider(previewView.surfaceProvider) }
         // Photos: the sensor's full resolution, the slower high-quality pipeline (noise reduction,
         // sharpening, multi-frame where the phone does it) and a high JPEG quality.
-        val ic = ImageCapture.Builder()
+        val icb = ImageCapture.Builder()
             .setCaptureMode(if (settings.fast) ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY else ImageCapture.CAPTURE_MODE_MAXIMIZE_QUALITY)
             .setJpegQuality(if (settings.fast) 90 else 97)
             .setResolutionSelector(
@@ -415,7 +416,21 @@ private fun CameraScreen(activity: CameraActivity) {
             )
             .setFlashMode(flash.capture)
             .setTargetRotation(rotation)
-            .build()
+        if (!settings.fast && look == Look.Normal) {
+            // The sensor's best still processing: high-quality noise reduction, sharpening and
+            // lens aberration correction (only the modes this camera lists).
+            runCatching {
+                val ch = Camera2CameraInfo.from(provider.getCameraInfo(base))
+                val ext2 = Camera2Interop.Extender(icb)
+                val nr = ch.getCameraCharacteristic(CameraCharacteristics.NOISE_REDUCTION_AVAILABLE_NOISE_REDUCTION_MODES) ?: IntArray(0)
+                if (CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY in nr) ext2.setCaptureRequestOption(CaptureRequest.NOISE_REDUCTION_MODE, CameraMetadata.NOISE_REDUCTION_MODE_HIGH_QUALITY)
+                val edge = ch.getCameraCharacteristic(CameraCharacteristics.EDGE_AVAILABLE_EDGE_MODES) ?: IntArray(0)
+                if (CameraMetadata.EDGE_MODE_HIGH_QUALITY in edge) ext2.setCaptureRequestOption(CaptureRequest.EDGE_MODE, CameraMetadata.EDGE_MODE_HIGH_QUALITY)
+                val ab = ch.getCameraCharacteristic(CameraCharacteristics.COLOR_CORRECTION_AVAILABLE_ABERRATION_MODES) ?: IntArray(0)
+                if (CameraMetadata.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY in ab) ext2.setCaptureRequestOption(CaptureRequest.COLOR_CORRECTION_ABERRATION_MODE, CameraMetadata.COLOR_CORRECTION_ABERRATION_MODE_HIGH_QUALITY)
+            }
+        }
+        val ic = icb.build()
         val q = when (settings.videoRes) { 1 -> Quality.UHD; 2 -> Quality.FHD; 3 -> Quality.HD; else -> Quality.HIGHEST }
         val qs = if (q == Quality.HIGHEST) QualitySelector.from(q) else QualitySelector.from(q, FallbackStrategy.lowerQualityOrHigherThan(q))
         val recorder = Recorder.Builder().setQualitySelector(qs).build()

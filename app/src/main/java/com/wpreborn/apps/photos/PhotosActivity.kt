@@ -19,6 +19,7 @@ import com.wpreborn.core.ui.wpCombinedClickable
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -74,7 +75,21 @@ import com.wpreborn.navigation.rememberNavigator
 import com.wpreborn.permissions.PermissionGate
 import com.wpreborn.permissions.Perms
 import com.wpreborn.permissions.rememberPermissionState
+import com.wpreborn.permissions.hasPermissions
 import java.util.Calendar
+import android.view.TextureView
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
+import androidx.media3.common.MediaItem
+import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
+import androidx.media3.exoplayer.ExoPlayer
+import com.wpreborn.core.ui.WpSlider
+import kotlinx.coroutines.delay
 
 private sealed interface PhotosPage {
     data object Hub : PhotosPage
@@ -90,10 +105,21 @@ class PhotosActivity : WpActivity() {
     override fun Content() {
         val context = LocalContext.current
         val perm = rememberPermissionState(Perms.IMAGES)
+        val videoPerm = rememberPermissionState(Perms.VIDEOS)
         val library = remember { PhotoLibrary(context) }
         var photos by remember { mutableStateOf<List<Photo>?>(null) }
         var reload by remember { mutableStateOf(0) }
-        LaunchedEffect(perm.granted, reload) { if (perm.granted) photos = library.load() }
+        // Videos need their own permission on Android 13+: asked once, after the pictures.
+        LaunchedEffect(perm.granted) {
+            val prefs = context.getSharedPreferences("photos", android.content.Context.MODE_PRIVATE)
+            if (perm.granted && !videoPerm.granted && !prefs.getBoolean("askedVideo", false)) {
+                prefs.edit().putBoolean("askedVideo", true).apply()
+                videoPerm.request()
+            }
+        }
+        LaunchedEffect(perm.granted, videoPerm.granted, reload) {
+            if (perm.granted) photos = library.load(videos = context.hasPermissions(Perms.VIDEOS))
+        }
         val albums = remember(photos) { photos?.let { library.albums(it) }.orEmpty() }
         val nav = rememberNavigator<PhotosPage>(PhotosPage.Hub)
         WpNavHost(nav) { page ->
@@ -214,7 +240,9 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
     }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].id }) { page ->
-            ZoomableImage(photos[page]) { chrome = !chrome }
+            val item = photos[page]
+            if (item.isVideo) VideoPage(item, active = pager.currentPage == page, chrome = chrome) { chrome = !chrome }
+            else ZoomableImage(item) { chrome = !chrome }
         }
         if (chrome) {
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
@@ -231,7 +259,7 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
                             runCatching {
                             context.startActivity(
                                 Intent.createChooser(
-                                    Intent(Intent.ACTION_SEND).setType("image/*").putExtra(Intent.EXTRA_STREAM, p.uri)
+                                    Intent(Intent.ACTION_SEND).setType(if (p.isVideo) "video/*" else "image/*").putExtra(Intent.EXTRA_STREAM, p.uri)
                                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
                                     null,
                                 ),
@@ -244,7 +272,7 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
                                 deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                             })
                         }
-                        add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) { onEdit(p) })
+                        if (!p.isVideo) add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) { onEdit(p) })
                     },
                     background = Color.Black.copy(alpha = 0.6f),
                 )
@@ -257,10 +285,15 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
 private fun ZoomableImage(photo: Photo, onTap: () -> Unit) {
     val context = LocalContext.current
     val image by produceState<ImageBitmap?>(null, photo.id) {
-        value = ImageLoader.full(context, photo.uri, 2048)?.asImageBitmap()
+        value = ImageLoader.full(context, photo.uri, 2560)?.asImageBitmap()
     }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    // Zoomed in: the picture at (up to) its full resolution, so detail stays sharp.
+    val zoomed = scale > 1.2f
+    val sharp by produceState<ImageBitmap?>(null, photo.id, zoomed) {
+        value = if (zoomed) ImageLoader.large(context, photo.uri, 4096)?.asImageBitmap() else null
+    }
     Box(
         Modifier
             .fillMaxSize()
@@ -306,7 +339,7 @@ private fun ZoomableImage(photo: Photo, onTap: () -> Unit) {
             ),
         contentAlignment = Alignment.Center,
     ) {
-        val img = image
+        val img = sharp ?: image
         if (img == null) {
             Thumbnail(photo.uri, Modifier.fillMaxSize(), sizePx = 512, contentScale = ContentScale.Fit)
         } else {
@@ -356,6 +389,15 @@ private fun SelectableThumb(photo: Photo, selection: PhotoSelection, onOpen: () 
             }) { if (selection.active) selection.toggle(photo.id) else onOpen() },
     ) {
         Thumbnail(photo.uri, Modifier.fillMaxSize(), sizePx = 256)
+        if (photo.isVideo) {
+            Row(
+                Modifier.align(Alignment.BottomStart).fillMaxWidth().background(Color.Black.copy(alpha = 0.45f)).padding(horizontal = 4.dp, vertical = 1.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                WpIcon(WpIcons.Play, tint = Color.White, size = 12.dp)
+                WpText(formatTime(photo.durationMs), style = WpType.Small, color = Color.White, modifier = Modifier.padding(start = 3.dp))
+            }
+        }
         if (selection.active) {
             if (selected) Box(Modifier.fillMaxSize().border(3.dp, Wp.accent))
             Box(
@@ -393,7 +435,13 @@ private fun SelectionAppBar(selection: PhotoSelection, photos: List<Photo>, onDe
             AppBarButton(WpIcons.Share, stringResource(R.string.share), enabled = chosen.isNotEmpty()) {
                 runCatching {
                     val send = Intent(Intent.ACTION_SEND_MULTIPLE)
-                        .setType("image/*")
+                        .setType(
+                            when {
+                                chosen.all { !it.isVideo } -> "image/*"
+                                chosen.all { it.isVideo } -> "video/*"
+                                else -> "*/*"
+                            },
+                        )
                         .putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(chosen.map { it.uri }))
                         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
@@ -415,4 +463,111 @@ private fun SelectionAppBar(selection: PhotoSelection, photos: List<Photo>, onDe
             AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { selection.clear() },
         ),
     )
+}
+
+private fun formatTime(ms: Long): String {
+    val t = (ms / 1000).coerceAtLeast(0)
+    return if (t >= 3600) "%d:%02d:%02d".format(t / 3600, t / 60 % 60, t % 60) else "%d:%02d".format(t / 60, t % 60)
+}
+
+/**
+ * A video in the viewer, played in place (ExoPlayer): the poster with a round play button,
+ * then the picture with play/pause and a seek bar while the app bar is shown. Only the
+ * page on screen plays; it pauses when swiped away.
+ */
+@Composable
+private fun VideoPage(photo: Photo, active: Boolean, chrome: Boolean, onTap: () -> Unit) {
+    val context = LocalContext.current
+    var playing by remember { mutableStateOf(false) }
+    var rendered by remember { mutableStateOf(false) }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(photo.durationMs) }
+    var aspect by remember { mutableFloatStateOf(0f) }
+    var seeking by remember { mutableStateOf<Float?>(null) }
+    val player = remember(photo.id) {
+        ExoPlayer.Builder(context).build().apply {
+            setAudioAttributes(AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build(), true)
+            setMediaItem(MediaItem.fromUri(photo.uri))
+            prepare()
+        }
+    }
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(isPlaying: Boolean) { playing = isPlaying }
+            override fun onRenderedFirstFrame() { rendered = true }
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                if (videoSize.height > 0) aspect = videoSize.width * videoSize.pixelWidthHeightRatio / videoSize.height
+            }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (player.duration > 0) duration = player.duration
+                if (state == Player.STATE_ENDED) {
+                    player.pause()
+                    player.seekTo(0)
+                }
+            }
+        }
+        player.addListener(listener)
+        onDispose {
+            player.removeListener(listener)
+            player.release()
+        }
+    }
+    LaunchedEffect(active) { if (!active) player.pause() }
+    LaunchedEffect(playing) {
+        do {
+            position = player.currentPosition
+            delay(250)
+        } while (playing)
+    }
+    Box(
+        Modifier.fillMaxSize().pointerInput(photo.id) { detectTapGestures(onTap = { onTap() }) },
+        contentAlignment = Alignment.Center,
+    ) {
+        AndroidView(
+            factory = { TextureView(it).also { tv -> player.setVideoTextureView(tv) } },
+            modifier = if (aspect > 0f) Modifier.fillMaxWidth().aspectRatio(aspect, matchHeightConstraintsFirst = aspect < 1f) else Modifier.fillMaxSize(),
+        )
+        if (!rendered || (!playing && position == 0L)) {
+            Thumbnail(photo.uri, Modifier.fillMaxSize(), sizePx = 1024, contentScale = ContentScale.Fit)
+        }
+        if (!playing || chrome) {
+            Box(
+                Modifier
+                    .size(72.dp)
+                    .border(3.dp, Color.White, CircleShape)
+                    .background(Color.Black.copy(alpha = 0.35f), CircleShape)
+                    .wpClickable { if (playing) player.pause() else player.play() },
+                contentAlignment = Alignment.Center,
+            ) {
+                WpIcon(if (playing) WpIcons.Pause else WpIcons.Play, tint = Color.White, size = 34.dp)
+            }
+        }
+        if (chrome) {
+            Row(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .padding(bottom = 104.dp)
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .padding(horizontal = 12.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                val shown = seeking?.let { (it * duration).toLong() } ?: position
+                WpText(formatTime(shown), style = WpType.Small, color = Color.White)
+                WpSlider(
+                    seeking ?: if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
+                    { seeking = it },
+                    Modifier.weight(1f).padding(horizontal = 10.dp),
+                    onValueChangeFinished = {
+                        seeking?.let {
+                            position = (it * duration).toLong()
+                            player.seekTo(position)
+                        }
+                        seeking = null
+                    },
+                )
+                WpText(formatTime(duration), style = WpType.Small, color = Color.White)
+            }
+        }
+    }
 }

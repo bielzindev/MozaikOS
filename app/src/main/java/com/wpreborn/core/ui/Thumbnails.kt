@@ -69,6 +69,22 @@ object ImageLoader {
         }
     }
 
+    /** A picture at up to [maxSide] pixels for close zoom; not cached, in graphics memory when possible. */
+    suspend fun large(context: Context, uri: Uri, maxSide: Int): Bitmap? = withContext(Dispatchers.IO) {
+        try {
+            val source = ImageDecoder.createSource(context.contentResolver, uri)
+            ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+                val w = info.size.width
+                val h = info.size.height
+                val scale = maxOf(1f, maxOf(w, h) / maxSide.toFloat())
+                decoder.setTargetSize((w / scale).toInt().coerceAtLeast(1), (h / scale).toInt().coerceAtLeast(1))
+                decoder.allocator = ImageDecoder.ALLOCATOR_HARDWARE
+            }
+        } catch (_: Throwable) {
+            null
+        }
+    }
+
     private fun decodeSampled(context: Context, uri: Uri, size: Int): Bitmap? = try {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }

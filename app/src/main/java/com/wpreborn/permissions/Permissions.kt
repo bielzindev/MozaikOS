@@ -49,6 +49,8 @@ object Perms {
         Build.VERSION.SDK_INT >= 33 -> arrayOf(Manifest.permission.READ_MEDIA_IMAGES)
         else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
+    /** Camera videos in Photos (Android 13+ asks for them apart from pictures). */
+    val VIDEOS = if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.READ_MEDIA_VIDEO) else arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     val NOTIFICATIONS = if (Build.VERSION.SDK_INT >= 33) arrayOf(Manifest.permission.POST_NOTIFICATIONS) else emptyArray()
     val BLUETOOTH = if (Build.VERSION.SDK_INT >= 31) arrayOf(Manifest.permission.BLUETOOTH_CONNECT) else emptyArray()
 }
@@ -61,6 +63,7 @@ fun Context.hasPermissions(perms: Array<String>): Boolean {
             // Requested together with READ_MEDIA_IMAGES; never required on its own.
             Manifest.permission.READ_MEDIA_VISUAL_USER_SELECTED -> true
             Manifest.permission.READ_MEDIA_IMAGES -> granted(p) || partial
+            Manifest.permission.READ_MEDIA_VIDEO -> granted(p) || partial
             else -> granted(p)
         }
     }

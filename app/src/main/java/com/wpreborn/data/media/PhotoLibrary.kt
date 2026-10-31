@@ -7,7 +7,7 @@ import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class Photo(val id: Long, val dateTaken: Long, val bucketId: Long, val bucket: String, val isVideo: Boolean) {
+data class Photo(val id: Long, val dateTaken: Long, val bucketId: Long, val bucket: String, val isVideo: Boolean, val durationMs: Long = 0) {
     val uri: Uri
         get() = ContentUris.withAppendedId(
             if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -17,31 +17,36 @@ data class Photo(val id: Long, val dateTaken: Long, val bucketId: Long, val buck
 
 data class PhotoAlbum(val id: Long, val name: String, val photos: List<Photo>)
 
-/** Reads photos (and camera videos) from MediaStore. Requires READ_MEDIA_IMAGES. */
+/** Reads photos and videos from MediaStore. Requires READ_MEDIA_IMAGES (and READ_MEDIA_VIDEO for videos). */
 class PhotoLibrary(private val context: Context) {
 
-    suspend fun load(limit: Int = 5000): List<Photo> = withContext(Dispatchers.IO) {
+    /** Pictures, newest first; with [videos], videos too (when that permission is granted). */
+    suspend fun load(limit: Int = 5000, videos: Boolean = false): List<Photo> = withContext(Dispatchers.IO) {
         val result = ArrayList<Photo>()
-        val projection = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DATE_TAKEN,
-            MediaStore.MediaColumns.DATE_ADDED,
-            MediaStore.MediaColumns.BUCKET_ID,
-            MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
-        )
-        try {
-            context.contentResolver.query(
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI, projection, null, null,
-                "${MediaStore.MediaColumns.DATE_ADDED} DESC",
-            )?.use { c ->
-                while (c.moveToNext() && result.size < limit) {
-                    val taken = c.getLong(1).takeIf { it > 0 } ?: (c.getLong(2) * 1000)
-                    result += Photo(c.getLong(0), taken, c.getLong(3), c.getString(4) ?: "", isVideo = false)
+        fun read(uri: android.net.Uri, video: Boolean) {
+            val projection = arrayOf(
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DATE_TAKEN,
+                MediaStore.MediaColumns.DATE_ADDED,
+                MediaStore.MediaColumns.BUCKET_ID,
+                MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
+                MediaStore.MediaColumns.DURATION,
+            )
+            try {
+                context.contentResolver.query(uri, projection, null, null, "${MediaStore.MediaColumns.DATE_ADDED} DESC")?.use { c ->
+                    var n = 0
+                    while (c.moveToNext() && n < limit) {
+                        val taken = c.getLong(1).takeIf { it > 0 } ?: (c.getLong(2) * 1000)
+                        result += Photo(c.getLong(0), taken, c.getLong(3), c.getString(4) ?: "", isVideo = video, durationMs = if (video) c.getLong(5) else 0)
+                        n++
+                    }
                 }
+            } catch (_: Exception) {
             }
-        } catch (_: SecurityException) {
         }
-        result.sortedByDescending { it.dateTaken }
+        read(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false)
+        if (videos) read(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
+        result.sortedByDescending { it.dateTaken }.take(limit)
     }
 
     fun albums(photos: List<Photo>): List<PhotoAlbum> =

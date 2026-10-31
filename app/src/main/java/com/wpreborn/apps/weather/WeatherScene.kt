@@ -57,18 +57,23 @@ private class Cloud(val x: Float, val y: Float, val scale: Float)
  */
 @Composable
 fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modifier: Modifier = Modifier) {
-    val photoRes = backgroundPhoto(Sky.of(code), skyPhase(isDay, sunrise, sunset))
+    val context = LocalContext.current
+    val key = WeatherPhotos.keyFor(Sky.of(code), skyPhase(isDay, sunrise, sunset))
+    val photo by androidx.compose.runtime.produceState(WeatherPhotos.load(context, key), key) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { WeatherPhotos.load(context, key) }
+    }
     androidx.compose.foundation.layout.Box(modifier) {
-        if (photoRes != null) {
+        val image = photo
+        if (image != null) {
             // The photo of the current conditions, drifting slowly, cross-fading when they change.
-            androidx.compose.animation.Crossfade(photoRes, androidx.compose.ui.Modifier.matchParentSize(), animationSpec = tween(1200), label = "photo") { res ->
+            androidx.compose.animation.Crossfade(image, Modifier.matchParentSize(), animationSpec = tween(1200), label = "photo") { img ->
                 val drift = androidx.compose.animation.core.rememberInfiniteTransition(label = "drift")
                 val d by drift.animateFloat(0f, 1f, androidx.compose.animation.core.infiniteRepeatable(tween(40_000, easing = androidx.compose.animation.core.LinearEasing), androidx.compose.animation.core.RepeatMode.Reverse), label = "d")
                 androidx.compose.foundation.Image(
-                    androidx.compose.ui.res.painterResource(res),
+                    img,
                     contentDescription = null,
                     contentScale = androidx.compose.ui.layout.ContentScale.Crop,
-                    modifier = androidx.compose.ui.Modifier.fillMaxSize().graphicsLayer {
+                    modifier = Modifier.fillMaxSize().graphicsLayer {
                         val s = 1.08f + 0.04f * d
                         scaleX = s
                         scaleY = s
@@ -77,12 +82,9 @@ fun WeatherScene(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, modif
                 )
             }
         }
-        SkyLayers(code, isDay, sunrise, sunset, photo = photoRes != null, modifier = androidx.compose.ui.Modifier.matchParentSize())
+        SkyLayers(code, isDay, sunrise, sunset, photo = image != null, modifier = Modifier.matchParentSize())
     }
 }
-
-/** Background photos (public domain / CC0, see third_party/weather-photos). Null draws the sky. */
-fun backgroundPhoto(sky: Sky, phase: SkyPhase): Int? = WeatherPhotos.forSky(sky, phase)
 
 @Composable
 private fun SkyLayers(code: Int, isDay: Boolean, sunrise: Long?, sunset: Long?, photo: Boolean, modifier: Modifier) {

@@ -33,6 +33,9 @@ jobs:
             echo "::warning::ZUNEX_KEYSTORE_BASE64 secret missing: APKs signed with a throwaway debug key (updates will conflict)"
           fi
 
+      - name: Weather photos (public domain, Wikimedia Commons)
+        run: bash scripts/fetch-weather-photos.sh
+
       - name: Build debug and release APKs
         env:
           ZUNEX_KEYSTORE_PASSWORD: ${{ secrets.ZUNEX_KEYSTORE_PASSWORD }}

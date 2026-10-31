@@ -50,6 +50,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
 
     private var observers = ArrayList<Job>()
 
+    /** Start tiles of ZUNEX apps that are turned off in the Store, waiting for them to return. */
+    private val parkedTiles = HashMap<String, List<TileSpec>>()
+
     init {
         viewModelScope.launch {
             val saved = tileRepo.tiles.first()
@@ -68,9 +71,15 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             apps.collect { list ->
                 if (list.isEmpty()) return@collect
                 val keys = list.mapTo(HashSet()) { it.key }
-                val current = _tiles.value
+                var current = _tiles.value
+                // A ZUNEX app turned back on in the Store gets its Start tiles back.
+                val restored = list.mapNotNull { it.builtIn }.flatMap { parkedTiles.remove(it.id).orEmpty() }
+                if (restored.isNotEmpty()) current = current + restored.filter { r -> current.none { it.id == r.id } }
                 val filtered = current.filter { it.appKey in keys }
-                if (filtered.size != current.size && current.isNotEmpty()) update(filtered)
+                // Tiles of ZUNEX apps that were only turned off are kept aside, not lost.
+                current.filter { it.appKey !in keys && it.appKey.startsWith("builtin:") }.groupBy { it.appKey.removePrefix("builtin:") }
+                    .forEach { (id, specs) -> parkedTiles[id] = parkedTiles[id].orEmpty() + specs }
+                if ((filtered.size != _tiles.value.size || restored.isNotEmpty()) && current.isNotEmpty()) update(filtered)
             }
         }
         refreshLive()

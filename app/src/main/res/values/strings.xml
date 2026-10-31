@@ -224,7 +224,7 @@
     <string name="about_launcher">ZUNEX</string>
     <string name="about_ram">RAM</string>
     <string name="about_more">more info</string>
-    <string name="about_disclaimer">ZUNEX is a fan-made recreation. It is not affiliated with or endorsed by Microsoft or Nokia. Open Sans font, SIL Open Font License.</string>
+    <string name="about_disclaimer">ZUNEX is a fan-made recreation, not affiliated with or endorsed by Microsoft or Nokia. Developer: João Gabriel. Open Sans font (SIL Open Font License). Weather icons: Meteocons by Bas Milius (MIT). Weather photos: Wikimedia Commons, public domain / CC0. Forecasts: Open-Meteo.</string>
     <string name="launcher_explain">ZUNEX works as your Home app: the Start button opens the Start screen and it starts automatically after the phone restarts.</string>
     <string name="launcher_is_default">It\'s your Home app.</string>
     <string name="launcher_not_default">It\'s not your Home app yet.</string>

@@ -224,7 +224,7 @@
     <string name="about_launcher">ZUNEX</string>
     <string name="about_ram">RAM</string>
     <string name="about_more">mais informações</string>
-    <string name="about_disclaimer">O ZUNEX é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Fonte Open Sans, SIL Open Font License.</string>
+    <string name="about_disclaimer">O ZUNEX é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Desenvolvedor: João Gabriel. Fonte Open Sans (SIL Open Font License). Ícones de clima: Meteocons, de Bas Milius (MIT). Fotos do clima: Wikimedia Commons, domínio público / CC0. Previsão: Open-Meteo.</string>
     <string name="launcher_explain">O ZUNEX funciona como seu app de tela inicial: o botão Início abre a tela Iniciar e ele inicia automaticamente quando o telefone reinicia.</string>
     <string name="launcher_is_default">É seu app de tela inicial.</string>
     <string name="launcher_not_default">Ainda não é seu app de tela inicial.</string>

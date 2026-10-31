@@ -102,6 +102,14 @@ class MusicController private constructor(private val context: Context) {
         c.seekTo(i, 0)
     }
 
+    /** Stops playback and clears the queue (the Music app was turned off or removed). */
+    fun stop() {
+        controller?.let {
+            it.stop()
+            it.clearMediaItems()
+        }
+    }
+
     fun togglePlay() = withController { if (it.isPlaying) it.pause() else it.play() }
     fun next() = withController { it.seekToNextMediaItem() }
     fun previous() = withController { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }

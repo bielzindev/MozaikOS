@@ -62,6 +62,13 @@ tap_text() {
   fi
 }
 start() { adb shell am start -W -n "$PKG/$1" >/dev/null; }
+# Like tap_text, but the last match (e.g. the button of a dialog drawn over the page).
+tap_text_last() {
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null 2>&1
+  local b
+  b=$(adb shell cat /sdcard/ui.xml | tr '>' '\n' | grep -iE "(text|content-desc)=\"$1\"" | tail -1 | grep -oE 'bounds="\[[0-9]+,[0-9]+\]\[[0-9]+,[0-9]+\]"' | grep -oE '[0-9]+' | tr '\n' ' ')
+  if [ -n "$b" ]; then set -- $b; adb shell input tap $(( ($1 + $3) / 2 )) $(( ($2 + $4) / 2 )); echo "tapped last $*"; else echo "text not found: $1"; fi
+}
 
 seed_data
 adb shell am force-stop $PKG
@@ -147,6 +154,18 @@ swipe_left; sleep 1
 shot 44-music-songs 2
 tap_text "Lumia Song"
 shot 45-music-now-playing 4
+tap_text "equalizer"
+shot 45b-equalizer 3
+tap_text "Rock"
+shot 45c-equalizer-rock 2
+adb shell input keyevent KEYCODE_BACK; sleep 1
+adb shell input keyevent KEYCODE_BACK; sleep 1
+shot 45d-music-playing-now-bar 2
+adb shell input keyevent KEYCODE_HOME
+shot 45e-start-playing-now-bar 3
+adb shell input swipe 540 30 540 1400 400
+shot 45f-action-center-music 2
+adb shell input keyevent KEYCODE_BACK; sleep 1
 adb shell dumpsys media_session | grep -iE "state=|description" | head -5 > "$OUT/media_session.txt"
 adb shell input keyevent KEYCODE_HOME
 
@@ -247,6 +266,36 @@ swipe_left
 shot 70-weather-daily 2
 adb shell input keyevent KEYCODE_HOME
 shot 71-start-weather-tile 4
+
+# ZUNEX Store: turn Calculator off for real, check it left the app list, turn it back on
+start com.wpreborn.apps.store.StoreActivity
+shot 72-store-hub 3
+swipe_left; sleep 1
+shot 73-store-quick-links 2
+swipe_left; sleep 1; swipe_left; sleep 1
+shot 74-store-all-apps 2
+tap_text "Calculator"
+shot 75-store-details 3
+tap_text "turn off"
+sleep 1
+tap_text_last "turn off"
+shot 76-store-turned-off 2
+adb shell cmd package query-activities -a android.intent.action.MAIN -c android.intent.category.LAUNCHER $PKG | grep -c CalculatorActivity > "$OUT/calculator_launchable_after_off.txt" || true
+adb shell input keyevent KEYCODE_HOME; sleep 2
+swipe_left
+shot 77-all-apps-without-calculator 3
+start com.wpreborn.apps.store.StoreActivity
+sleep 2
+swipe_left; sleep 1; swipe_left; sleep 1; swipe_left; sleep 1
+tap_text "Calculator"
+sleep 2
+tap_text "turn on"
+shot 78-store-turned-on 2
+adb shell input keyevent KEYCODE_HOME
+
+# Weather with its animated sky (Playing Now bar below if music still plays)
+start com.wpreborn.apps.weather.WeatherActivity
+shot 79-weather-animated 5
 
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true

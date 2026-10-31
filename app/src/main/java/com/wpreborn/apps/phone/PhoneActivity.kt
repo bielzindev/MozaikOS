@@ -133,11 +133,14 @@ class PhoneActivity : WpActivity() {
                 MessagingActivity.openSystemMessaging(context, number)
                 return
             }
-            context.startActivity(
-                Intent(context, MessagingActivity::class.java)
-                    .putExtra(MessagingActivity.EXTRA_ADDRESS, number)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-            )
+            // ZUNEX Messaging may be turned off in the Store: then the phone's app writes.
+            runCatching {
+                context.startActivity(
+                    Intent(context, MessagingActivity::class.java)
+                        .putExtra(MessagingActivity.EXTRA_ADDRESS, number)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }.onFailure { MessagingActivity.openSystemMessaging(context, number) }
         }
     }
 }
@@ -196,7 +199,7 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
             buttons = listOf(
                 AppBarButton(WpIcons.Keypad, stringResource(R.string.phone_keypad), onClick = onKeypad),
                 AppBarButton(WpIcons.People, stringResource(R.string.app_people)) {
-                    context.startActivity(Intent(context, PeopleActivity::class.java))
+                    runCatching { context.startActivity(Intent(context, PeopleActivity::class.java)) }
                 },
             ),
             menuItems = buildList {

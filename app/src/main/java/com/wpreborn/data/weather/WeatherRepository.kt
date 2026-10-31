@@ -78,6 +78,15 @@ class WeatherRepository private constructor(private val context: Context) {
     /** The place shown on the live tile: the first in the list. */
     val primary: Place? get() = _places.value.firstOrNull()
 
+    /** Forgets places, forecasts and preferences (the Weather app was uninstalled). */
+    fun clearAll() {
+        prefs.edit().clear().apply()
+        cacheDir.mkdirs()
+        _places.value = emptyList()
+        _forecasts.value = emptyMap()
+        _fahrenheit.value = false
+    }
+
     fun setFahrenheit(value: Boolean) {
         prefs.edit().putBoolean("fahrenheit", value).apply()
         _fahrenheit.value = value

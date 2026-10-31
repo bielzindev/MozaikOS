@@ -69,6 +69,11 @@ class NotesRepository private constructor(context: Context) {
 
     suspend fun toggleStar(id: String) = write(_notes.value.orEmpty().map { if (it.id == id) it.copy(starred = !it.starred) else it })
 
+    /** Forgets every note (the Notes app was uninstalled). */
+    fun clearAll() {
+        _notes.value = emptyList()
+    }
+
     fun saveAsync(note: Note) { scope.launch { save(note) } }
     fun deleteAsync(id: String) { scope.launch { delete(id) } }
 

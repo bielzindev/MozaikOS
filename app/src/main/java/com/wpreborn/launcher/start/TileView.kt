@@ -86,6 +86,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Calculator -> IconTile(com.wpreborn.core.icons.Glyphs.Calculator, tile.size)
             BuiltInApp.Notes -> IconTile(com.wpreborn.core.icons.Glyphs.Note, tile.size)
             BuiltInApp.Weather -> WeatherTile(tile.size, inputs.liveEnabled)
+            BuiltInApp.Store -> StoreTile(tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&
@@ -403,4 +404,14 @@ private fun BoxScope.WeatherTile(size: TileSize, live: Boolean) {
             }
         }
     }
+}
+
+/** Store: its bag, with the number of available updates like the 8.1 Store tile. */
+@Composable
+private fun BoxScope.StoreTile(size: TileSize) {
+    val context = LocalContext.current
+    val manager = remember { com.wpreborn.data.store.AppManager.get(context) }
+    val states by manager.states.collectAsState()
+    val updates = remember(states) { com.wpreborn.data.store.ZunexCatalog.apps.count { manager.hasUpdate(it) } }
+    CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
 }

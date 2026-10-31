@@ -87,7 +87,9 @@ class AppRepository private constructor(private val context: Context) {
                     .filter { it.applicationInfo.packageName != context.packageName }
                     .map { it.toEntry(user) }
             }
-            val builtIns = BuiltInApp.entries.map { b ->
+            // Only the ZUNEX apps that are installed and turned on in the Store.
+            val manager = com.wpreborn.data.store.AppManager.get(context)
+            val builtIns = BuiltInApp.entries.filter { manager.isActive(it) }.map { b ->
                 AppEntry("builtin:${b.id}", context.getString(b.label), context.packageName, ComponentName(context, b.activity), null, b)
             }
             _apps.value = (android + builtIns).sortedWith { a, b -> collator.compare(a.label, b.label) }
@@ -190,10 +192,17 @@ class AppRepository private constructor(private val context: Context) {
      * System apps that duplicate a ZUNEX app (dialer, messaging, music, calendar, contacts,
      * gallery, Android Settings). They are hidden from the app list unless the user shows them.
      */
+    /**
+     * System apps that a turned-on ZUNEX app replaces (dialer, messages, music, calendar,
+     * contacts, gallery, calculator, camera, settings). Turning a ZUNEX app off in the Store
+     * brings its system counterpart back to the app list.
+     */
     fun duplicatePackages(): Set<String> {
         val pm = context.packageManager
+        val manager = com.wpreborn.data.store.AppManager.get(context)
         val result = HashSet<String>()
-        fun add(intent: Intent) {
+        fun add(app: BuiltInApp, intent: Intent) {
+            if (!manager.isActive(app)) return
             try {
                 pm.queryIntentActivities(intent, 0).forEach { ri ->
                     val ai = ri.activityInfo.applicationInfo
@@ -202,13 +211,16 @@ class AppRepository private constructor(private val context: Context) {
             } catch (_: Exception) {
             }
         }
-        add(Intent(Intent.ACTION_DIAL))
-        listOf(
-            Intent.CATEGORY_APP_MESSAGING, Intent.CATEGORY_APP_MUSIC, Intent.CATEGORY_APP_CALENDAR,
-            Intent.CATEGORY_APP_CONTACTS, Intent.CATEGORY_APP_GALLERY, Intent.CATEGORY_APP_CALCULATOR,
-        ).forEach { add(Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, it)) }
-        add(Intent(android.provider.Settings.ACTION_SETTINGS))
-        add(Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+        fun main(category: String) = Intent.makeMainSelectorActivity(Intent.ACTION_MAIN, category)
+        add(BuiltInApp.Phone, Intent(Intent.ACTION_DIAL))
+        add(BuiltInApp.Messaging, main(Intent.CATEGORY_APP_MESSAGING))
+        add(BuiltInApp.Music, main(Intent.CATEGORY_APP_MUSIC))
+        add(BuiltInApp.Calendar, main(Intent.CATEGORY_APP_CALENDAR))
+        add(BuiltInApp.People, main(Intent.CATEGORY_APP_CONTACTS))
+        add(BuiltInApp.Photos, main(Intent.CATEGORY_APP_GALLERY))
+        add(BuiltInApp.Calculator, main(Intent.CATEGORY_APP_CALCULATOR))
+        add(BuiltInApp.Camera, Intent(android.provider.MediaStore.INTENT_ACTION_STILL_IMAGE_CAMERA))
+        add(BuiltInApp.Settings, Intent(android.provider.Settings.ACTION_SETTINGS))
         return result
     }
 

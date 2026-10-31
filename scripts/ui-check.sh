@@ -299,6 +299,24 @@ adb shell input keyevent KEYCODE_HOME
 start com.wpreborn.apps.weather.WeatherActivity
 shot 79-weather-animated 5
 
+# New apps
+adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION || true
+for app in alarms.AlarmsActivity alarms.ClockActivity recorder.RecorderActivity flashlight.FlashlightActivity maps.MapsActivity; do
+  name=${app##*.}
+  start "com.wpreborn.apps.$app"
+  shot "80-$name" 5
+  swipe_left
+  shot "81-$name-2" 2
+  adb shell input keyevent KEYCODE_HOME
+  sleep 1
+done
+# An alarm that rings a minute from now (via the timer)
+start com.wpreborn.apps.alarms.ClockActivity
+sleep 2; swipe_left; sleep 1; swipe_left; sleep 2
+tap_text "start"
+shot 82-timer-running 3
+adb shell input keyevent KEYCODE_HOME
+
 # Lock screen preview
 adb shell am start -W -n "$PKG/com.wpreborn.launcher.lock.LockActivity" >/dev/null 2>&1 || true
 shot 30-lock 3

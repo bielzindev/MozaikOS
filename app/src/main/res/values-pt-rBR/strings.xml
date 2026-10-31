@@ -503,4 +503,6 @@
     <string name="store_short">loja</string>
     <string name="music_favorite">adicionar às favoritas</string>
     <string name="music_unfavorite">remover das favoritas</string>
+    <string name="about_developer">Desenvolvedor</string>
+    <string name="music_playing_now">playing now</string>
 </resources>

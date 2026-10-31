@@ -35,6 +35,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -95,12 +96,33 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
         else -> stringResource(R.string.music_other_app)
     }
 
+    // The cover, blurred and darkened, fills the screen; the accent comes from the cover.
+    val coverAccent = rememberCoverAccent(playback)
+    val accent by androidx.compose.animation.animateColorAsState(coverAccent, tween(600), label = "accent")
+    androidx.compose.runtime.CompositionLocalProvider(
+        com.wpreborn.core.theme.LocalPalette provides com.wpreborn.core.theme.WpPalette.Dark,
+        com.wpreborn.core.theme.LocalAccent provides accent,
+    ) {
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        if (playback != null) {
+            AnimatedContent(playback.trackKey, transitionSpec = { fadeIn(tween(500)) togetherWith fadeOut(tween(500)) }, label = "bg") { _ ->
+                // A tiny copy stretched over the screen is a cheap, smooth blur on every Android version.
+                PlaybackArt(
+                    playback,
+                    Modifier.fillMaxSize().then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(30.dp) else Modifier),
+                    sizePx = 24,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                )
+            }
+            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
+        }
     Column(Modifier.fillMaxSize()) {
         WpText(appTitle.uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
         WpText(
-            stringResource(if (showQueue) R.string.music_up_next else R.string.music_now_playing),
+            stringResource(if (showQueue) R.string.music_up_next else R.string.music_playing_now),
             style = WpType.Header,
             maxLines = 1,
+            softWrap = false,
             modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
         )
         if (playback == null) {
@@ -169,6 +191,8 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
                 listOf(AppBarMenuItem(stringResource(R.string.music_open_app)) { playback.packageName?.let { openPackage(context, it) } })
             },
         )
+    }
+    }
     }
 }
 
@@ -318,3 +342,38 @@ internal fun openPackage(context: android.content.Context, pkg: String) {
         runCatching { context.startActivity(it.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
     }
 }
+
+/** A vivid, readable accent taken from the cover (falls back to the system accent). */
+@Composable
+fun rememberCoverAccent(playback: Playback?): Color {
+    val context = LocalContext.current
+    val fallback = Wp.accent
+    val color by androidx.compose.runtime.produceState(fallback, playback?.trackKey, playback?.artBitmap) {
+        val bmp = playback?.artBitmap ?: playback?.artUri?.let { com.wpreborn.core.ui.ImageLoader.thumbnail(context, it, 96) }
+        value = bmp?.let { coverAccent(it) } ?: fallback
+    }
+    return color
+}
+
+/** The most colourful tone of the cover, brightened enough to read on the dark player. */
+fun coverAccent(bmp: android.graphics.Bitmap): Color? = runCatching {
+    val src = if (bmp.config == android.graphics.Bitmap.Config.HARDWARE) bmp.copy(android.graphics.Bitmap.Config.ARGB_8888, false) else bmp
+    val small = android.graphics.Bitmap.createScaledBitmap(src, 24, 24, true)
+    var best: FloatArray? = null
+    var bestScore = -1f
+    val hsv = FloatArray(3)
+    // Pick the hue with the most saturated, bright pixels (16 hue buckets).
+    val score = FloatArray(16)
+    val sample = Array(16) { FloatArray(3) }
+    for (y in 0 until small.height) for (x in 0 until small.width) {
+        android.graphics.Color.colorToHSV(small.getPixel(x, y), hsv)
+        val w = hsv[1] * hsv[2]
+        val b = (hsv[0] / 22.5f).toInt().coerceIn(0, 15)
+        score[b] += w
+        if (w > sample[b][1] * sample[b][2]) hsv.copyInto(sample[b])
+    }
+    for (b in 0 until 16) if (score[b] > bestScore) { bestScore = score[b]; best = sample[b] }
+    val c = best ?: return@runCatching null
+    if (bestScore < 1.5f) return@runCatching null // greyscale cover: keep the system accent
+    Color(android.graphics.Color.HSVToColor(floatArrayOf(c[0], c[1].coerceIn(0.55f, 0.9f), c[2].coerceAtLeast(0.85f))))
+}.getOrNull()

@@ -1,6 +1,8 @@
 # ZUNEX
 
-Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência do **Windows Phone 8.1** — Start Screen com blocos dinâmicos, lista de aplicativos, Central de Ações, controle de volume, tela de bloqueio estilo Lumia e aplicativos próprios: Telefone, Mensagens, Música, Pessoas, Calendário, Fotos e Configurações.
+Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência do **Windows Phone 8.1** — Start Screen com blocos dinâmicos, lista de aplicativos, Central de Ações, controle de volume, tela de bloqueio estilo Lumia e a família de aplicativos ZUNEX: Telefone, Pessoas, Mensagens, Música, Fotos, Câmera, Calendário, Notas, Calculadora, Clima, Teclado Word Flow, Configurações e a ZUNEX Store.
+
+**Desenvolvedor:** João Gabriel
 
 > Projeto de fã, sem afiliação com Microsoft ou Nokia. A fonte Segoe WP não pode ser redistribuída; usamos a **Open Sans** (licença SIL OFL — veja `third_party/opensans/OFL.txt`).
 

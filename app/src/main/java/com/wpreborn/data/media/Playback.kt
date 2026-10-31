@@ -39,7 +39,11 @@ data class Playback(
     val shuffle: Boolean,
     val repeatMode: Int,
     val nextTitles: List<String>,
+    val session: Int = 0,
 ) {
+    /** Closing the Playing Now bar hides it until new music starts (or another app plays). */
+    val dismissKey get() = if (own) "own:$session" else "ext:$packageName"
+
     val isSpotify get() = packageName == NowPlaying.SPOTIFY
     val progress get() = if (durationMs > 0) (positionMs.toFloat() / durationMs).coerceIn(0f, 1f) else 0f
     /** Stable key of the current track, for transitions. */
@@ -81,6 +85,7 @@ data class Playback(
                 shuffle = ui.shuffle,
                 repeatMode = ui.repeatMode,
                 nextTitles = ui.nextTitles,
+                session = ui.session,
             )
             external != null -> Playback(
                 own = false,
@@ -121,4 +126,9 @@ fun rememberPlayback(): Playback? {
         }
     }
     return remember(ui, external, tick) { Playback.of(ui, external, tick) }
+}
+
+/** The Playing Now bar the user closed (by [Playback.dismissKey]); it returns with new music. */
+object PlayingNowDismissal {
+    var dismissed by androidx.compose.runtime.mutableStateOf<String?>(null)
 }

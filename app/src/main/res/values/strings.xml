@@ -502,4 +502,6 @@
     <string name="store_short">store</string>
     <string name="music_favorite">add to favorites</string>
     <string name="music_unfavorite">remove from favorites</string>
+    <string name="about_developer">Developer</string>
+    <string name="music_playing_now">playing now</string>
 </resources>

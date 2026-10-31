@@ -481,7 +481,8 @@ private fun AboutPage() {
             stringResource(R.string.about_name) to Build.MODEL,
             stringResource(R.string.about_manufacturer) to Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
             stringResource(R.string.about_android) to "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            stringResource(R.string.about_launcher) to "Windows Phone Reborn ${BuildConfig.VERSION_NAME}",
+            stringResource(R.string.about_launcher) to "ZUNEX ${BuildConfig.VERSION_NAME}",
+            stringResource(R.string.about_developer) to "João Gabriel",
             stringResource(R.string.about_ram) to Formatter.formatShortFileSize(
                 context,
                 android.app.ActivityManager.MemoryInfo().also { context.getSystemService(android.app.ActivityManager::class.java).getMemoryInfo(it) }.totalMem,

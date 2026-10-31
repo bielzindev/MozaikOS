@@ -362,6 +362,8 @@ private fun LockMedia(playback: com.wpreborn.data.media.Playback) {
         Modifier.fillMaxWidth().padding(start = 24.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        com.wpreborn.apps.common.PlaybackArt(playback, Modifier.size(64.dp))
+        Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             WpText(playback.title, style = WpType.Normal.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WpText(playback.artist, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)

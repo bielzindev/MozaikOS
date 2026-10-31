@@ -99,6 +99,13 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
             ) { playback.togglePlay(context) }
             Spacer(Modifier.width(6.dp))
             RoundButton(WpIcons.Next, size = 40.dp, contentDescription = stringResource(R.string.music_next)) { playback.next(context) }
+            // Close: hides the bar until new music starts; playback continues.
+            Box(
+                Modifier.size(40.dp).wpClickable { com.wpreborn.data.media.PlayingNowDismissal.dismissed = playback.dismissKey },
+                contentAlignment = Alignment.Center,
+            ) {
+                WpIcon(WpIcons.Close, size = 18.dp, tint = Wp.palette.subtle)
+            }
         }
     }
 }
@@ -113,15 +120,15 @@ private fun appLabel(pkg: String?): String {
 
 /** Album art of the current track: the cover from our library or the other app's bitmap. */
 @Composable
-fun PlaybackArt(playback: Playback, modifier: Modifier, sizePx: Int = 256) {
+fun PlaybackArt(playback: Playback, modifier: Modifier, sizePx: Int = 256, contentScale: ContentScale = ContentScale.Crop) {
     Box(modifier.background(Wp.accent), contentAlignment = Alignment.Center) {
         WpIcon(WpIcons.MusicNote, tint = Color.White, size = 22.dp)
         val bmp = playback.artBitmap
         if (bmp != null) {
             val img = remember(bmp) { bmp.asImageBitmap() }
-            Image(img, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            Image(img, null, Modifier.fillMaxSize(), contentScale = contentScale)
         } else if (playback.artUri != null) {
-            Thumbnail(playback.artUri, Modifier.fillMaxSize(), sizePx = sizePx)
+            Thumbnail(playback.artUri, Modifier.fillMaxSize(), sizePx = sizePx, contentScale = contentScale)
         }
     }
 }

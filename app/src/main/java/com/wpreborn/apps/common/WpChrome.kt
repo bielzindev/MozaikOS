@@ -83,7 +83,8 @@ fun WpChrome(
                 val playback = com.wpreborn.data.media.rememberPlayback()
                 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
                 val imeOpen = WindowInsets.isImeVisible
-                val bar = showPlayingNow && !chrome.hidePlayingNow && !imeOpen && playback != null
+                val bar = showPlayingNow && !chrome.hidePlayingNow && !imeOpen && playback != null &&
+                    com.wpreborn.data.media.PlayingNowDismissal.dismissed != playback.dismissKey
                 Box(
                     Modifier.weight(1f).fillMaxWidth().then(
                         if (bar) Modifier.consumeWindowInsets(WindowInsets.navigationBars) else Modifier.navigationBarsPadding(),

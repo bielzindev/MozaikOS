@@ -36,6 +36,8 @@ data class PlayerUi(
     val queueSize: Int = 0,
     val nextTitles: List<String> = emptyList(),
     val mediaId: String? = null,
+    /** Changes every time new music is started (used to bring back a closed Playing Now bar). */
+    val session: Int = 0,
 )
 
 /** App-side handle on [MusicService] through a Media3 MediaController. */
@@ -46,6 +48,7 @@ class MusicController private constructor(private val context: Context) {
     private val pending = ArrayList<(MediaController) -> Unit>()
     private var connecting = false
     private var ticker: Job? = null
+    private var session = 0
 
     private val _ui = MutableStateFlow(PlayerUi())
     val ui: StateFlow<PlayerUi> = _ui.asStateFlow()
@@ -89,6 +92,7 @@ class MusicController private constructor(private val context: Context) {
     }
 
     fun playSongs(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false) = withController { c ->
+        session++
         c.setMediaItems(songs.map { it.toMediaItem() }, startIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0)), 0L)
         c.shuffleModeEnabled = shuffle
         c.prepare()
@@ -160,6 +164,7 @@ class MusicController private constructor(private val context: Context) {
             queueSize = c.mediaItemCount,
             nextTitles = next,
             mediaId = c.currentMediaItem?.mediaId,
+            session = session,
         )
     }
 

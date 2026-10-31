@@ -130,7 +130,15 @@ private fun WeatherHub(repo: WeatherRepository, placeId: String?, onPlaces: () -
     val colors = w?.let { skyColors(it.code, it.isDay) } ?: listOf(Color(0xFF1E88E5), Color(0xFF0B4F9C))
     // Weather is always light text on the sky, whatever the theme.
     CompositionLocalProvider(LocalPalette provides WpPalette.Dark) {
-        Column(Modifier.fillMaxSize().background(Brush.verticalGradient(colors))) {
+      Box(Modifier.fillMaxSize().background(Brush.verticalGradient(colors))) {
+        // The living sky: follows the current conditions and the time of day.
+        if (w != null) {
+            val today = w.days.firstOrNull()
+            WeatherScene(w.code, w.isDay, today?.sunrise, today?.sunset, Modifier.fillMaxSize())
+            // Keeps the text readable over bright skies.
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.25f), Color.Transparent, Color.Black.copy(alpha = 0.35f)))))
+        }
+        Column(Modifier.fillMaxSize()) {
             Box(Modifier.weight(1f)) {
                 if (w == null) {
                     Column(Modifier.padding(20.dp)) {
@@ -161,6 +169,7 @@ private fun WeatherHub(repo: WeatherRepository, placeId: String?, onPlaces: () -
                 ),
             )
         }
+      }
     }
 }
 

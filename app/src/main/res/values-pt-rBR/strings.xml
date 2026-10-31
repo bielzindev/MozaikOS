@@ -585,4 +585,13 @@
     <string name="kb_size_large">grande</string>
     <string name="photos_select">selecionar</string>
     <string name="photos_select_all">selecionar tudo</string>
+    <string name="kb_clip_empty">Os textos copiados aparecem aqui</string>
+    <string name="kb_clip_clear">limpar</string>
+    <string name="kb_edit_select">selecionar</string>
+    <string name="kb_edit_selecting">selecionando…</string>
+    <string name="kb_edit_all">tudo</string>
+    <string name="kb_edit_copy">copiar</string>
+    <string name="kb_edit_cut">recortar</string>
+    <string name="kb_edit_paste">colar</string>
+    <string name="kb_listening">🎤 ouvindo…</string>
 </resources>

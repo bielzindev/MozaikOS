@@ -584,4 +584,13 @@
     <string name="kb_size_large">large</string>
     <string name="photos_select">select</string>
     <string name="photos_select_all">select all</string>
+    <string name="kb_clip_empty">Copied text will appear here</string>
+    <string name="kb_clip_clear">clear</string>
+    <string name="kb_edit_select">select</string>
+    <string name="kb_edit_selecting">selecting…</string>
+    <string name="kb_edit_all">all</string>
+    <string name="kb_edit_copy">copy</string>
+    <string name="kb_edit_cut">cut</string>
+    <string name="kb_edit_paste">paste</string>
+    <string name="kb_listening">🎤 listening…</string>
 </resources>

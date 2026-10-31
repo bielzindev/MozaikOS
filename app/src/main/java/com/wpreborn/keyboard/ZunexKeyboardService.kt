@@ -41,7 +41,12 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
     /** Word replaced by autocorrect, so backspace can undo it. */
     private var undoCorrection: Pair<String, String>? = null
 
-    private enum class Page { Letters, Symbols, Emoji, Number, Phone }
+    private enum class Page { Letters, Symbols, Emoji, Number, Phone, Clipboard, Edit }
+
+    // Clipboard history (this keyboard is the default input method, so it may read the clipboard).
+    private val clipListener = android.content.ClipboardManager.OnPrimaryClipChangedListener { rememberClip() }
+    private var selecting = false
+    private var recognizer: android.speech.SpeechRecognizer? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -49,6 +54,143 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         predictor = WordPredictor(this)
         language = KeyboardLayouts.byCode(prefs.current)
         predictor.preload(language)
+        runCatching { getSystemService(android.content.ClipboardManager::class.java)?.addPrimaryClipChangedListener(clipListener) }
+    }
+
+    override fun onDestroy() {
+        runCatching { getSystemService(android.content.ClipboardManager::class.java)?.removePrimaryClipChangedListener(clipListener) }
+        recognizer?.destroy()
+        super.onDestroy()
+    }
+
+    private fun clips(): List<String> = (getSharedPreferences("zunex_keyboard", MODE_PRIVATE).getString("clips", "") ?: "")
+        .split("\u0001").filter { it.isNotEmpty() }
+
+    private fun rememberClip() {
+        val text = runCatching {
+            getSystemService(android.content.ClipboardManager::class.java)?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+        }.getOrNull()?.trim()
+        if (text.isNullOrEmpty() || text.length > 2000) return
+        val next = (listOf(text) + clips().filterNot { it == text }).take(12)
+        getSharedPreferences("zunex_keyboard", MODE_PRIVATE).edit().putString("clips", next.joinToString("\u0001")).apply()
+        if (page == Page.Clipboard) render()
+    }
+
+    private fun clipboardRows(): List<KeyRow> {
+        val list = clips().take(4)
+        val rows = ArrayList<KeyRow>()
+        if (list.isEmpty()) rows += listOf(Key(getString(R.string.kb_clip_empty), KeyType.Action, 10f, text = "none"))
+        list.forEachIndexed { i, c ->
+            val one = c.replace('\n', ' ')
+            rows += listOf(Key(if (one.length > 34) one.take(33) + "…" else one, KeyType.Action, 10f, text = "paste:$i"))
+        }
+        rows += listOf(
+            Key("abc", KeyType.Letters, 2f),
+            Key(getString(R.string.kb_clip_clear), KeyType.Action, 3f, text = "clipclear"),
+            Key("space", KeyType.Space, 3f, text = " "),
+            Key("del", KeyType.Backspace, 2f),
+        )
+        return rows
+    }
+
+    private fun editRows(): List<KeyRow> = listOf(
+        listOf(Key("⇤", KeyType.Action, text = "home"), Key("▲", KeyType.Action, text = "up"), Key("⇥", KeyType.Action, text = "end")),
+        listOf(Key("◀", KeyType.Action, text = "left"), Key(getString(if (selecting) R.string.kb_edit_selecting else R.string.kb_edit_select), KeyType.Action, text = "select"), Key("▶", KeyType.Action, text = "right")),
+        listOf(
+            Key(getString(R.string.kb_edit_all), KeyType.Action, text = "selall"),
+            Key(getString(R.string.kb_edit_copy), KeyType.Action, text = "copy"),
+            Key(getString(R.string.kb_edit_cut), KeyType.Action, text = "cut"),
+            Key(getString(R.string.kb_edit_paste), KeyType.Action, text = "paste"),
+        ),
+        listOf(Key("abc", KeyType.Letters, 1f), Key("▼", KeyType.Action, text = "down"), Key("del", KeyType.Backspace, 1f)),
+    )
+
+    private fun arrow(code: Int) {
+        val ic = ic() ?: return
+        val meta = if (selecting) android.view.KeyEvent.META_SHIFT_ON or android.view.KeyEvent.META_SHIFT_LEFT_ON else 0
+        val t = android.os.SystemClock.uptimeMillis()
+        ic.sendKeyEvent(android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_DOWN, code, 0, meta))
+        ic.sendKeyEvent(android.view.KeyEvent(t, t, android.view.KeyEvent.ACTION_UP, code, 0, meta))
+    }
+
+    private fun action(id: String) {
+        val ic = ic()
+        when {
+            id.startsWith("paste:") -> {
+                clips().getOrNull(id.removePrefix("paste:").toIntOrNull() ?: -1)?.let { commitComposing(); ic?.commitText(it, 1) }
+                page = Page.Letters
+                render()
+            }
+            id == "clipclear" -> { getSharedPreferences("zunex_keyboard", MODE_PRIVATE).edit().remove("clips").apply(); render() }
+            id == "home" -> arrow(android.view.KeyEvent.KEYCODE_MOVE_HOME)
+            id == "end" -> arrow(android.view.KeyEvent.KEYCODE_MOVE_END)
+            id == "up" -> arrow(android.view.KeyEvent.KEYCODE_DPAD_UP)
+            id == "down" -> arrow(android.view.KeyEvent.KEYCODE_DPAD_DOWN)
+            id == "left" -> arrow(android.view.KeyEvent.KEYCODE_DPAD_LEFT)
+            id == "right" -> arrow(android.view.KeyEvent.KEYCODE_DPAD_RIGHT)
+            id == "select" -> { selecting = !selecting; render() }
+            id == "selall" -> ic?.performContextMenuAction(android.R.id.selectAll)
+            id == "copy" -> ic?.performContextMenuAction(android.R.id.copy)
+            id == "cut" -> ic?.performContextMenuAction(android.R.id.cut)
+            id == "paste" -> ic?.performContextMenuAction(android.R.id.paste)
+        }
+    }
+
+    override fun onToolbar(id: String) {
+        when (id) {
+            "clip" -> { commitComposing(); rememberClip(); page = Page.Clipboard; render() }
+            "edit" -> { commitComposing(); selecting = false; page = Page.Edit; render() }
+            "voice" -> startVoice()
+            "settings" -> runCatching {
+                startActivity(android.content.Intent(this, KeyboardSettingsActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+        }
+    }
+
+    /** Voice typing with Android's speech recognition; partial words show in the strip. */
+    private fun startVoice() {
+        if (checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED ||
+            !android.speech.SpeechRecognizer.isRecognitionAvailable(this)
+        ) {
+            // The keyboard can't ask for permissions itself: its settings screen does.
+            runCatching {
+                startActivity(
+                    android.content.Intent(this, KeyboardSettingsActivity::class.java)
+                        .putExtra(KeyboardSettingsActivity.EXTRA_ASK_MIC, true)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+                )
+            }
+            return
+        }
+        commitComposing()
+        recognizer?.destroy()
+        val r = android.speech.SpeechRecognizer.createSpeechRecognizer(this)
+        recognizer = r
+        val v = view
+        v?.suggestions = listOf(getString(R.string.kb_listening))
+        r.setRecognitionListener(object : android.speech.RecognitionListener {
+            override fun onReadyForSpeech(params: android.os.Bundle?) = Unit
+            override fun onBeginningOfSpeech() = Unit
+            override fun onRmsChanged(rmsdB: Float) = Unit
+            override fun onBufferReceived(buffer: ByteArray?) = Unit
+            override fun onEndOfSpeech() = Unit
+            override fun onEvent(eventType: Int, params: android.os.Bundle?) = Unit
+            override fun onError(error: Int) { updateSuggestions() }
+            override fun onPartialResults(partial: android.os.Bundle?) {
+                partial?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { view?.suggestions = listOf("🎤 $it") }
+            }
+            override fun onResults(results: android.os.Bundle?) {
+                val text = results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
+                if (!text.isNullOrBlank()) ic()?.commitText(text + " ", 1)
+                updateSuggestions()
+            }
+        })
+        r.startListening(
+            android.content.Intent(android.speech.RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE_MODEL, android.speech.RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                .putExtra(android.speech.RecognizerIntent.EXTRA_LANGUAGE, java.util.Locale(language.code).toLanguageTag())
+                .putExtra(android.speech.RecognizerIntent.EXTRA_PARTIAL_RESULTS, true),
+        )
     }
 
     override fun onCreateInputView(): View {
@@ -124,7 +266,10 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             Page.Number -> KeyboardLayouts.numberPad(phone = false)
             Page.Phone -> KeyboardLayouts.numberPad(phone = true)
             Page.Emoji -> emptyList()
+            Page.Clipboard -> clipboardRows()
+            Page.Edit -> editRows()
         }
+        v.toolbar = if (page == Page.Letters) listOf("📋" to "clip", "🎤" to "voice", "✂" to "edit", "⚙" to "settings") else emptyList()
         updateSuggestions()
     }
 
@@ -153,7 +298,8 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         }
         if (word.isEmpty()) {
             correctionShown = null
-            v.suggestions = lastCommitted?.let { predictor.predictNext(language, it) }.orEmpty()
+            val before = ic()?.getTextBeforeCursor(1, 0)
+            v.suggestions = if (before.isNullOrEmpty()) emptyList() else lastCommitted?.let { predictor.predictNext(language, it) }.orEmpty()
             v.highlighted = -1
             return
         }
@@ -263,6 +409,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             KeyType.Language -> switchLanguage()
             KeyType.Comma -> punctuation(",")
             KeyType.Period -> punctuation(".")
+            KeyType.Action -> action(key.text)
         }
     }
 

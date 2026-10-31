@@ -29,6 +29,8 @@ interface KeyboardListener {
     fun onCursor(steps: Int)
     fun onDeleteWord()
     fun onLongPressSpace()
+    /** A tool in the strip (clipboard, voice, edit, settings). */
+    fun onToolbar(id: String) {}
 }
 
 /**
@@ -72,6 +74,9 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
     var spaceLabel = ""
         set(v) { field = v; invalidate() }
     var enterLabel: String? = null
+        set(v) { field = v; invalidate() }
+    /** Tools shown in the strip when there are no suggestions: (glyph, id). */
+    var toolbar: List<Pair<String, String>> = emptyList()
         set(v) { field = v; invalidate() }
     var swipeEnabled = true
     var lettersPage = true
@@ -285,7 +290,13 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             }
             return
         }
-        if (suggestions.isEmpty()) return
+        if (suggestions.isEmpty()) {
+            // The tool strip: evenly spaced glyphs.
+            if (toolbar.isEmpty()) return
+            val tw = width / toolbar.size.toFloat()
+            toolbar.forEachIndexed { i, (glyph, _) -> text(canvas, glyph, tw * i + tw / 2, stripHeight / 2, 19f, subtle) }
+            return
+        }
         val w = width / suggestions.size.toFloat()
         suggestions.forEachIndexed { i, s ->
             textPaint.color = if (i == highlighted) accent else fg
@@ -618,7 +629,13 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             invalidate()
             return
         }
-        if (suggestions.isEmpty()) return
+        if (suggestions.isEmpty()) {
+            if (toolbar.isEmpty()) return
+            val t = (x / (width / toolbar.size.toFloat())).toInt().coerceIn(0, toolbar.lastIndex)
+            feedback(this)
+            listener.onToolbar(toolbar[t].second)
+            return
+        }
         val i = (x / (width / suggestions.size.toFloat())).toInt().coerceIn(0, suggestions.lastIndex)
         feedback(this)
         listener.onSuggestion(i, suggestions[i])

@@ -43,6 +43,11 @@ class KeyboardSettingsActivity : WpActivity() {
     override fun Content() {
         val context = LocalContext.current
         val prefs = remember { KeyboardPrefs(context) }
+        // Voice typing asked for the microphone (the keyboard itself can't show the request).
+        val mic = com.wpreborn.permissions.rememberPermissionState(arrayOf(android.Manifest.permission.RECORD_AUDIO))
+        androidx.compose.runtime.LaunchedEffect(Unit) {
+            if (intent?.getBooleanExtra(EXTRA_ASK_MIC, false) == true && !mic.granted) mic.request()
+        }
         var enabled by remember { mutableStateOf(isEnabled(context)) }
         var selected by remember { mutableStateOf(isSelected(context)) }
         val owner = LocalLifecycleOwner.current
@@ -154,6 +159,8 @@ class KeyboardSettingsActivity : WpActivity() {
     }
 
     companion object {
+        const val EXTRA_ASK_MIC = "ask_mic"
+
         private fun imm(context: Context) = context.getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager
 
         fun isEnabled(context: Context): Boolean =

@@ -1,7 +1,7 @@
 package com.wpreborn.keyboard
 
 /** What a key does. Char keys output [Key.text]. */
-enum class KeyType { Char, Shift, Backspace, Enter, Space, Symbols, Letters, SymbolsPage, Emoji, Language, Comma, Period }
+enum class KeyType { Char, Shift, Backspace, Enter, Space, Symbols, Letters, SymbolsPage, Emoji, Language, Comma, Period, Action }
 
 data class Key(
     val label: String,

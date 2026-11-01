@@ -176,7 +176,18 @@ class MusicActivity : WpActivity() {
                         }
                         // When the artist, album or playlist no longer exists (its last song was
                         // deleted or retagged) the page goes back instead of staying blank.
-                        is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { ArtistDetail(it, nav, controller) }
+                        is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { a ->
+                            if (useMix) {
+                                MixArtistPage(
+                                    col, a,
+                                    onAlbum = { nav.navigate(MusicPage.AlbumPage(it)) },
+                                    onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
+                                    onPlay = { list, i, source -> controller.playSongs(list, i, source = source); nav.navigate(MusicPage.NowPlaying) },
+                                )
+                            } else {
+                                ArtistDetail(a, nav, controller)
+                            }
+                        }
                             ?: GoneBack(col != null) { nav.pop() }
                         is MusicPage.AlbumPage -> col?.albums?.firstOrNull { it.id == page.id }?.let { AlbumDetail(it, controller, songActions) }
                             ?: GoneBack(col != null) { nav.pop() }

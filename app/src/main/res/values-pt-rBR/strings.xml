@@ -801,4 +801,12 @@
     <string name="mix_vote_down">Você não vai mais ouvir esta música nos seus mixes pessoais.</string>
     <string name="mix_share_three">compartilhar três músicas</string>
     <string name="music_search_recent">pesquisas recentes</string>
+    <string name="artist_similar">parecidos</string>
+    <string name="artist_about">sobre</string>
+    <string name="artist_no_similar">Ainda não há artistas do mesmo gênero nas suas músicas.</string>
+    <string name="artist_source">Fonte: Wikipédia (CC BY-SA) - ler mais</string>
+    <string name="artist_no_bio">Sem informações sobre este artista (elas vêm da Wikipédia quando há conexão com a internet).</string>
+    <string name="artist_time">tempo total</string>
+    <string name="artist_most_played">mais ouvida</string>
+    <string name="artist_play_mix">tocar mix</string>
 </resources>

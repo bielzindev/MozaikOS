@@ -800,4 +800,12 @@
     <string name="mix_vote_down">You won\'t hear this song in your personal mixes again.</string>
     <string name="mix_share_three">share three songs</string>
     <string name="music_search_recent">recent searches</string>
+    <string name="artist_similar">similar</string>
+    <string name="artist_about">about</string>
+    <string name="artist_no_similar">No artists of the same genre in your music yet.</string>
+    <string name="artist_source">Source: Wikipedia (CC BY-SA) - read more</string>
+    <string name="artist_no_bio">No information about this artist (it comes from Wikipedia when there\'s an internet connection).</string>
+    <string name="artist_time">total time</string>
+    <string name="artist_most_played">most played</string>
+    <string name="artist_play_mix">play mix</string>
 </resources>

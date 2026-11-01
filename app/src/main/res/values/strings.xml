@@ -764,4 +764,5 @@
     <string name="store_new_browser">First release.</string>
     <string name="mix_try_beta">new interface (beta)</string>
     <string name="mix_get_beta">new interface: update in the Store</string>
+    <string name="mix_classic">classic interface</string>
 </resources>

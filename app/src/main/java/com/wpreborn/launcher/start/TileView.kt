@@ -25,6 +25,8 @@ import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -233,7 +235,7 @@ private fun MusicTile(size: TileSize, playing: NowPlaying?, artUri: Uri?, live: 
     }
     if (size == TileSize.Medium) {
         FlipTile(enabled = true, seed = seed, front = {
-            Box(Modifier.fillMaxSize()) { AlbumArt(playing.art, artUri) }
+            KenBurns { ArtistImage(playing.artist) { AlbumArt(playing.art, artUri) } }
         }, back = {
             Box(Modifier.fillMaxSize()) {
                 AlbumArt(playing.art, artUri)
@@ -243,11 +245,12 @@ private fun MusicTile(size: TileSize, playing: NowPlaying?, artUri: Uri?, live: 
         })
         return
     }
-    // Wide / large: the cover over the whole tile, the song and artist on a soft shade.
+    // Wide / large, like Xbox Music's tile on 8.1: the artist's picture slowly panning and
+    // zooming ("visualisations"), the song and artist over a shade at the bottom.
     Box(Modifier.fillMaxSize()) {
-        AlbumArt(playing.art, artUri)
-        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.horizontalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
-        Caption(Modifier.align(Alignment.TopEnd).fillMaxWidth(0.55f).padding(8.dp))
+        KenBurns { ArtistImage(playing.artist) { AlbumArt(playing.art, artUri) } }
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
+        Caption(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 24.dp))
     }
 }
 
@@ -271,10 +274,49 @@ private fun IdleMusicTile(size: TileSize, seed: Int) {
         return
     }
     CycleTile(covers, enabled = covers.size > 1, seed = seed) { uri ->
-        Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 512) {
-            Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Music, size) }
+        KenBurns {
+            Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 512) {
+                Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Music, size) }
+            }
         }
     }
+}
+
+/** Slow pan and zoom of a picture (the "visualisations" of the 8.1 music tiles). */
+@Composable
+private fun KenBurns(content: @Composable () -> Unit) {
+    val t = androidx.compose.animation.core.rememberInfiniteTransition(label = "kenburns")
+    val p by t.animateFloat(
+        0f, 1f,
+        androidx.compose.animation.core.infiniteRepeatable(
+            androidx.compose.animation.core.tween(14000, easing = androidx.compose.animation.core.LinearEasing),
+            androidx.compose.animation.core.RepeatMode.Reverse,
+        ),
+        label = "kenburns-p",
+    )
+    Box(Modifier.fillMaxSize().clipToBounds()) {
+        Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                val s = 1.08f + 0.14f * p
+                scaleX = s
+                scaleY = s
+                translationX = (p - 0.5f) * size.width * 0.08f
+                translationY = (0.5f - p) * size.height * 0.05f
+            },
+        ) { content() }
+    }
+}
+
+/** The artist's picture (Wikipedia, cached by the Music app), else [fallback]. */
+@Composable
+private fun ArtistImage(artist: String, fallback: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val bio by produceState<com.wpreborn.apps.music.ArtistBio?>(null, artist) {
+        value = if (artist.isBlank()) null else com.wpreborn.apps.music.ArtistBios.load(context, artist)
+    }
+    val img by com.wpreborn.apps.news.rememberWebImage(bio?.image, 720)
+    val i = img
+    if (i != null) Image(i, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else fallback()
 }
 
 @Composable

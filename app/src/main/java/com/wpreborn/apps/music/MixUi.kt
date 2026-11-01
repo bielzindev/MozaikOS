@@ -49,6 +49,10 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wpreborn.R
+import androidx.compose.animation.togetherWith
+import androidx.compose.ui.graphics.graphicsLayer
+import com.wpreborn.core.motion.tilt
+import com.wpreborn.core.motion.slideInStaggered
 import com.wpreborn.apps.common.LocalChrome
 import com.wpreborn.core.icons.Glyphs
 import com.wpreborn.core.icons.WpIcons
@@ -134,6 +138,7 @@ fun MixHome(
     val recent = remember(col) { col?.songs?.sortedByDescending { it.dateAdded }?.take(40).orEmpty() }
     val bgSong = recent.firstOrNull() ?: col?.songs?.firstOrNull()
 
+    val canvasScroll = rememberScrollState()
     var homeMenu by remember { mutableStateOf(false) }
     var createMix by remember { mutableStateOf(false) }
     val playMeLabel = stringResource(R.string.mix_play_me).uppercase()
@@ -153,7 +158,8 @@ fun MixHome(
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         // Background: the picture of what's playing, black and white and dimmed.
-        Art(playback, bgSong, Modifier.fillMaxSize(), grey = true, size = 720)
+        // Panorama parallax: the background moves slower than the tiles, as on Windows 8.
+        Art(playback, bgSong, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.3f; scaleY = 1.3f; translationX = size.width * 0.12f - canvasScroll.value * 0.18f }, grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)))
 
         Column(Modifier.fillMaxSize()) {
@@ -190,10 +196,10 @@ fun MixHome(
                 val xC = xB + big + g * 1.8f
                 val canvasWidth = xC + big * 2 + g
                 val bottom = maxHeight - labelSpace
-                Box(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp)) {
+                Box(Modifier.fillMaxSize().horizontalScroll(canvasScroll).padding(start = 18.dp, end = 18.dp)) {
                     Box(Modifier.width(canvasWidth).fillMaxHeight()) {
                         // What's playing, with its time in huge numerals running off the bottom.
-                        Box(Modifier.size(art).clipToBounds().background(Color.DarkGray).wpClickable(onClick = onNowPlaying)) {
+                        Box(Modifier.size(art).slideInStaggered(0).tilt().clipToBounds().background(Color.DarkGray).wpClickable(onClick = onNowPlaying)) {
                             Art(playback, bgSong, Modifier.fillMaxSize(), grey = false)
                             WpText(
                                 if (playback != null) fmt(playback.positionMs) else "0:00",
@@ -205,13 +211,13 @@ fun MixHome(
                             )
                         }
                         // "play me"
-                        Box(Modifier.offset(art - big, art + g).size(big).background(accent).wpClickable { playMe() }.padding(8.dp)) {
+                        Box(Modifier.offset(art - big, art + g).size(big).slideInStaggered(1).tilt().background(accent).wpClickable { playMe() }.padding(8.dp)) {
                             WpIcon(WpIcons.Play, tint = Color.White, size = big * 0.45f, modifier = Modifier.align(Alignment.Center).offset(y = (-6).dp))
                             WpText(stringResource(R.string.mix_play_me).lowercase(), style = WpType.Normal.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
                         }
                         // Small square stepped once more: shuffle everything.
                         Box(
-                            Modifier.offset(art - small, art + big + g * 2).size(small).background(accent.copy(alpha = 0.7f)).wpClickable {
+                            Modifier.offset(art - small, art + big + g * 2).size(small).slideInStaggered(2).tilt().background(accent.copy(alpha = 0.7f)).wpClickable {
                                 col?.songs?.takeIf { it.isNotEmpty() }?.let { controller.playSongs(it.shuffled(), 0, shuffle = true); onNowPlaying() }
                             },
                             contentAlignment = Alignment.Center,
@@ -224,11 +230,11 @@ fun MixHome(
                         while (y + (if (smallTurn) small else big) <= bottom && i < 12) {
                             val m = mixes.getOrNull(i)
                             if (smallTurn) {
-                                SmallSquare(m, accent, Modifier.offset(xB, y).size(small)) { mm -> controller.playSongs(mm.songs, 0); onNowPlaying() }
+                                SmallSquare(m, accent, Modifier.offset(xB, y).size(small).slideInStaggered(3 + i / 2).tilt()) { mm -> controller.playSongs(mm.songs, 0); onNowPlaying() }
                                 y += small + g
                             } else {
                                 if (m != null) {
-                                    MixTile(m, accent, Modifier.offset(xB, y).size(big)) { controller.playSongs(m.songs, 0); onNowPlaying() }
+                                    MixTile(m, accent, Modifier.offset(xB, y).size(big).slideInStaggered(3 + i / 2).tilt()) { controller.playSongs(m.songs, 0); onNowPlaying() }
                                 } else {
                                     Box(Modifier.offset(xB, y).size(big).background(accent.copy(alpha = 0.55f)))
                                 }
@@ -242,7 +248,7 @@ fun MixHome(
                         // favourites (wide), my music, playlists.
                         @Composable
                         fun Hub(x: Dp, y: Dp, w: Dp, label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, plus: Boolean = false, onClick: () -> Unit) {
-                            Box(Modifier.offset(x, y).size(w, big).background(accent).wpClickable(onClick = onClick).padding(8.dp)) {
+                            Box(Modifier.offset(x, y).size(w, big).slideInStaggered(7).tilt().background(accent).wpClickable(onClick = onClick).padding(8.dp)) {
                                 Box(Modifier.align(Alignment.Center).offset(y = (-8).dp)) {
                                     WpIcon(icon, tint = Color.White, size = big * 0.38f)
                                     if (plus) {
@@ -385,6 +391,16 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
             }
         }
         Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(bottom = 18.dp)) {
+            // Each new song slides in from the right (Windows 8 content transition).
+            androidx.compose.animation.AnimatedContent(
+                targetState = playback.trackKey,
+                transitionSpec = {
+                    (androidx.compose.animation.slideInHorizontally(androidx.compose.animation.core.tween(380, easing = com.wpreborn.core.motion.WpEasing.CubicInOut)) { it / 3 } +
+                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(300))) togetherWith
+                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(150))
+                },
+                label = "track",
+            ) { _ ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.Top) {
                 Art(playback, null, Modifier.size(150.dp).background(accent), grey = false)
                 Spacer(Modifier.width(12.dp))
@@ -409,6 +425,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                         RoundButton(WpIcons.Star, filled = fav, accent = accent, size = 42.dp) { playback.mediaId?.let { Favorites.get(context).toggle(it) } }
                     }
                 }
+            }
             }
             Spacer(Modifier.height(14.dp))
             // Progress: accent over a dim line, the times under it.

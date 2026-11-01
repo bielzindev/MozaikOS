@@ -173,11 +173,18 @@ object KeyboardLayouts {
         )
     }
 
-    /** Phone/number pad. */
-    fun numberPad(phone: Boolean): List<KeyRow> = listOf(
-        listOf(Key("1"), Key("2"), Key("3"), Key(if (phone) "+" else "-")),
-        listOf(Key("4"), Key("5"), Key("6"), Key(if (phone) "(" else ",")),
-        listOf(Key("7"), Key("8"), Key("9"), Key("del", KeyType.Backspace)),
-        listOf(Key(if (phone) "*" else "."), Key("0"), Key(if (phone) "#" else " ", text = if (phone) "#" else " "), Key("enter", KeyType.Enter)),
-    )
+    /**
+     * Phone/number pad over the whole width, like Windows Phone's: three wide digit columns
+     * (2.7 units each) and a narrower column of signs, backspace and enter (1.9 units).
+     */
+    fun numberPad(phone: Boolean): List<KeyRow> {
+        fun d(s: String) = Key(s, width = 2.7f)
+        fun side(s: String, type: KeyType = KeyType.Char) = Key(s, type, width = 1.9f)
+        return listOf(
+            listOf(d("1"), d("2"), d("3"), side(if (phone) "+" else "-")),
+            listOf(d("4"), d("5"), d("6"), side(if (phone) "(" else ",")),
+            listOf(d("7"), d("8"), d("9"), side("del", KeyType.Backspace)),
+            listOf(d(if (phone) "*" else "."), d("0"), Key(if (phone) "#" else " ", width = 2.7f, text = if (phone) "#" else " "), side("enter", KeyType.Enter)),
+        )
+    }
 }

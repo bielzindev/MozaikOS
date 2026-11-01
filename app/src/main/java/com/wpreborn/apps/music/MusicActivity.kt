@@ -667,7 +667,7 @@ private fun ArtistDetail(artist: Artist, nav: WpNavigator<MusicPage>, controller
                 }
                 else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
                     val photo by com.wpreborn.apps.news.rememberWebImage(bio?.image, 720)
-                    photo?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxWidth().height(200.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
+                    photo?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxWidth().aspectRatio((it.width.toFloat() / it.height.coerceAtLeast(1)).coerceIn(0.62f, 2.2f)), contentScale = androidx.compose.ui.layout.ContentScale.Crop, alignment = Alignment.TopCenter) }
                     val b = bio
                     if (b != null) {
                         WpText(b.text, style = WpType.Normal.copy(lineHeight = 24.sp), modifier = Modifier.padding(top = 10.dp))

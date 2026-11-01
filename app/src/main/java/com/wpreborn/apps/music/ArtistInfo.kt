@@ -6,6 +6,7 @@ import android.net.Uri
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -149,6 +150,7 @@ fun MixArtistPage(
             Image(
                 it, null, Modifier.fillMaxSize().then(if (android.os.Build.VERSION.SDK_INT >= 31) Modifier.blur(24.dp) else Modifier),
                 contentScale = ContentScale.Crop,
+                alignment = androidx.compose.ui.BiasAlignment(0f, -0.6f),
             )
         }
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.62f)))
@@ -198,7 +200,8 @@ fun MixArtistPage(
                             }
                         }
                         else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
-                            photo?.let { Image(it, null, Modifier.fillMaxWidth().height(220.dp), contentScale = ContentScale.Crop) }
+                            // The whole picture, in its own proportions (portraits aren't cut).
+                            photo?.let { Image(it, null, Modifier.fillMaxWidth().aspectRatio((it.width.toFloat() / it.height.coerceAtLeast(1)).coerceIn(0.62f, 2.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter) }
                             Spacer(Modifier.height(12.dp))
                             val b = bio
                             if (b != null) {

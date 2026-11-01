@@ -317,7 +317,8 @@ private fun ArtistImage(artist: String, fallback: @Composable () -> Unit) {
     }
     val img by com.wpreborn.apps.news.rememberWebImage(bio?.image, 720)
     val i = img
-    if (i != null) Image(i, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) else fallback()
+    // Cropped towards the top, where faces usually are.
+    if (i != null) Image(i, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop, alignment = androidx.compose.ui.BiasAlignment(0f, -0.7f)) else fallback()
 }
 
 @Composable

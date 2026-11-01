@@ -29,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -143,7 +144,7 @@ fun MixArtistPage(
         col.artists.filter { it.name != artist.name && it.name.isNotBlank() && it.songs.any { s -> s.genre?.lowercase() in g } }
             .sortedByDescending { a -> a.songs.count { s -> s.genre?.lowercase() in g } }.take(12)
     }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().clipToBounds().background(Color.Black)) {
         // Background: the artist's picture (or a cover), blurred and dimmed.
         val bg = photo ?: cover
         bg?.let {

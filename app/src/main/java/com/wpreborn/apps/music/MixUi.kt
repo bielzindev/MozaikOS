@@ -156,7 +156,7 @@ fun MixHome(
         if (startPlayMe(context, c, playMeLabel)) onNowPlaying()
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().clipToBounds().background(Color.Black)) {
         // Background: the picture of what's playing, black and white and dimmed.
         // Panorama parallax: the background moves slower than the tiles, as on Windows 8.
         Art(playback, bgSong, Modifier.fillMaxSize().graphicsLayer { scaleX = 1.3f; scaleY = 1.3f; translationX = size.width * 0.12f - canvasScroll.value * 0.18f }, grey = true, size = 720)
@@ -370,7 +370,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
     val votes by votesStore.votes.collectAsState()
     val source by controller.source.collectAsState()
     var banner by remember { mutableStateOf<Boolean?>(null) }
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize().clipToBounds().background(Color.Black)) {
         Art(playback, null, Modifier.fillMaxSize(), grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
         if (playback == null) {

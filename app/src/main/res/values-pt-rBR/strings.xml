@@ -766,4 +766,7 @@
     <string name="mix_try_beta">nova interface (beta)</string>
     <string name="mix_get_beta">nova interface: atualize na Loja</string>
     <string name="mix_classic">interface clássica</string>
+    <string name="music_save_queue">salvar fila como playlist</string>
+    <string name="music_crossfade_off">transição gradual: desligada</string>
+    <string name="music_crossfade_on">transição gradual: %1$d s</string>
 </resources>

@@ -66,6 +66,7 @@ import com.wpreborn.data.media.rememberPlayback
 import com.wpreborn.data.store.AppManager
 import com.wpreborn.data.apps.BuiltInApp
 import com.wpreborn.services.music.MusicController
+import kotlinx.coroutines.launch
 
 /** Music app versions from this one on offer the new interface (released through the Store). */
 const val MIX_UI_VERSION = 31
@@ -119,6 +120,7 @@ fun MixHome(
     onNowPlaying: () -> Unit,
     onLibrary: (Int) -> Unit,
     onClassic: () -> Unit,
+    onChanged: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
@@ -126,6 +128,9 @@ fun MixHome(
     val accent = Wp.accent
     val recent = remember(col) { col?.songs?.sortedByDescending { it.dateAdded }?.take(40).orEmpty() }
     val bgSong = recent.firstOrNull() ?: col?.songs?.firstOrNull()
+
+    var homeMenu by remember { mutableStateOf(false) }
+    var newPlaylist by remember { mutableStateOf(false) }
 
     fun playMe() {
         val songs = col?.songs.orEmpty()
@@ -149,7 +154,7 @@ fun MixHome(
                 WpText("Mix", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Light), color = Color.White, maxLines = 1, softWrap = false)
             }
             Box(
-                Modifier.padding(start = 18.dp, top = 4.dp, bottom = 12.dp).size(30.dp).border(2.dp, Color.White, CircleShape).wpClickable(onClick = onClassic),
+                Modifier.padding(start = 18.dp, top = 4.dp, bottom = 12.dp).size(30.dp).border(2.dp, Color.White, CircleShape).wpClickable { homeMenu = true },
                 contentAlignment = Alignment.Center,
             ) { WpIcon(WpIcons.More, tint = Color.White, size = 16.dp) }
 
@@ -246,6 +251,15 @@ fun MixHome(
                 )
             }
         }
+        if (homeMenu) {
+            MenuOverlay(
+                listOf(
+                    stringResource(R.string.music_new_playlist) to { newPlaylist = true; Unit },
+                    stringResource(R.string.mix_classic) to onClassic,
+                ),
+            ) { homeMenu = false }
+        }
+        if (newPlaylist) PlaylistPicker(emptyList(), startWithNew = true, onDone = { newPlaylist = false; onChanged() }) { newPlaylist = false }
     }
 }
 
@@ -276,7 +290,7 @@ private fun MixTile(m: Mix, accent: Color, modifier: Modifier, onClick: () -> Un
  * large round play / next buttons.
  */
 @Composable
-fun MixNowPlaying(onEqualizer: () -> Unit) {
+fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
     val playback = rememberPlayback()
@@ -288,6 +302,9 @@ fun MixNowPlaying(onEqualizer: () -> Unit) {
         onDispose { chrome?.hidePlayingNow = false }
     }
     var seeking by remember { mutableStateOf<Float?>(null) }
+    var menu by remember { mutableStateOf(false) }
+    var queue by remember { mutableStateOf(false) }
+    var playlistFor by remember { mutableStateOf<List<Long>?>(null) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Art(playback, null, Modifier.fillMaxSize(), grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -346,6 +363,131 @@ fun MixNowPlaying(onEqualizer: () -> Unit) {
                 RoundButton(if (playback.playing) WpIcons.Pause else WpIcons.Play, filled = false, accent = accent, size = 64.dp) { controller.togglePlay() }
                 Spacer(Modifier.width(28.dp))
                 RoundButton(WpIcons.Next, filled = false, accent = accent, size = 64.dp) { controller.next() }
+            }
+        }
+        // "..." at the bottom right, as on MixRadio's player.
+        Box(
+            Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 8.dp).size(40.dp).wpClickable { menu = true },
+            contentAlignment = Alignment.Center,
+        ) { WpIcon(WpIcons.More, tint = Color.White, size = 22.dp) }
+
+        if (queue) QueueOverlay(playback, accent, onPick = { controller.skipAhead(it + 1); queue = false }) { queue = false }
+        if (menu) {
+            val fade = com.wpreborn.services.music.Crossfade.seconds(context)
+            MenuOverlay(
+                listOf(
+                    stringResource(R.string.music_up_next) to { queue = true; Unit },
+                    stringResource(R.string.music_add_to_playlist) to { playback.mediaId?.toLongOrNull()?.let { playlistFor = listOf(it) }; Unit },
+                    stringResource(R.string.music_save_queue) to { playlistFor = controller.queueIds(); Unit },
+                    (if (fade == 0) stringResource(R.string.music_crossfade_off) else stringResource(R.string.music_crossfade_on, fade)) to {
+                        com.wpreborn.services.music.Crossfade.cycle(context)
+                        Unit
+                    },
+                    stringResource(R.string.eq_title) to onEqualizer,
+                ),
+            ) { menu = false }
+        }
+        playlistFor?.let { ids -> PlaylistPicker(ids, onDone = { playlistFor = null; onChanged() }) { playlistFor = null } }
+    }
+}
+
+/** A Windows Phone menu: text items rising from the bottom over a dimmed screen. */
+@Composable
+fun MenuOverlay(items: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).wpClickable(onClick = onDismiss)) {
+        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1F1F1F)).padding(vertical = 10.dp)) {
+            items.forEach { (label, action) ->
+                WpText(
+                    label,
+                    style = WpType.Large.copy(fontSize = 20.sp),
+                    color = Color.White,
+                    modifier = Modifier.fillMaxWidth().wpClickable { onDismiss(); action() }.padding(horizontal = 20.dp, vertical = 10.dp),
+                )
+            }
+        }
+    }
+}
+
+/** "up next": the queue over the player; tap a song to play it. */
+@Composable
+private fun QueueOverlay(playback: Playback, accent: Color, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.88f)).padding(start = 20.dp, top = 14.dp, end = 16.dp)) {
+        WpText(stringResource(R.string.music_title).uppercase(), style = WpType.AppTitle, color = Color.White)
+        WpText(stringResource(R.string.music_up_next), style = WpType.Header, color = Color.White, maxLines = 1, softWrap = false)
+        WpText(playback.title, style = WpType.Large, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
+            if (playback.nextTitles.isEmpty()) item { WpText(stringResource(R.string.music_queue_end), style = WpType.Large, color = Color.White.copy(alpha = 0.6f)) }
+            items(playback.nextTitles.size) { i ->
+                WpText(
+                    playback.nextTitles[i],
+                    style = WpType.Large.copy(fontSize = 22.sp),
+                    color = Color.White,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().wpClickable { onPick(i) }.padding(vertical = 8.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Adds songs to a playlist: the ZUNEX playlists, or "new playlist" with a name box
+ * (also used on its own, with no songs, to just create a playlist).
+ */
+@Composable
+fun PlaylistPicker(songIds: List<Long>, startWithNew: Boolean = false, onDone: () -> Unit, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val library = remember { com.wpreborn.data.media.MusicLibrary(context) }
+    val playlists = remember { library.userPlaylists() }
+    var naming by remember { mutableStateOf(startWithNew || playlists.isEmpty()) }
+    var name by remember { mutableStateOf("") }
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).wpClickable(onClick = onDismiss)) {
+        Column(
+            Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome).wpClickable { }
+                .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
+        ) {
+            if (naming) {
+                WpText(stringResource(R.string.music_new_playlist), style = WpType.Large.copy(fontWeight = FontWeight.SemiBold))
+                WpText(stringResource(R.string.music_playlist_name), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp))
+                com.wpreborn.core.ui.WpTextBox(name, { name = it }, Modifier.fillMaxWidth())
+                Spacer(Modifier.height(20.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    com.wpreborn.core.ui.WpButton(stringResource(R.string.save), Modifier.weight(1f)) {
+                        if (name.isNotBlank()) scope.launch {
+                            val p = library.createPlaylist(name.trim())
+                            if (songIds.isNotEmpty()) library.addToPlaylist(p.id, songIds)
+                            onDone()
+                        }
+                    }
+                    com.wpreborn.core.ui.WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                }
+            } else {
+                WpText(stringResource(R.string.music_add_to_playlist), style = WpType.Large.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(bottom = 8.dp))
+                WpText(
+                    stringResource(R.string.music_new_playlist),
+                    style = WpType.Large,
+                    color = Wp.accent,
+                    modifier = Modifier.fillMaxWidth().wpClickable { naming = true }.padding(vertical = 8.dp),
+                )
+                playlists.forEach { p ->
+                    WpText(
+                        p.name,
+                        style = WpType.Large,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.fillMaxWidth().wpClickable {
+                            scope.launch {
+                                library.addToPlaylist(p.id, songIds)
+                                onDone()
+                            }
+                        }.padding(vertical = 8.dp),
+                    )
+                }
             }
         }
     }

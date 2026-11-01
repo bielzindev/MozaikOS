@@ -154,6 +154,7 @@ class MusicActivity : WpActivity() {
                                 onNowPlaying = { nav.navigate(MusicPage.NowPlaying) },
                                 onLibrary = { nav.navigate(MusicPage.Library(it)) },
                                 onClassic = { switchUi(false) },
+                                onChanged = { reload++ },
                             )
                         } else {
                             CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, onMixUi = { switchUi(true) }) {
@@ -172,7 +173,7 @@ class MusicActivity : WpActivity() {
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
                         } ?: GoneBack(col != null) { nav.pop() }
-                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
+                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(onEqualizer = { nav.navigate(MusicPage.Equalizer) }, onChanged = { reload++ })
                             else NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }

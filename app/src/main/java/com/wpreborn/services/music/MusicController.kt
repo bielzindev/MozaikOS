@@ -122,6 +122,9 @@ class MusicController private constructor(private val context: Context) {
         if (c.mediaItemCount == 0) c.stop()
     }
 
+    /** The songs of the queue in order (their ids), for "save as playlist". */
+    fun queueIds(): List<Long> = controller?.let { c -> (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).mediaId.toLongOrNull() } }.orEmpty()
+
     fun togglePlay() = withController { if (it.isPlaying) it.pause() else it.play() }
     fun next() = withController { it.seekToNextMediaItem() }
     fun previous() = withController { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }

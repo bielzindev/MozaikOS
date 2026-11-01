@@ -82,6 +82,8 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
     val playback = rememberPlayback()
     val favorites by remember { Favorites.get(context) }.ids.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
+    var savingQueue by remember { mutableStateOf<List<Long>?>(null) }
+    var crossfadeTick by remember { mutableStateOf(0) }
 
     // The Playing Now bar would repeat this screen.
     val chrome = LocalChrome.current
@@ -186,12 +188,17 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
                     id?.let { AppBarMenuItem(stringResource(if (it in favorites) R.string.music_unfavorite else R.string.music_favorite)) { Favorites.get(context).toggle(it) } },
                     AppBarMenuItem(stringResource(if (showQueue) R.string.music_now_playing else R.string.music_up_next)) { showQueue = !showQueue },
                     AppBarMenuItem(stringResource(R.string.eq_title)) { onEqualizer() },
+                    AppBarMenuItem(stringResource(R.string.music_save_queue)) { savingQueue = controller.queueIds() },
+                    AppBarMenuItem(
+                        remember(crossfadeTick) { com.wpreborn.services.music.Crossfade.seconds(context) }.let { if (it == 0) stringResource(R.string.music_crossfade_off) else stringResource(R.string.music_crossfade_on, it) },
+                    ) { com.wpreborn.services.music.Crossfade.cycle(context); crossfadeTick++ },
                 )
             } else {
                 listOf(AppBarMenuItem(stringResource(R.string.music_open_app)) { playback.packageName?.let { openPackage(context, it) } })
             },
         )
     }
+    savingQueue?.let { ids -> PlaylistPicker(ids, onDone = { savingQueue = null }) { savingQueue = null } }
     }
     }
 }

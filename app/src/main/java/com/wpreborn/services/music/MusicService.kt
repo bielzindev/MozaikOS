@@ -16,6 +16,7 @@ import com.wpreborn.apps.music.MusicActivity
 class MusicService : MediaSessionService() {
 
     private var session: MediaSession? = null
+    private var crossfade: Crossfade? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -56,6 +57,8 @@ class MusicService : MediaSessionService() {
                 }
             }
         })
+        // Gradual transitions between songs (setting in the player's menu).
+        crossfade = Crossfade(this, player)
         // The equalizer follows the player's audio session.
         AudioEffects.attach(this, player.audioSessionId)
         player.addAnalyticsListener(object : androidx.media3.exoplayer.analytics.AnalyticsListener {
@@ -74,6 +77,8 @@ class MusicService : MediaSessionService() {
 
     override fun onDestroy() {
         session?.player?.let { QueueStore(this).save(it) }
+        crossfade?.release()
+        crossfade = null
         AudioEffects.release()
         session?.run {
             player.release()

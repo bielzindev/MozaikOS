@@ -765,4 +765,7 @@
     <string name="mix_try_beta">new interface (beta)</string>
     <string name="mix_get_beta">new interface: update in the Store</string>
     <string name="mix_classic">classic interface</string>
+    <string name="music_save_queue">save queue as playlist</string>
+    <string name="music_crossfade_off">gradual transition: off</string>
+    <string name="music_crossfade_on">gradual transition: %1$d s</string>
 </resources>

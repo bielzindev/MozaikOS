@@ -808,4 +808,7 @@
     <string name="artist_time">total time</string>
     <string name="artist_most_played">most played</string>
     <string name="artist_play_mix">play mix</string>
+    <string name="music_vote_up">like (more like this)</string>
+    <string name="music_vote_up_undo">remove like</string>
+    <string name="music_vote_down">dislike (skip)</string>
 </resources>

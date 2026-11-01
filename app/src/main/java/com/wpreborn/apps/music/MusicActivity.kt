@@ -179,13 +179,13 @@ class MusicActivity : WpActivity() {
                         is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { a ->
                             if (useMix) {
                                 MixArtistPage(
-                                    col, a,
+                                    col!!, a,
                                     onAlbum = { nav.navigate(MusicPage.AlbumPage(it)) },
                                     onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
                                     onPlay = { list, i, source -> controller.playSongs(list, i, source = source); nav.navigate(MusicPage.NowPlaying) },
                                 )
                             } else {
-                                ArtistDetail(a, nav, controller)
+                                ArtistDetail(a, nav, controller, col!!)
                             }
                         }
                             ?: GoneBack(col != null) { nav.pop() }
@@ -200,7 +200,11 @@ class MusicActivity : WpActivity() {
                             onAlbum = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.let { s -> col.albums.firstOrNull { a -> a.songs.any { it.id == s.id } }?.let { nav.navigate(MusicPage.AlbumPage(it.id)) } } },
                             onArtist = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.artist?.takeIf { it.isNotBlank() }?.let { nav.navigate(MusicPage.ArtistPage(it)) } },
                         )
-                            else NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
+                            else NowPlayingScreen(
+                                onEqualizer = { nav.navigate(MusicPage.Equalizer) },
+                                onArtist = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.artist?.takeIf { it.isNotBlank() }?.let { nav.navigate(MusicPage.ArtistPage(it)) } },
+                                onAlbum = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.let { s -> col.albums.firstOrNull { a -> a.songs.any { it.id == s.id } }?.let { nav.navigate(MusicPage.AlbumPage(it.id)) } } },
+                            )
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
                         MusicPage.Favorites -> FavoritesPage(
@@ -281,6 +285,8 @@ private fun CollectionPage(
     var selected by remember { mutableStateOf(emptySet<String>()) }
     var confirmPlaylists by remember { mutableStateOf(false) }
     var addMany by remember { mutableStateOf<List<Song>?>(null) }
+    var creatingMix by remember { mutableStateOf(false) }
+    val playMeTitle = stringResource(R.string.mix_play_me).uppercase()
     val selecting = selKind >= 0
     fun clearSel() {
         selKind = -1
@@ -312,8 +318,19 @@ private fun CollectionPage(
                     col == null -> LoadingDots(Modifier.padding(top = 24.dp))
                     col.songs.isEmpty() && index != 3 -> CenteredMessage(stringResource(R.string.music_empty), Modifier.padding(start = 20.dp))
                     page == 0 -> MixesGrid(mixes) { m ->
-                        controller.playSongs(m.songs, 0)
-                        nav.navigate(MusicPage.NowPlaying)
+                        if (m.id == "playme") {
+                            // The same "play me" as the new interface (favourite artists, votes).
+                            if (com.wpreborn.data.media.FavoriteArtists.get(context).artists.value.isEmpty() &&
+                                com.wpreborn.data.media.PlayStats.get(context).counts().isEmpty()
+                            ) {
+                                nav.navigate(MusicPage.PlayMeIntro)
+                            } else if (startPlayMe(context, col, playMeTitle)) {
+                                nav.navigate(MusicPage.NowPlaying)
+                            }
+                        } else {
+                            controller.playSongs(m.songs, 0, source = m.title.uppercase())
+                            nav.navigate(MusicPage.NowPlaying)
+                        }
                     }
                     index == 0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, bottom = 16.dp)) {
                         itemsIndexed(col.artists, key = { _, a -> a.name }) { i, a ->
@@ -453,6 +470,8 @@ private fun CollectionPage(
                 },
                 menuItems = listOf(
                     AppBarMenuItem(stringResource(R.string.refresh)) { onReload() },
+                    AppBarMenuItem(stringResource(R.string.mix_create)) { creatingMix = true },
+                    AppBarMenuItem(stringResource(R.string.mix_favorites)) { nav.navigate(MusicPage.Favorites) },
                 ) + (if (onMixUi == null) emptyList() else listOf(
                     // The new interface arrives as an update of Music in the ZUNEX Store.
                     AppBarMenuItem(stringResource(if (MusicUi.available(context)) R.string.mix_try_beta else R.string.mix_get_beta)) {
@@ -500,7 +519,16 @@ private fun CollectionPage(
                 onDismiss = { addMany = null },
             )
         }
-        if (confirmPlaylists) {
+        if (creatingMix && col != null) {
+            ArtistChooser(col, limit = 3, title = stringResource(R.string.mix_create)) { chosen ->
+                creatingMix = false
+                if (chosen.isNotEmpty()) {
+                    val list = com.wpreborn.data.media.PlayMe.fromArtists(col, chosen, com.wpreborn.data.media.Votes.get(context).votes.value)
+                    if (list.isNotEmpty()) { controller.playSongs(list, 0, source = chosen.joinToString(" + ").uppercase()); nav.navigate(MusicPage.NowPlaying) }
+                }
+            }
+        }
+                if (confirmPlaylists) {
             WpMessageBox(
                 title = stringResource(R.string.music_delete_playlists_title),
                 message = context.resources.getQuantityString(R.plurals.music_delete_playlists_message, selected.size, selected.size),
@@ -603,37 +631,71 @@ private fun AlbumCover(uri: android.net.Uri?, modifier: Modifier) {
 }
 
 @Composable
-private fun ArtistDetail(artist: Artist, nav: WpNavigator<MusicPage>, controller: MusicController) {
+private fun ArtistDetail(artist: Artist, nav: WpNavigator<MusicPage>, controller: MusicController, col: MusicCollection) {
+    val context = LocalContext.current
+    val favStore = remember { com.wpreborn.data.media.FavoriteArtists.get(context) }
+    val favs by favStore.artists.collectAsState()
+    val bio by androidx.compose.runtime.produceState<ArtistBio?>(null, artist.name) { value = ArtistBios.load(context, artist.name) }
+    val plays = remember { com.wpreborn.data.media.PlayStats.get(context).counts() }
+    // Xbox Music's artist page: a pivot of albums, songs and about.
     Column(Modifier.fillMaxSize()) {
-        WpPageHeader(stringResource(R.string.music_title), artist.name)
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
-            item {
-                WpText(
-                    stringResource(R.string.music_play_artist),
-                    style = WpType.Large,
-                    color = Wp.accent,
-                    modifier = Modifier.wpClickable { controller.playSongs(artist.songs) ; nav.navigate(MusicPage.NowPlaying) }.padding(vertical = 6.dp),
-                )
-                WpText(stringResource(R.string.music_albums), style = WpType.GroupHeader, color = Wp.palette.subtle, modifier = Modifier.padding(top = 8.dp))
-            }
-            itemsIndexed(artist.albums, key = { _, a -> "a${a.id}" }) { i, a ->
-                Row(
-                    Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(MusicPage.AlbumPage(a.id)) }.padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    AlbumCover(a.artUri, Modifier.size(64.dp))
-                    Spacer(Modifier.width(12.dp))
-                    Column {
-                        WpText(a.title, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        WpText(a.songs.size.toString(), style = WpType.Subtle, color = Wp.palette.subtle)
+        WpPivot(
+            title = artist.name,
+            headers = listOf(stringResource(R.string.music_albums), stringResource(R.string.music_songs), stringResource(R.string.artist_about)),
+            modifier = Modifier.weight(1f),
+        ) { page ->
+            when (page) {
+                0 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
+                    itemsIndexed(artist.albums, key = { _, a -> "a${a.id}" }) { i, a ->
+                        Row(
+                            Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(MusicPage.AlbumPage(a.id)) }.padding(vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            AlbumCover(a.artUri, Modifier.size(64.dp))
+                            Spacer(Modifier.width(12.dp))
+                            Column {
+                                WpText(a.title, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                WpText(a.songs.size.toString(), style = WpType.Subtle, color = Wp.palette.subtle)
+                            }
+                        }
                     }
                 }
-            }
-            item { WpText(stringResource(R.string.music_songs), style = WpType.GroupHeader, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp)) }
-            itemsIndexed(artist.songs, key = { _, s -> "s${s.id}" }) { i, s ->
-                SongRow(s, Modifier) { controller.playSongs(artist.songs, i); nav.navigate(MusicPage.NowPlaying) }
+                1 -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
+                    itemsIndexed(artist.songs, key = { _, s -> "s${s.id}" }) { i, s ->
+                        SongRow(s, Modifier.slideInStaggered(i)) { controller.playSongs(artist.songs, i); nav.navigate(MusicPage.NowPlaying) }
+                    }
+                }
+                else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
+                    val photo by com.wpreborn.apps.news.rememberWebImage(bio?.image, 720)
+                    photo?.let { androidx.compose.foundation.Image(it, null, Modifier.fillMaxWidth().height(200.dp), contentScale = androidx.compose.ui.layout.ContentScale.Crop) }
+                    val b = bio
+                    if (b != null) {
+                        WpText(b.text, style = WpType.Normal.copy(lineHeight = 24.sp), modifier = Modifier.padding(top = 10.dp))
+                        WpText(stringResource(R.string.artist_source), style = WpType.Small, color = Wp.accent, modifier = Modifier.padding(top = 8.dp).wpClickable {
+                            runCatching { context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(b.page)).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        })
+                    } else {
+                        WpText(stringResource(R.string.artist_no_bio), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.padding(top = 10.dp))
+                    }
+                    val top = artist.songs.maxByOrNull { plays[it.id] ?: 0 }?.takeIf { (plays[it.id] ?: 0) > 0 }
+                    WpText(stringResource(R.string.music_songs).lowercase() + ": " + artist.songs.size + "   " + stringResource(R.string.music_albums).lowercase() + ": " + artist.albums.size, style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 16.dp))
+                    top?.let { WpText(stringResource(R.string.artist_most_played) + ": " + it.title, style = WpType.Subtle, color = Wp.palette.subtle) }
+                }
             }
         }
+        val fav = artist.name in favs
+        WpAppBar(
+            buttons = listOf(
+                AppBarButton(WpIcons.Play, stringResource(R.string.music_play_artist)) { controller.playSongs(artist.songs, source = artist.name.uppercase()); nav.navigate(MusicPage.NowPlaying) },
+                AppBarButton(WpIcons.Shuffle, stringResource(R.string.artist_play_mix)) {
+                    val list = com.wpreborn.data.media.PlayMe.fromArtists(col, listOf(artist.name), com.wpreborn.data.media.Votes.get(context).votes.value)
+                    if (list.isNotEmpty()) { controller.playSongs(list, source = artist.name.uppercase()); nav.navigate(MusicPage.NowPlaying) }
+                },
+                AppBarButton(if (fav) WpIcons.Star else WpIcons.StarOutline, stringResource(if (fav) R.string.mix_remove_artist else R.string.mix_add_artist)) {
+                    if (fav) favStore.remove(listOf(artist.name)) else favStore.add(listOf(artist.name))
+                },
+            ),
+        )
     }
 }
 

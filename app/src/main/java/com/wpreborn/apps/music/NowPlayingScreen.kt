@@ -76,7 +76,7 @@ import kotlin.math.roundToInt
  * favourite, up next and the equalizer. The cover swipes to change song, like Xbox Music.
  */
 @Composable
-fun NowPlayingScreen(onEqualizer: () -> Unit) {
+fun NowPlayingScreen(onEqualizer: () -> Unit, onArtist: (String) -> Unit = {}, onAlbum: (String) -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
     val playback = rememberPlayback()
@@ -85,6 +85,9 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
     var savingQueue by remember { mutableStateOf<List<Long>?>(null) }
     var editingQueue by remember { mutableStateOf(false) }
     var sleepMenu by remember { mutableStateOf(false) }
+    var banner by remember { mutableStateOf<Boolean?>(null) }
+    val votesStore = remember { com.wpreborn.data.media.Votes.get(context) }
+    val votes by votesStore.votes.collectAsState()
     var crossfadeTick by remember { mutableStateOf(0) }
 
     // The Playing Now bar would repeat this screen.
@@ -193,6 +196,18 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
                     AppBarMenuItem(stringResource(R.string.music_save_queue)) { savingQueue = controller.queueIds() },
                     AppBarMenuItem(stringResource(R.string.music_edit_queue)) { editingQueue = true },
                     AppBarMenuItem(sleepLabel()) { sleepMenu = true },
+                    // MixRadio's thumbs, as menu items in the classic player.
+                    AppBarMenuItem(stringResource(if (id != null && votes[id] == 1) R.string.music_vote_up_undo else R.string.music_vote_up)) {
+                        id?.let { votesStore.vote(it, 1); if (votesStore.votes.value[it] == 1) banner = true }
+                    },
+                    AppBarMenuItem(stringResource(R.string.music_vote_down)) {
+                        id?.let { votesStore.vote(it, -1); if (votesStore.votes.value[it] == -1) { controller.next(); banner = false } }
+                    },
+                    AppBarMenuItem(stringResource(R.string.mix_share_three)) {
+                        shareThree(context, listOfNotNull(id?.toLongOrNull()) + controller.upNext(2).mapNotNull { it.mediaId.toLongOrNull() })
+                    },
+                    AppBarMenuItem(stringResource(R.string.music_go_artist)) { id?.let(onArtist) },
+                    AppBarMenuItem(stringResource(R.string.music_go_album)) { id?.let(onAlbum) },
                     AppBarMenuItem(
                         remember(crossfadeTick) { com.wpreborn.services.music.Crossfade.seconds(context) }.let { if (it == 0) stringResource(R.string.music_crossfade_off) else stringResource(R.string.music_crossfade_on, it) },
                     ) { com.wpreborn.services.music.Crossfade.cycle(context); crossfadeTick++ },
@@ -205,6 +220,7 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
     savingQueue?.let { ids -> PlaylistPicker(ids, onDone = { savingQueue = null }) { savingQueue = null } }
     if (editingQueue && playback != null) QueueEditor(playback, Wp.accent) { editingQueue = false }
     if (sleepMenu) SleepMenu { sleepMenu = false }
+    banner?.let { up -> VoteBanner(up) { banner = null } }
     }
     }
 }

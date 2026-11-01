@@ -148,13 +148,13 @@ fun FavoritesPage(col: MusicCollection?, onArtist: (String) -> Unit, onPlay: (Li
 
 /** Choose artists from the collection (for favourites). */
 @Composable
-fun ArtistChooser(col: MusicCollection, limit: Int, already: Set<String> = emptySet(), onDone: (List<String>) -> Unit) {
+fun ArtistChooser(col: MusicCollection, limit: Int, already: Set<String> = emptySet(), title: String? = null, onDone: (List<String>) -> Unit) {
     var chosen by remember { mutableStateOf(listOf<String>()) }
     androidx.activity.compose.BackHandler { onDone(emptyList()) }
     val artists = remember(col) { col.artists.map { it.name }.filter { it.isNotBlank() && it != com.wpreborn.data.media.MusicLibrary.UNKNOWN && it !in already } }
     Column(Modifier.fillMaxSize().background(Wp.palette.background).padding(start = 20.dp, top = 14.dp, end = 16.dp)) {
         WpText(stringResource(R.string.mix_favorites).uppercase(), style = WpType.AppTitle)
-        WpText(stringResource(R.string.mix_add_artist), style = WpType.Header, maxLines = 1, softWrap = false)
+        WpText(title ?: stringResource(R.string.mix_add_artist), style = WpType.Header, maxLines = 1, softWrap = false)
         LazyColumn(Modifier.weight(1f)) {
             items(artists, key = { it }) { a ->
                 val on = a in chosen

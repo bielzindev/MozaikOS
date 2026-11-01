@@ -128,6 +128,11 @@ object ZunexCatalog {
             clearData = prefs("news"),
         ),
         CatalogApp(
+            BuiltInApp.Browser, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_browser, R.string.store_new_browser, Color(0xFF1BA1E2),
+            permissions = listOf(R.string.perm_label_internet), featured = true,
+            clearData = prefs("browser"),
+        ),
+        CatalogApp(
             BuiltInApp.Settings, "8.1.0", 1, StoreCategory.System, R.string.store_desc_settings, R.string.store_new_settings, Color(0xFF647687), required = true,
         ),
         CatalogApp(

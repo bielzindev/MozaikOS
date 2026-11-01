@@ -40,7 +40,8 @@ enum class BuiltInApp(
     Recorder("recorder", R.string.app_recorder, com.wpreborn.core.icons.Glyphs.Microphone, com.wpreborn.apps.recorder.RecorderActivity::class.java, TileSize.Small),
     Flashlight("flashlight", R.string.app_flashlight, WpIcons.Flashlight, com.wpreborn.apps.flashlight.FlashlightActivity::class.java, TileSize.Small),
     Maps("maps", R.string.app_maps, com.wpreborn.core.icons.Glyphs.MapPin, com.wpreborn.apps.maps.MapsActivity::class.java, TileSize.Medium),
-    News("news", R.string.app_news, com.wpreborn.core.icons.Glyphs.News, com.wpreborn.apps.news.NewsActivity::class.java, TileSize.Wide);
+    News("news", R.string.app_news, com.wpreborn.core.icons.Glyphs.News, com.wpreborn.apps.news.NewsActivity::class.java, TileSize.Wide),
+    Browser("browser", R.string.app_browser, WpIcons.Globe, com.wpreborn.apps.browser.BrowserActivity::class.java, TileSize.Medium);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

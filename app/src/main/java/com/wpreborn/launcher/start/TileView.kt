@@ -96,6 +96,7 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Flashlight -> IconTile(WpIcons.Flashlight, tile.size)
             BuiltInApp.Maps -> IconTile(com.wpreborn.core.icons.Glyphs.MapPin, tile.size)
             BuiltInApp.News -> NewsTile(tile.size, inputs.liveEnabled, seed)
+            BuiltInApp.Browser -> IconTile(WpIcons.Globe, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
       }

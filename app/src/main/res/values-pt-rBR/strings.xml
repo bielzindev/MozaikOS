@@ -730,4 +730,37 @@
         <item quantity="one">editar tags de %d música</item>
         <item quantity="other">editar tags de %d músicas</item>
     </plurals>
+    <string name="app_browser">Internet</string>
+    <string name="browser_address_hint">Pesquise ou digite um endereço</string>
+    <string name="browser_stop">parar</string>
+    <string name="browser_more">mais</string>
+    <string name="browser_forward">avançar</string>
+    <string name="browser_new_tab">nova guia</string>
+    <string name="browser_new_inprivate">nova guia InPrivate</string>
+    <string name="browser_add_favorite">adicionar aos favoritos</string>
+    <string name="browser_remove_favorite">remover dos favoritos</string>
+    <string name="browser_hub">favoritos e histórico</string>
+    <string name="browser_find">localizar na página</string>
+    <string name="browser_find_prev">anterior</string>
+    <string name="browser_find_next">próximo</string>
+    <string name="browser_desktop_site">versão para computador</string>
+    <string name="browser_mobile_site">versão para celular</string>
+    <string name="browser_settings">configurações</string>
+    <string name="browser_tabs">guias</string>
+    <string name="browser_favorites">favoritos</string>
+    <string name="browser_history">histórico</string>
+    <string name="browser_no_favorites">Nenhum favorito ainda. Adicione pelo menu ...</string>
+    <string name="browser_no_history">Sem histórico.</string>
+    <string name="browser_frequent">frequentes</string>
+    <string name="browser_frequent_empty">Os sites que você mais visita vão aparecer aqui.</string>
+    <string name="browser_inprivate_info">Guias InPrivate não salvam histórico, cache nem cookies de terceiros. Feche a guia para esquecer a página.</string>
+    <string name="browser_too_many_tabs">Feche uma guia para abrir outra.</string>
+    <string name="browser_downloading">Baixando %1$s</string>
+    <string name="browser_cleared">Histórico e dados dos sites excluídos.</string>
+    <string name="browser_search_engine">Mecanismo de pesquisa</string>
+    <string name="browser_clear">excluir histórico e dados</string>
+    <string name="browser_engine_info">As páginas são exibidas pelo Chromium (Android System WebView), o motor do Chrome, atualizado pela Google Play.</string>
+    <string name="browser_make_default">tornar o navegador padrão</string>
+    <string name="store_desc_browser">Navegador no estilo Metro do Internet Explorer do Windows Phone 8.1, rodando em Chromium: barra de endereço embaixo, guias com miniaturas, InPrivate, favoritos e histórico, sites frequentes, localizar na página, versão para computador, downloads.</string>
+    <string name="store_new_browser">Primeira versão.</string>
 </resources>

@@ -729,4 +729,37 @@
         <item quantity="one">edit tags of %d song</item>
         <item quantity="other">edit tags of %d songs</item>
     </plurals>
+    <string name="app_browser">Internet</string>
+    <string name="browser_address_hint">Search or enter address</string>
+    <string name="browser_stop">stop</string>
+    <string name="browser_more">more</string>
+    <string name="browser_forward">forward</string>
+    <string name="browser_new_tab">new tab</string>
+    <string name="browser_new_inprivate">new InPrivate tab</string>
+    <string name="browser_add_favorite">add to favourites</string>
+    <string name="browser_remove_favorite">remove from favourites</string>
+    <string name="browser_hub">favourites and history</string>
+    <string name="browser_find">find on page</string>
+    <string name="browser_find_prev">previous</string>
+    <string name="browser_find_next">next</string>
+    <string name="browser_desktop_site">desktop version</string>
+    <string name="browser_mobile_site">mobile version</string>
+    <string name="browser_settings">settings</string>
+    <string name="browser_tabs">tabs</string>
+    <string name="browser_favorites">favourites</string>
+    <string name="browser_history">history</string>
+    <string name="browser_no_favorites">No favourites yet. Add one from the ... menu.</string>
+    <string name="browser_no_history">No history.</string>
+    <string name="browser_frequent">frequent</string>
+    <string name="browser_frequent_empty">The sites you visit most will appear here.</string>
+    <string name="browser_inprivate_info">InPrivate tabs don\'t save history, cache or third-party cookies. Close the tab to forget the page.</string>
+    <string name="browser_too_many_tabs">Close a tab to open another one.</string>
+    <string name="browser_downloading">Downloading %1$s</string>
+    <string name="browser_cleared">History and site data deleted.</string>
+    <string name="browser_search_engine">Search engine</string>
+    <string name="browser_clear">delete history and data</string>
+    <string name="browser_engine_info">Pages are shown by Chromium (Android System WebView), the engine of Chrome, kept up to date by Google Play.</string>
+    <string name="browser_make_default">make it the default browser</string>
+    <string name="store_desc_browser">A browser in the Metro style of Internet Explorer on Windows Phone 8.1, running on Chromium: address bar at the bottom, tabs with thumbnails, InPrivate, favourites and history, frequent sites, find on page, desktop version, downloads.</string>
+    <string name="store_new_browser">First release.</string>
 </resources>

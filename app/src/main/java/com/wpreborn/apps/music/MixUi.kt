@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wpreborn.R
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.graphicsLayer
 import com.wpreborn.core.motion.tilt
@@ -402,7 +403,21 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                 label = "track",
             ) { _ ->
             Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp), verticalAlignment = Alignment.Top) {
-                Art(playback, null, Modifier.size(150.dp).background(accent), grey = false)
+                // Swipe the cover: left for the next song, right for the previous one.
+                var dragX by remember { androidx.compose.runtime.mutableFloatStateOf(0f) }
+                Art(
+                    playback, null,
+                    Modifier.size(150.dp).background(accent).pointerInput(Unit) {
+                        androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                            onDragEnd = {
+                                if (dragX < -120f) controller.next() else if (dragX > 120f) controller.previousTrack()
+                                dragX = 0f
+                            },
+                            onDragCancel = { dragX = 0f },
+                        ) { change, amount -> change.consume(); dragX += amount }
+                    }.graphicsLayer { translationX = dragX * 0.5f },
+                    grey = false,
+                )
                 Spacer(Modifier.width(12.dp))
                 Column(Modifier.weight(1f).height(150.dp)) {
                     WpText(playback.title, style = WpType.Large.copy(fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -446,9 +461,11 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
             }
             Spacer(Modifier.height(12.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+                RoundButton(WpIcons.Previous, filled = false, accent = accent, size = 52.dp) { controller.previous() }
+                Spacer(Modifier.width(22.dp))
                 RoundButton(if (playback.playing) WpIcons.Pause else WpIcons.Play, filled = false, accent = accent, size = 64.dp) { controller.togglePlay() }
-                Spacer(Modifier.width(28.dp))
-                RoundButton(WpIcons.Next, filled = false, accent = accent, size = 64.dp) { controller.next() }
+                Spacer(Modifier.width(22.dp))
+                RoundButton(WpIcons.Next, filled = false, accent = accent, size = 52.dp) { controller.next() }
             }
         }
         // "..." at the bottom right, as on MixRadio's player.

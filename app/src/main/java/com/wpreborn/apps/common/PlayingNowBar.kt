@@ -30,6 +30,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import kotlinx.coroutines.launch
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -66,9 +70,33 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
         Box(Modifier.fillMaxWidth().height(2.dp).background(Wp.palette.divider)) {
             Box(Modifier.fillMaxWidth(playback.progress.coerceAtLeast(0.001f)).height(2.dp).background(Wp.accent))
         }
+        // Drag sideways: left for the next song, right for the previous one.
+        val drag = remember { androidx.compose.animation.core.Animatable(0f) }
+        val scope = androidx.compose.runtime.rememberCoroutineScope()
+        val threshold = with(androidx.compose.ui.platform.LocalDensity.current) { 72.dp.toPx() }
         Row(
             Modifier
                 .fillMaxWidth()
+                .pointerInput(playback.own) {
+                    detectHorizontalDragGestures(
+                        onDragEnd = {
+                            val d = drag.value
+                            when {
+                                d < -threshold -> playback.next(context)
+                                d > threshold -> playback.previousTrack(context)
+                            }
+                            scope.launch { drag.animateTo(0f, androidx.compose.animation.core.tween(220)) }
+                        },
+                        onDragCancel = { scope.launch { drag.animateTo(0f) } },
+                    ) { change, amount ->
+                        change.consume()
+                        scope.launch { drag.snapTo(drag.value + amount) }
+                    }
+                }
+                .graphicsLayer {
+                    translationX = drag.value
+                    alpha = 1f - (kotlin.math.abs(drag.value) / (threshold * 3)).coerceIn(0f, 0.5f)
+                }
                 .wpClickable(tilt = false) { playback.openPlayer(context) }
                 .padding(start = 10.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,

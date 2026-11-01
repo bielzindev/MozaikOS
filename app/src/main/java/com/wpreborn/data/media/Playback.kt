@@ -52,6 +52,7 @@ data class Playback(
     fun togglePlay(context: Context) = if (own) MusicController.get(context).togglePlay() else ExternalMediaWatcher.playPause()
     fun next(context: Context) { if (own) MusicController.get(context).next() else ExternalMediaWatcher.next() }
     fun previous(context: Context) { if (own) MusicController.get(context).previous() else ExternalMediaWatcher.previous() }
+    fun previousTrack(context: Context) { if (own) MusicController.get(context).previousTrack() else ExternalMediaWatcher.previous() }
     fun seekTo(context: Context, ms: Long) { if (own) MusicController.get(context).seekTo(ms) else ExternalMediaWatcher.seekTo(ms) }
 
     /** Opens the full player: ours, or the app that is playing. */

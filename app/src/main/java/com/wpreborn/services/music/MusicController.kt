@@ -194,6 +194,8 @@ class MusicController private constructor(private val context: Context) {
 
     fun togglePlay() = withController { if (it.isPlaying) it.pause() else it.play() }
     fun next() = withController { it.seekToNextMediaItem() }
+    /** Straight to the previous song (the back button restarts the song first after 3 s). */
+    fun previousTrack() = withController { c -> if (c.hasPreviousMediaItem()) c.seekToPreviousMediaItem() else c.seekTo(0) }
     fun previous() = withController { if (it.currentPosition > 3000) it.seekTo(0) else it.seekToPreviousMediaItem() }
     fun seekTo(ms: Long) = withController { it.seekTo(ms) }
     fun toggleShuffle() = withController { it.shuffleModeEnabled = !it.shuffleModeEnabled }

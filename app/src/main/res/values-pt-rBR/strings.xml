@@ -769,4 +769,20 @@
     <string name="music_save_queue">salvar fila como playlist</string>
     <string name="music_crossfade_off">transição gradual: desligada</string>
     <string name="music_crossfade_on">transição gradual: %1$d s</string>
+    <string name="music_search">pesquisar</string>
+    <string name="music_search_hint">músicas, artistas, álbuns, playlists</string>
+    <string name="music_search_none">Nada encontrado.</string>
+    <string name="music_play_next">tocar em seguida</string>
+    <string name="music_add_queue">adicionar à fila</string>
+    <string name="music_clear_queue">limpar fila</string>
+    <string name="music_edit_queue">editar fila</string>
+    <string name="music_sleep">timer de sono</string>
+    <string name="music_sleep_off">desligar timer</string>
+    <string name="music_sleep_minutes">em %1$d minutos</string>
+    <string name="music_sleep_end">no fim desta música</string>
+    <string name="music_sleep_until_end">timer de sono: fim da música</string>
+    <string name="music_sleep_left">timer de sono: %1$d min</string>
+    <string name="music_go_album">ir para o álbum</string>
+    <string name="music_go_artist">ir para o artista</string>
+    <string name="music_rename_playlist">renomear playlist</string>
 </resources>

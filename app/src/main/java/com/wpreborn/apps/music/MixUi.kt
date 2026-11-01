@@ -31,6 +31,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.ColorMatrix
@@ -121,6 +122,7 @@ fun MixHome(
     onLibrary: (Int) -> Unit,
     onClassic: () -> Unit,
     onChanged: () -> Unit = {},
+    onSearch: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
@@ -254,6 +256,7 @@ fun MixHome(
         if (homeMenu) {
             MenuOverlay(
                 listOf(
+                    stringResource(R.string.music_search) to onSearch,
                     stringResource(R.string.music_new_playlist) to { newPlaylist = true; Unit },
                     stringResource(R.string.mix_classic) to onClassic,
                 ),
@@ -290,7 +293,7 @@ private fun MixTile(m: Mix, accent: Color, modifier: Modifier, onClick: () -> Un
  * large round play / next buttons.
  */
 @Composable
-fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}) {
+fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: (String) -> Unit = {}, onArtist: (String) -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
     val playback = rememberPlayback()
@@ -305,6 +308,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}) {
     var menu by remember { mutableStateOf(false) }
     var queue by remember { mutableStateOf(false) }
     var playlistFor by remember { mutableStateOf<List<Long>?>(null) }
+    var sleepMenu by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Art(playback, null, Modifier.fillMaxSize(), grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -371,7 +375,8 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}) {
             contentAlignment = Alignment.Center,
         ) { WpIcon(WpIcons.More, tint = Color.White, size = 22.dp) }
 
-        if (queue) QueueOverlay(playback, accent, onPick = { controller.skipAhead(it + 1); queue = false }) { queue = false }
+        if (queue) QueueEditor(playback, accent) { queue = false }
+        if (sleepMenu) SleepMenu { sleepMenu = false }
         if (menu) {
             val fade = com.wpreborn.services.music.Crossfade.seconds(context)
             MenuOverlay(
@@ -383,6 +388,9 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}) {
                         com.wpreborn.services.music.Crossfade.cycle(context)
                         Unit
                     },
+                    sleepLabel() to { sleepMenu = true; Unit },
+                    stringResource(R.string.music_go_album) to { playback.mediaId?.let(onAlbum); Unit },
+                    stringResource(R.string.music_go_artist) to { playback.mediaId?.let(onArtist); Unit },
                     stringResource(R.string.eq_title) to onEqualizer,
                 ),
             ) { menu = false }
@@ -409,27 +417,81 @@ fun MenuOverlay(items: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
     }
 }
 
-/** "up next": the queue over the player; tap a song to play it. */
+/**
+ * "up next": the queue over the player, like Spotify's: tap a song to play it, move it
+ * earlier or later, take it out, or clear everything after the current song.
+ */
 @Composable
-private fun QueueOverlay(playback: Playback, accent: Color, onPick: (Int) -> Unit, onDismiss: () -> Unit) {
+fun QueueEditor(playback: Playback, accent: Color, onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val controller = remember { MusicController.get(context) }
     androidx.activity.compose.BackHandler(onBack = onDismiss)
-    Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.88f)).padding(start = 20.dp, top = 14.dp, end = 16.dp)) {
+    // Re-read the queue whenever it changes (the player publishes its state).
+    val ui by controller.ui.collectAsState()
+    var version by remember { mutableStateOf(0) }
+    val entries = remember(ui.queueSize, ui.index, ui.shuffle, version) { controller.upNext() }
+    Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.92f)).padding(start = 20.dp, top = 14.dp, end = 8.dp)) {
         WpText(stringResource(R.string.music_title).uppercase(), style = WpType.AppTitle, color = Color.White)
         WpText(stringResource(R.string.music_up_next), style = WpType.Header, color = Color.White, maxLines = 1, softWrap = false)
-        WpText(playback.title, style = WpType.Large, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp, bottom = 8.dp))
+        WpText(playback.title, style = WpType.Large, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+        WpText(playback.artist, style = WpType.Small, color = Color.White.copy(alpha = 0.7f), maxLines = 1, modifier = Modifier.padding(bottom = 10.dp))
         androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
-            if (playback.nextTitles.isEmpty()) item { WpText(stringResource(R.string.music_queue_end), style = WpType.Large, color = Color.White.copy(alpha = 0.6f)) }
-            items(playback.nextTitles.size) { i ->
-                WpText(
-                    playback.nextTitles[i],
-                    style = WpType.Large.copy(fontSize = 22.sp),
-                    color = Color.White,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.fillMaxWidth().wpClickable { onPick(i) }.padding(vertical = 8.dp),
-                )
+            if (entries.isEmpty()) item { WpText(stringResource(R.string.music_queue_end), style = WpType.Large, color = Color.White.copy(alpha = 0.6f)) }
+            items(entries.size, key = { entries[it].index.toString() + entries[it].mediaId }) { i ->
+                val e = entries[i]
+                Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f).wpClickable { controller.playAt(e.index); onDismiss() }) {
+                        WpText(e.title, style = WpType.Large.copy(fontSize = 20.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        WpText(e.artist, style = WpType.Small, color = Color.White.copy(alpha = 0.65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                    if (!ui.shuffle) {
+                        SmallIcon(WpIcons.Back, "↑", enabled = i > 0) { controller.move(e.index, -1); version++ }
+                        SmallIcon(WpIcons.Forward, "↓", enabled = i < entries.lastIndex) { controller.move(e.index, 1); version++ }
+                    }
+                    SmallIcon(WpIcons.Close, "×", enabled = true) { controller.removeAt(e.index); version++ }
+                }
             }
         }
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
+            WpText(stringResource(R.string.music_clear_queue), style = WpType.Normal, color = Color.White, modifier = Modifier.wpClickable { controller.clearUpNext(); version++ }.padding(10.dp))
+            WpText(stringResource(R.string.ok), style = WpType.Normal, color = Color.White, modifier = Modifier.wpClickable(onClick = onDismiss).padding(10.dp))
+        }
+    }
+}
+
+@Composable
+private fun SmallIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, desc: String, enabled: Boolean, onClick: () -> Unit) {
+    Box(
+        Modifier.size(40.dp).then(if (enabled) Modifier.wpClickable(onClick = onClick) else Modifier),
+        contentAlignment = Alignment.Center,
+    ) {
+        // Back/Forward arrows turned to point up and down for "move".
+        val rot = when (desc) { "↑" -> 90f; "↓" -> 90f; else -> 0f }
+        WpIcon(icon, tint = Color.White.copy(alpha = if (enabled) 1f else 0.3f), size = 20.dp, modifier = Modifier.rotate(rot))
+    }
+}
+
+/** Sleep timer choices, as a menu. */
+@Composable
+fun SleepMenu(onDismiss: () -> Unit) {
+    val context = LocalContext.current
+    val now = remember { com.wpreborn.services.music.SleepTimer.state(context) }
+    val items = buildList<Pair<String, () -> Unit>> {
+        if (now != null) add(stringResource(R.string.music_sleep_off) to { com.wpreborn.services.music.SleepTimer.cancel(context); Unit })
+        listOf(5, 15, 30, 45, 60).forEach { m -> add(stringResource(R.string.music_sleep_minutes, m) to { com.wpreborn.services.music.SleepTimer.set(context, m); Unit }) }
+        add(stringResource(R.string.music_sleep_end) to { com.wpreborn.services.music.SleepTimer.endOfSong(context); Unit })
+    }
+    MenuOverlay(items, onDismiss)
+}
+
+/** The sleep timer's label for menus. */
+@Composable
+fun sleepLabel(): String {
+    val context = LocalContext.current
+    return when (val s = com.wpreborn.services.music.SleepTimer.state(context)) {
+        null -> stringResource(R.string.music_sleep)
+        -1 -> stringResource(R.string.music_sleep_until_end)
+        else -> stringResource(R.string.music_sleep_left, s)
     }
 }
 

@@ -83,6 +83,8 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
     val favorites by remember { Favorites.get(context) }.ids.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
     var savingQueue by remember { mutableStateOf<List<Long>?>(null) }
+    var editingQueue by remember { mutableStateOf(false) }
+    var sleepMenu by remember { mutableStateOf(false) }
     var crossfadeTick by remember { mutableStateOf(0) }
 
     // The Playing Now bar would repeat this screen.
@@ -189,6 +191,8 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
                     AppBarMenuItem(stringResource(if (showQueue) R.string.music_now_playing else R.string.music_up_next)) { showQueue = !showQueue },
                     AppBarMenuItem(stringResource(R.string.eq_title)) { onEqualizer() },
                     AppBarMenuItem(stringResource(R.string.music_save_queue)) { savingQueue = controller.queueIds() },
+                    AppBarMenuItem(stringResource(R.string.music_edit_queue)) { editingQueue = true },
+                    AppBarMenuItem(sleepLabel()) { sleepMenu = true },
                     AppBarMenuItem(
                         remember(crossfadeTick) { com.wpreborn.services.music.Crossfade.seconds(context) }.let { if (it == 0) stringResource(R.string.music_crossfade_off) else stringResource(R.string.music_crossfade_on, it) },
                     ) { com.wpreborn.services.music.Crossfade.cycle(context); crossfadeTick++ },
@@ -199,6 +203,8 @@ fun NowPlayingScreen(onEqualizer: () -> Unit) {
         )
     }
     savingQueue?.let { ids -> PlaylistPicker(ids, onDone = { savingQueue = null }) { savingQueue = null } }
+    if (editingQueue && playback != null) QueueEditor(playback, Wp.accent) { editingQueue = false }
+    if (sleepMenu) SleepMenu { sleepMenu = false }
     }
     }
 }

@@ -183,6 +183,10 @@ class MusicLibrary(private val context: Context) {
         }
     }
 
+    suspend fun renamePlaylist(playlistId: String, name: String) {
+        saveUserPlaylists(userPlaylists().map { if (it.id == playlistId) it.copy(name = name) else it })
+    }
+
     /** Takes the songs at [positions] out of a ZUNEX playlist (the files stay). */
     suspend fun removeFromPlaylist(playlistId: String, positions: Set<Int>) {
         saveUserPlaylists(userPlaylists().map { p -> if (p.id == playlistId) p.copy(songIds = p.songIds.filterIndexed { i, _ -> i !in positions }) else p })

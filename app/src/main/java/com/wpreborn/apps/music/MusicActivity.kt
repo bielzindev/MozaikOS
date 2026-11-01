@@ -99,6 +99,7 @@ private sealed interface MusicPage {
     data object Equalizer : MusicPage
     /** The classic collection pivot opened from the new interface, on one of its pages. */
     data class Library(val page: Int) : MusicPage
+    data object Search : MusicPage
 }
 
 /**
@@ -153,6 +154,7 @@ class MusicActivity : WpActivity() {
                                 col, mixes,
                                 onNowPlaying = { nav.navigate(MusicPage.NowPlaying) },
                                 onLibrary = { nav.navigate(MusicPage.Library(it)) },
+                                onSearch = { nav.navigate(MusicPage.Search) },
                                 onClassic = { switchUi(false) },
                                 onChanged = { reload++ },
                             )
@@ -173,10 +175,22 @@ class MusicActivity : WpActivity() {
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
                         } ?: GoneBack(col != null) { nav.pop() }
-                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(onEqualizer = { nav.navigate(MusicPage.Equalizer) }, onChanged = { reload++ })
+                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(
+                            onEqualizer = { nav.navigate(MusicPage.Equalizer) },
+                            onChanged = { reload++ },
+                            onAlbum = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.let { s -> col.albums.firstOrNull { a -> a.songs.any { it.id == s.id } }?.let { nav.navigate(MusicPage.AlbumPage(it.id)) } } },
+                            onArtist = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.artist?.takeIf { it.isNotBlank() }?.let { nav.navigate(MusicPage.ArtistPage(it)) } },
+                        )
                             else NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
+                        MusicPage.Search -> SearchPage(
+                            col,
+                            onPlay = { list, i -> controller.playSongs(list, i); nav.navigate(MusicPage.NowPlaying) },
+                            onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
+                            onAlbum = { nav.navigate(MusicPage.AlbumPage(it)) },
+                            onPlaylist = { nav.navigate(MusicPage.PlaylistPage(it)) },
+                        )
                     }
                 }
             }
@@ -374,6 +388,14 @@ private fun CollectionPage(
                     }
                     if (selKind == 3) {
                         add(
+                            AppBarButton(WpIcons.Playlist, stringResource(R.string.music_add_queue), enabled = selected.isNotEmpty()) {
+                                controller.addToQueue(col.songs.filter { it.id.toString() in selected })
+                                clearSel()
+                            },
+                        )
+                    }
+                    if (selKind == 3) {
+                        add(
                             AppBarButton(WpIcons.Add, stringResource(R.string.music_add_to_playlist), enabled = selected.isNotEmpty() && userPlaylists.isNotEmpty()) {
                                 addMany = col.songs.filter { it.id.toString() in selected }
                             },
@@ -390,8 +412,9 @@ private fun CollectionPage(
                         },
                     )
                     add(AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { clearSel() })
-                } else if (granted && col != null && page in 2..4) {
-                    listOf(AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select)) { selKind = page; selected = emptySet() })
+                } else if (granted && col != null) {
+                    listOf(AppBarButton(WpIcons.Search, stringResource(R.string.music_search)) { nav.navigate(MusicPage.Search) }) +
+                        if (page in 2..4) listOf(AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select)) { selKind = page; selected = emptySet() }) else emptyList()
                 } else {
                     emptyList()
                 },
@@ -417,6 +440,8 @@ private fun CollectionPage(
             WpContextMenu(
                 items = listOf(
                     ContextMenuItem(stringResource(R.string.music_play)) { controller.playSongs(listOf(s)) },
+                    ContextMenuItem(stringResource(R.string.music_play_next)) { controller.playNext(listOf(s)) },
+                    ContextMenuItem(stringResource(R.string.music_add_queue)) { controller.addToQueue(listOf(s)) },
                     ContextMenuItem(stringResource(R.string.music_add_to_playlist), enabled = !col?.playlists.orEmpty().none { !it.system }) { addTo = s },
                     ContextMenuItem(stringResource(R.string.music_rename)) { songActions.rename(s) },
                     ContextMenuItem(stringResource(R.string.music_edit_tags)) { songActions.editTags(listOf(s)) },
@@ -616,6 +641,8 @@ private fun AlbumDetail(album: Album, controller: MusicController, songActions: 
         WpContextMenu(
             items = listOf(
                 ContextMenuItem(stringResource(R.string.music_play)) { controller.playSongs(listOf(song)) },
+                ContextMenuItem(stringResource(R.string.music_play_next)) { controller.playNext(listOf(song)) },
+                ContextMenuItem(stringResource(R.string.music_add_queue)) { controller.addToQueue(listOf(song)) },
                 ContextMenuItem(stringResource(R.string.music_rename)) { songActions.rename(song) },
                 ContextMenuItem(stringResource(R.string.music_edit_tags)) { songActions.editTags(listOf(song)) },
                 ContextMenuItem(stringResource(R.string.delete)) { songActions.delete(song) },
@@ -634,6 +661,7 @@ private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicCont
     // Positions in the playlist (a song can be in it twice), for "remove".
     val entries = remember(p, songs) { val byId = songs.associateBy { it.id }; p.songIds.mapIndexedNotNull { i, id -> byId[id]?.let { i to it } } }
     var sel by remember(p.id) { mutableStateOf<Set<Int>?>(null) }
+    var renaming by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = sel != null) { sel = null }
     Column(Modifier.fillMaxSize()) {
         WpPageHeader(stringResource(R.string.music_playlists), p.name)
@@ -687,7 +715,19 @@ private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicCont
                     }
                 },
             ) else emptyList(),
+            menuItems = if (!p.system) listOf(
+                com.wpreborn.core.ui.AppBarMenuItem(stringResource(R.string.music_rename_playlist)) { renaming = true },
+            ) else emptyList(),
         )
+        if (renaming) {
+            NameDialog(stringResource(R.string.music_rename_playlist), p.name, onDismiss = { renaming = false }) { name ->
+                renaming = false
+                scope.launch {
+                    MusicLibrary(context).renamePlaylist(p.id, name)
+                    onChanged()
+                }
+            }
+        }
     }
 }
 
@@ -733,4 +773,21 @@ private fun SelectBox(checked: Boolean, modifier: Modifier = Modifier, onImage: 
 @Composable
 private fun GoneBack(loaded: Boolean, back: () -> Unit) {
     if (loaded) androidx.compose.runtime.LaunchedEffect(Unit) { back() }
+}
+
+/** A name box in a Windows Phone dialog (playlist names). */
+@Composable
+private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(initial) }
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).wpClickable(onClick = onDismiss)) {
+        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome).wpClickable { }.padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp)) {
+            WpText(title, style = WpType.Large)
+            WpTextBox(name, { name = it }, Modifier.fillMaxWidth().padding(top = 12.dp))
+            Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WpButton(stringResource(R.string.save), Modifier.weight(1f)) { if (name.isNotBlank()) onSave(name.trim()) }
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+            }
+        }
+    }
 }

@@ -122,6 +122,68 @@ class MusicController private constructor(private val context: Context) {
         if (c.mediaItemCount == 0) c.stop()
     }
 
+    /** One song of the queue, in play order after the current one ([index] in the player). */
+    data class QueueEntry(val index: Int, val mediaId: String, val title: String, val artist: String)
+
+    /** What plays after the current song, in play order (shuffle and repeat included). */
+    fun upNext(max: Int = 200): List<QueueEntry> {
+        val c = controller ?: return emptyList()
+        val out = ArrayList<QueueEntry>()
+        var i = c.nextMediaItemIndex
+        val start = c.currentMediaItemIndex
+        while (i != androidx.media3.common.C.INDEX_UNSET && i != start && out.size < max) {
+            val m = c.getMediaItemAt(i)
+            out += QueueEntry(i, m.mediaId, m.mediaMetadata.title?.toString().orEmpty(), m.mediaMetadata.artist?.toString().orEmpty())
+            i = c.currentTimeline.getNextWindowIndex(i, androidx.media3.common.Player.REPEAT_MODE_OFF, c.shuffleModeEnabled)
+        }
+        return out
+    }
+
+    /** "Play next": right after the current song. */
+    fun playNext(songs: List<Song>) = withController { c ->
+        if (c.mediaItemCount == 0) {
+            playSongs(songs)
+        } else {
+            c.addMediaItems(c.currentMediaItemIndex + 1, songs.map { it.toMediaItem() })
+            publish()
+        }
+    }
+
+    /** "Add to queue": at the end. */
+    fun addToQueue(songs: List<Song>) = withController { c ->
+        if (c.mediaItemCount == 0) {
+            playSongs(songs)
+        } else {
+            c.addMediaItems(songs.map { it.toMediaItem() })
+            publish()
+        }
+    }
+
+    fun removeAt(index: Int) = withController { c ->
+        if (index in 0 until c.mediaItemCount && index != c.currentMediaItemIndex) c.removeMediaItem(index)
+        publish()
+    }
+
+    /** Moves a queued song one place earlier or later in the list. */
+    fun move(index: Int, by: Int) = withController { c ->
+        val to = index + by
+        if (index in 0 until c.mediaItemCount && to in 0 until c.mediaItemCount && index != c.currentMediaItemIndex && to != c.currentMediaItemIndex) {
+            c.moveMediaItem(index, to)
+        }
+        publish()
+    }
+
+    /** Leaves only the current song in the queue. */
+    fun clearUpNext() = withController { c ->
+        val cur = c.currentMediaItemIndex
+        if (cur < 0) return@withController
+        if (cur + 1 < c.mediaItemCount) c.removeMediaItems(cur + 1, c.mediaItemCount)
+        if (cur > 0) c.removeMediaItems(0, cur)
+        publish()
+    }
+
+    fun playAt(index: Int) = withController { c -> if (index in 0 until c.mediaItemCount) { c.seekTo(index, 0); c.play() } }
+
     /** The songs of the queue in order (their ids), for "save as playlist". */
     fun queueIds(): List<Long> = controller?.let { c -> (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).mediaId.toLongOrNull() } }.orEmpty()
 

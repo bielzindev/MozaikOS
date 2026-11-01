@@ -168,12 +168,12 @@ fun MixHome(
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val g = 6.dp
                 val labelSpace = 64.dp
-                val u = minOf(maxWidth * 0.185f, (maxHeight - labelSpace) / 6.4f).coerceAtLeast(48.dp)
+                val u = minOf(maxWidth * 0.18f, (maxHeight - labelSpace) / 6.4f).coerceAtLeast(48.dp)
                 val art = u * 2.6f
                 val big = u * 2f
                 val small = u * 1.15f
-                val xB = art + g * 2.5f
-                val xC = xB + big + g * 2.5f
+                val xB = art + g * 1.8f
+                val xC = xB + big + g * 1.8f
                 val canvasWidth = xC + big
                 val bottom = maxHeight - labelSpace
                 Box(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp)) {
@@ -183,7 +183,7 @@ fun MixHome(
                             Art(playback, bgSong, Modifier.fillMaxSize(), grey = false)
                             WpText(
                                 if (playback != null) fmt(playback.positionMs) else "0:00",
-                                style = WpType.Header.copy(fontSize = (art.value * 0.46f).sp, lineHeight = (art.value * 0.46f).sp, fontWeight = FontWeight.Bold),
+                                style = WpType.Header.copy(fontSize = (art.value * 0.5f).sp, lineHeight = (art.value * 0.5f).sp, fontWeight = FontWeight.Bold),
                                 color = Color.White.copy(alpha = 0.78f),
                                 maxLines = 1,
                                 softWrap = false,
@@ -269,17 +269,33 @@ fun MixHome(
 /** A small square of the mix column: the cover of a mix, or a translucent accent square. */
 @Composable
 private fun SmallSquare(m: Mix?, accent: Color, modifier: Modifier, onPlay: (Mix) -> Unit) {
-    val art by rememberThumbnail(m?.songs?.firstOrNull()?.albumArtUri, 256)
+    // Live: the square flips now and then to another cover of its mix, like MixRadio's tiles.
+    val covers = remember(m) { m?.songs?.map { it.albumArtUri }?.distinct()?.take(6).orEmpty() }
     Box(modifier.background(accent.copy(alpha = 0.55f)).then(if (m != null) Modifier.wpClickable { onPlay(m) } else Modifier)) {
-        art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        if (covers.isNotEmpty()) {
+            com.wpreborn.launcher.start.FlippingCell(covers, 0, (m?.id ?: "").hashCode(), enabled = covers.size > 1) { uri ->
+                val art by rememberThumbnail(uri, 256)
+                Box(Modifier.fillMaxSize().background(accent.copy(alpha = 0.55f))) {
+                    art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                }
+            }
+        }
     }
 }
 
 @Composable
 private fun MixTile(m: Mix, accent: Color, modifier: Modifier, onClick: () -> Unit) {
-    val art by rememberThumbnail(m.songs.getOrNull(1)?.albumArtUri ?: m.songs.firstOrNull()?.albumArtUri, 384)
+    // Live: the covers of the mix's songs slide up one after another (cycle tile).
+    val covers = remember(m) { m.songs.map { it.albumArtUri }.distinct().take(6) }
     Box(modifier.background(accent).wpClickable(onClick = onClick)) {
-        art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        if (covers.isNotEmpty()) {
+            com.wpreborn.launcher.start.CycleTile(covers, enabled = covers.size > 1, seed = m.id.hashCode()) { uri ->
+                val art by rememberThumbnail(uri, 384)
+                Box(Modifier.fillMaxSize().background(accent)) {
+                    art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                }
+            }
+        }
         // Caption on an accent band, as on MixRadio's mix tiles.
         Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(accent.copy(alpha = 0.82f)).padding(horizontal = 8.dp, vertical = 6.dp)) {
             WpText(m.title, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)

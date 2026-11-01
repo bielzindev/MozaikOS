@@ -234,6 +234,30 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         render()
     }
 
+    /**
+     * The user moved the cursor (tapped elsewhere in the text, or the app moved it): the word
+     * being typed is left as it is and typing continues where the cursor now is, instead of
+     * going on with the old word (which made the cursor jump back to it).
+     */
+    override fun onUpdateSelection(oldSelStart: Int, oldSelEnd: Int, newSelStart: Int, newSelEnd: Int, candidatesStart: Int, candidatesEnd: Int) {
+        super.onUpdateSelection(oldSelStart, oldSelEnd, newSelStart, newSelEnd, candidatesStart, candidatesEnd)
+        val typing = composingText().isNotEmpty()
+        // Our own updates always leave the cursor at the end of the word's composing region;
+        // anything else is the user (late updates from our own commits have no region and are
+        // ignored, so fast typing isn't cut).
+        val awayFromWord = candidatesStart >= 0 && (newSelStart != newSelEnd || newSelEnd != candidatesEnd)
+        if (typing && awayFromWord) {
+            ic()?.finishComposingText()
+            resetComposing()
+            correctionShown = null
+            updateSuggestions()
+        } else if (!typing && newSelStart != oldSelStart && candidatesStart < 0) {
+            // Cursor moved with nothing being typed: fresh suggestions for the new place.
+            undoCorrection = null
+            updateSuggestions()
+        }
+    }
+
     override fun onFinishInput() {
         super.onFinishInput()
         commitComposing()

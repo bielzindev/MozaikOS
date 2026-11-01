@@ -106,7 +106,12 @@ object ArtistBios {
         val norm = name.lowercase().filter { it.isLetterOrDigit() }
         for (i in 0 until hits.length()) {
             val title = hits.getJSONObject(i).getString("title")
-            if (!title.lowercase().filter { it.isLetterOrDigit() }.contains(norm.take(6))) continue
+            // The page must be about this artist: its title holds the whole name
+            // (not a list, a discography or a song of theirs).
+            val t = title.lowercase().filter { it.isLetterOrDigit() }
+            if (!t.contains(norm) || t.length > norm.length + 14) continue
+            val low = title.lowercase()
+            if (listOf("discograph", "discografia", "lista de", "list of", "song", "canção", "álbum", "album", "tour", "turnê").any { it in low }) continue
             val s = JSONObject(get("https://$lang.wikipedia.org/api/rest_v1/page/summary/" + URLEncoder.encode(title.replace(' ', '_'), "UTF-8")))
             if (s.optString("type") == "disambiguation") continue
             val text = s.optString("extract")

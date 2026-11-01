@@ -292,7 +292,14 @@ fun rememberWebImage(url: String?, size: Int): State<ImageBitmap?> {
     val context = LocalContext.current
     val initial = remember(url, size) { url?.let { WebImages.cached(it, size)?.asImageBitmap() } }
     return produceState(initial, url, size) {
-        if (url != null && value == null) value = WebImages.load(context, url, size)?.asImageBitmap()
+        // When the address changes the state still holds the previous picture: always load
+        // the new one (or clear it), so nothing shows another item's picture.
+        val cached = url?.let { WebImages.cached(it, size) }
+        value = when {
+            url == null -> null
+            cached != null -> cached.asImageBitmap()
+            else -> WebImages.load(context, url, size)?.asImageBitmap()
+        }
     }
 }
 

@@ -192,7 +192,7 @@ class MusicActivity : WpActivity() {
                         is MusicPage.AlbumPage -> col?.albums?.firstOrNull { it.id == page.id }?.let { AlbumDetail(it, controller, songActions) }
                             ?: GoneBack(col != null) { nav.pop() }
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
-                            PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
+                            PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ }, allSongs = col.songs)
                         } ?: GoneBack(col != null) { nav.pop() }
                         MusicPage.NowPlaying -> if (useMix) MixNowPlaying(
                             onEqualizer = { nav.navigate(MusicPage.Equalizer) },
@@ -750,18 +750,29 @@ private fun AlbumDetail(album: Album, controller: MusicController, songActions: 
 }
 
 @Composable
-private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicController, onDeleted: () -> Unit, onChanged: () -> Unit) {
+private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicController, onDeleted: () -> Unit, onChanged: () -> Unit, allSongs: List<Song> = emptyList()) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     // Positions in the playlist (a song can be in it twice), for "remove".
     val entries = remember(p, songs) { val byId = songs.associateBy { it.id }; p.songIds.mapIndexedNotNull { i, id -> byId[id]?.let { i to it } } }
     var sel by remember(p.id) { mutableStateOf<Set<Int>?>(null) }
     var renaming by remember { mutableStateOf(false) }
+    var picking by remember { mutableStateOf(false) }
     androidx.activity.compose.BackHandler(enabled = sel != null) { sel = null }
     Column(Modifier.fillMaxSize()) {
         WpPageHeader(stringResource(R.string.music_playlists), p.name)
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, bottom = 16.dp)) {
-            if (songs.isEmpty()) item { CenteredMessage(stringResource(R.string.music_playlist_empty)) }
+            if (songs.isEmpty()) item {
+                CenteredMessage(stringResource(R.string.music_playlist_empty))
+                if (!p.system) {
+                    WpText(
+                        stringResource(R.string.music_add_songs),
+                        style = WpType.Large,
+                        color = Wp.accent,
+                        modifier = Modifier.padding(top = 12.dp).wpClickable { picking = true }.padding(vertical = 6.dp),
+                    )
+                }
+            }
             itemsIndexed(entries, key = { _, e -> "${e.first}-${e.second.id}" }) { i, (pos, s) ->
                 SongRow(
                     s,
@@ -802,6 +813,7 @@ private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicCont
                 AppBarButton(WpIcons.Play, stringResource(R.string.music_play), enabled = songs.isNotEmpty()) { controller.playSongs(songs) },
                 AppBarButton(WpIcons.Shuffle, stringResource(R.string.music_shuffle), enabled = songs.isNotEmpty()) { controller.playSongs(songs.shuffled(), shuffle = true) },
             ) + if (!p.system) listOf(
+                AppBarButton(WpIcons.Add, stringResource(R.string.music_add_songs)) { picking = true },
                 AppBarButton(WpIcons.SelectAll, stringResource(R.string.music_select), enabled = songs.isNotEmpty()) { sel = emptySet() },
                 AppBarButton(WpIcons.Delete, stringResource(R.string.delete)) {
                     scope.launch {
@@ -814,6 +826,15 @@ private fun PlaylistDetail(p: Playlist, songs: List<Song>, controller: MusicCont
                 com.wpreborn.core.ui.AppBarMenuItem(stringResource(R.string.music_rename_playlist)) { renaming = true },
             ) else emptyList(),
         )
+        if (picking) {
+            SongPicker(allSongs, already = p.songIds.toSet(), onDismiss = { picking = false }) { ids ->
+                picking = false
+                if (ids.isNotEmpty()) scope.launch {
+                    MusicLibrary(context).addToPlaylist(p.id, ids)
+                    onChanged()
+                }
+            }
+        }
         if (renaming) {
             NameDialog(stringResource(R.string.music_rename_playlist), p.name, onDismiss = { renaming = false }) { name ->
                 renaming = false
@@ -884,5 +905,44 @@ private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, on
                 WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
             }
         }
+    }
+}
+
+/** Pick songs to add to a playlist: search box and check boxes, like the 8.1 "add songs". */
+@Composable
+private fun SongPicker(all: List<Song>, already: Set<Long>, onDismiss: () -> Unit, onDone: (List<Long>) -> Unit) {
+    var q by remember { mutableStateOf("") }
+    var chosen by remember { mutableStateOf(listOf<Long>()) }
+    androidx.activity.compose.BackHandler(onBack = onDismiss)
+    val shown = remember(all, q) {
+        val n = q.trim().lowercase()
+        all.filter { n.isEmpty() || it.title.lowercase().contains(n) || it.artist.lowercase().contains(n) || it.album.lowercase().contains(n) }
+    }
+    Column(Modifier.fillMaxSize().background(Wp.palette.background)) {
+        Column(Modifier.padding(start = 20.dp, top = 14.dp, end = 20.dp)) {
+            WpText(stringResource(R.string.music_title).uppercase(), style = WpType.AppTitle)
+            WpText(stringResource(R.string.music_add_songs), style = WpType.Header, maxLines = 1, softWrap = false)
+            WpTextBox(q, { q = it }, Modifier.fillMaxWidth().padding(top = 4.dp), placeholder = stringResource(R.string.music_search_hint))
+        }
+        LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp)) {
+            items(shown.size, key = { shown[it].id }) { i ->
+                val s = shown[i]
+                val on = s.id in chosen
+                Row(Modifier.fillMaxWidth().wpClickable { chosen = if (on) chosen - s.id else chosen + s.id }.padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    SelectBox(on)
+                    Spacer(Modifier.width(14.dp))
+                    Column(Modifier.weight(1f)) {
+                        WpText(s.title, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis, color = if (s.id in already) Wp.palette.subtle else Wp.palette.foreground)
+                        WpText(s.artist, style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        }
+        WpAppBar(
+            buttons = listOf(
+                AppBarButton(WpIcons.Check, stringResource(R.string.music_add_songs), enabled = chosen.isNotEmpty()) { onDone(chosen) },
+                AppBarButton(WpIcons.Close, stringResource(R.string.cancel), onClick = onDismiss),
+            ),
+        )
     }
 }

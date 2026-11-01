@@ -91,7 +91,12 @@ class MusicController private constructor(private val context: Context) {
         }
     }
 
-    fun playSongs(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false) = withController { c ->
+    private val _source = kotlinx.coroutines.flow.MutableStateFlow<String?>(null)
+    /** What the queue was started from ("PLAY ME · artist", a mix...), shown in the player. */
+    val source: kotlinx.coroutines.flow.StateFlow<String?> = _source
+
+    fun playSongs(songs: List<Song>, startIndex: Int = 0, shuffle: Boolean = false, source: String? = null) = withController { c ->
+        _source.value = source
         session++
         c.setMediaItems(songs.map { it.toMediaItem() }, startIndex.coerceIn(0, (songs.size - 1).coerceAtLeast(0)), 0L)
         c.shuffleModeEnabled = shuffle

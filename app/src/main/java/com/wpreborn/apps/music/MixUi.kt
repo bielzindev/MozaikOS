@@ -132,15 +132,24 @@ fun MixHome(
     val bgSong = recent.firstOrNull() ?: col?.songs?.firstOrNull()
 
     var homeMenu by remember { mutableStateOf(false) }
+    var createMix by remember { mutableStateOf(false) }
+    val playMeLabel = stringResource(R.string.mix_play_me).uppercase()
     var newPlaylist by remember { mutableStateOf(false) }
 
     fun playMe() {
-        val songs = col?.songs.orEmpty()
-        if (songs.isEmpty()) return
-        // "Play me": your radio - favourites first, then everything, shuffled.
-        val fav = Favorites.get(context).ids.value
-        val picked = (songs.filter { it.id.toString() in fav }.shuffled() + songs.shuffled()).distinctBy { it.id }
-        controller.playSongs(picked, 0, shuffle = false)
+        val c = col ?: return
+        if (c.songs.isEmpty()) return
+        // "play me": a radio seeded from one of your favourite artists, broadening to music
+        // like it; each press starts from the next favourite artist (see PlayMe).
+        val prefs = context.getSharedPreferences("music", android.content.Context.MODE_PRIVATE)
+        val seed = prefs.getInt("playMeSeed", 0)
+        prefs.edit().putInt("playMeSeed", seed + 1).apply()
+        val (artist, list) = com.wpreborn.data.media.PlayMe.build(
+            c, com.wpreborn.data.media.PlayStats.get(context).counts(), Favorites.get(context).ids.value,
+            com.wpreborn.data.media.Votes.get(context).votes.value, seed,
+        )
+        if (list.isEmpty()) return
+        controller.playSongs(list, 0, shuffle = false, source = playMeLabel + if (artist.isNotBlank()) " · $artist" else "")
         onNowPlaying()
     }
 
@@ -257,10 +266,23 @@ fun MixHome(
             MenuOverlay(
                 listOf(
                     stringResource(R.string.music_search) to onSearch,
+                    stringResource(R.string.mix_create) to { createMix = true; Unit },
                     stringResource(R.string.music_new_playlist) to { newPlaylist = true; Unit },
                     stringResource(R.string.mix_classic) to onClassic,
                 ),
             ) { homeMenu = false }
+        }
+        if (createMix && col != null) {
+            ArtistPicker(col) { chosen ->
+                createMix = false
+                if (chosen.isNotEmpty()) {
+                    val list = com.wpreborn.data.media.PlayMe.fromArtists(col, chosen, com.wpreborn.data.media.Votes.get(context).votes.value)
+                    if (list.isNotEmpty()) {
+                        controller.playSongs(list, 0, source = chosen.joinToString(" + ").uppercase())
+                        onNowPlaying()
+                    }
+                }
+            }
         }
         if (newPlaylist) PlaylistPicker(emptyList(), startWithNew = true, onDone = { newPlaylist = false; onChanged() }) { newPlaylist = false }
     }
@@ -325,6 +347,9 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
     var queue by remember { mutableStateOf(false) }
     var playlistFor by remember { mutableStateOf<List<Long>?>(null) }
     var sleepMenu by remember { mutableStateOf(false) }
+    val votesStore = remember { com.wpreborn.data.media.Votes.get(context) }
+    val votes by votesStore.votes.collectAsState()
+    val source by controller.source.collectAsState()
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Art(playback, null, Modifier.fillMaxSize(), grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -336,7 +361,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
         Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 14.dp, end = 16.dp), verticalAlignment = Alignment.Top) {
             WpIcon(Glyphs.Radio, tint = accent, size = 20.dp)
             Spacer(Modifier.width(6.dp))
-            WpText(playback.album.ifBlank { stringResource(R.string.music_title) }.uppercase(), style = WpType.AppTitle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+            WpText((source ?: playback.album.ifBlank { stringResource(R.string.music_title) }).uppercase(), style = WpType.AppTitle, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 RoundButton(WpIcons.Shuffle, filled = playback.shuffle, accent = accent, size = 40.dp) { controller.toggleShuffle() }
                 RoundButton(
@@ -355,9 +380,17 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                     Spacer(Modifier.weight(1f))
                     Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
                         val fav = playback.mediaId != null && playback.mediaId in favorites
-                        RoundButton(Glyphs.Heart, filled = fav, accent = accent, size = 42.dp) { playback.mediaId?.let { Favorites.get(context).toggle(it) } }
-                        RoundButton(WpIcons.Previous, filled = false, accent = accent, size = 42.dp) { controller.previous() }
-                        RoundButton(WpIcons.Sound, filled = true, accent = accent, size = 42.dp, onClick = onEqualizer)
+                        // MixRadio's three: thumbs up, thumbs down (skips, and never again in
+                        // "play me"), and the star (favourites).
+                        val vote = playback.mediaId?.let { votes[it] } ?: 0
+                        RoundButton(ThumbUp, filled = vote == 1, accent = accent, size = 42.dp) { playback.mediaId?.let { votesStore.vote(it, 1) } }
+                        RoundButton(ThumbUp, filled = vote == -1, accent = accent, size = 42.dp, rotate = 180f) {
+                            playback.mediaId?.let { id ->
+                                votesStore.vote(id, -1)
+                                if (votesStore.votes.value[id] == -1) controller.next()
+                            }
+                        }
+                        RoundButton(WpIcons.Star, filled = fav, accent = accent, size = 42.dp) { playback.mediaId?.let { Favorites.get(context).toggle(it) } }
                     }
                 }
             }
@@ -573,7 +606,7 @@ fun PlaylistPicker(songIds: List<Long>, startWithNew: Boolean = false, onDone: (
 
 /** MixRadio's round buttons: a white ring, or filled with the accent when on. */
 @Composable
-private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, filled: Boolean, accent: Color, size: Dp, onClick: () -> Unit) {
+private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, filled: Boolean, accent: Color, size: Dp, rotate: Float = 0f, onClick: () -> Unit) {
     Box(
         Modifier
             .size(size)
@@ -582,6 +615,49 @@ private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, f
             .wpClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
-        WpIcon(icon, tint = Color.White, size = size * 0.5f)
+        WpIcon(icon, tint = Color.White, size = size * 0.5f, modifier = Modifier.rotate(rotate))
+    }
+}
+
+/** Thumb (Material Design "thumb up" path, Apache 2.0); rotated for thumbs down. */
+private val ThumbUp: androidx.compose.ui.graphics.vector.ImageVector by lazy {
+    androidx.compose.ui.graphics.vector.ImageVector.Builder("thumb", 24.dp, 24.dp, 24f, 24f).addPath(
+        androidx.compose.ui.graphics.vector.PathParser().parsePathString(
+            "M1,21h4V9H1v12zM23,10c0,-1.1 -0.9,-2 -2,-2h-6.31l0.95,-4.57 0.03,-0.32c0,-0.41 -0.17,-0.79 -0.44,-1.06L14.17,1 7.59,7.59C7.22,7.95 7,8.45 7,9v10c0,1.1 0.9,2 2,2h9c0.83,0 1.54,-0.5 1.84,-1.22l3.02,-7.05c0.09,-0.23 0.14,-0.47 0.14,-0.73v-2z",
+        ).toNodes(),
+        fill = androidx.compose.ui.graphics.SolidColor(Color.White),
+    ).build()
+}
+
+/** "create a mix": choose up to three artists. */
+@Composable
+private fun ArtistPicker(col: MusicCollection, onDone: (List<String>) -> Unit) {
+    var chosen by remember { mutableStateOf(listOf<String>()) }
+    androidx.activity.compose.BackHandler { onDone(emptyList()) }
+    val artists = remember(col) { col.artists.map { it.name }.filter { it.isNotBlank() && it != com.wpreborn.data.media.MusicLibrary.UNKNOWN } }
+    Column(Modifier.fillMaxSize().background(Wp.palette.background).padding(start = 20.dp, top = 14.dp, end = 16.dp)) {
+        WpText("ZUNEX MIX", style = WpType.AppTitle)
+        WpText(stringResource(R.string.mix_create), style = WpType.Header, maxLines = 1, softWrap = false)
+        WpText(stringResource(R.string.mix_create_hint), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 8.dp))
+        androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {
+            items(artists.size) { i ->
+                val a = artists[i]
+                val on = a in chosen
+                WpText(
+                    a.lowercase(),
+                    style = WpType.ExtraLarge,
+                    color = if (on) Wp.accent else Wp.palette.foreground,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.fillMaxWidth().wpClickable {
+                        chosen = if (on) chosen - a else if (chosen.size < 3) chosen + a else chosen
+                    }.padding(vertical = 4.dp),
+                )
+            }
+        }
+        Row(Modifier.fillMaxWidth().padding(vertical = 10.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            com.wpreborn.core.ui.WpButton(stringResource(R.string.music_play), Modifier.weight(1f)) { onDone(chosen) }
+            com.wpreborn.core.ui.WpButton(stringResource(R.string.cancel), Modifier.weight(1f)) { onDone(emptyList()) }
+        }
     }
 }

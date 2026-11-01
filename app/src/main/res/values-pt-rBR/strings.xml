@@ -785,4 +785,6 @@
     <string name="music_go_album">ir para o álbum</string>
     <string name="music_go_artist">ir para o artista</string>
     <string name="music_rename_playlist">renomear playlist</string>
+    <string name="mix_create">criar um mix</string>
+    <string name="mix_create_hint">Escolha até três artistas; o mix junta músicas parecidas com as deles.</string>
 </resources>

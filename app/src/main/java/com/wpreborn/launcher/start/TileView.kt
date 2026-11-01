@@ -234,25 +234,39 @@ private fun MusicTile(size: TileSize, playing: NowPlaying?, artUri: Uri?, live: 
             WpText(playing.artist, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
-    if (size == TileSize.Medium) {
-        FlipTile(enabled = true, seed = seed, front = {
+    // Two faces that flip, as on Windows Phone: the artist's picture slowly panning and
+    // zooming with the song over a shade; and the album cover beside the song's name.
+    val artistFace: @Composable () -> Unit = {
+        Box(Modifier.fillMaxSize()) {
             KenBurns { ArtistImage(playing.artist) { AlbumArt(playing.art, artUri) } }
-        }, back = {
-            Box(Modifier.fillMaxSize()) {
-                AlbumArt(playing.art, artUri)
-                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
-                Caption(Modifier.padding(8.dp))
+            Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
+            if (size != TileSize.Medium) Caption(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 24.dp))
+        }
+    }
+    val coverFace: @Composable () -> Unit = {
+        if (size == TileSize.Medium) {
+            // Medium: the cover small at the top left, the song beside it and under it.
+            Column(Modifier.fillMaxSize().padding(8.dp)) {
+                Row(verticalAlignment = Alignment.Top) {
+                    Box(Modifier.size(56.dp)) { AlbumArt(playing.art, artUri) }
+                    Spacer(Modifier.width(8.dp))
+                    WpText(playing.artist, style = WpType.Small, color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                }
+                WpText(playing.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
             }
-        })
-        return
+        } else {
+            // Wide / large: the cover filling the tile's height on the left, the song beside it.
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxHeight().aspectRatio(1f)) { AlbumArt(playing.art, artUri) }
+                Column(Modifier.weight(1f).fillMaxHeight().padding(start = 10.dp, top = 8.dp, end = 8.dp, bottom = 24.dp)) {
+                    WpText(playing.title, style = WpType.Normal.copy(fontSize = 17.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                    WpText(playing.artist, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    if (playing.album.isNotBlank()) WpText(playing.album, style = WpType.Small, color = Color.White.copy(alpha = 0.75f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
     }
-    // Wide / large, like Xbox Music's tile on 8.1: the artist's picture slowly panning and
-    // zooming ("visualisations"), the song and artist over a shade at the bottom.
-    Box(Modifier.fillMaxSize()) {
-        KenBurns { ArtistImage(playing.artist) { AlbumArt(playing.art, artUri) } }
-        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.verticalGradient(0.45f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
-        Caption(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(start = 8.dp, end = 8.dp, bottom = 24.dp))
-    }
+    FlipTile(enabled = true, seed = seed, front = artistFace, back = coverFace)
 }
 
 @Composable

@@ -799,4 +799,5 @@
     <string name="mix_vote_down_title">Not for you?</string>
     <string name="mix_vote_down">You won\'t hear this song in your personal mixes again.</string>
     <string name="mix_share_three">share three songs</string>
+    <string name="music_search_recent">recent searches</string>
 </resources>

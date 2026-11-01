@@ -800,4 +800,5 @@
     <string name="mix_vote_down_title">Não curtiu?</string>
     <string name="mix_vote_down">Você não vai mais ouvir esta música nos seus mixes pessoais.</string>
     <string name="mix_share_three">compartilhar três músicas</string>
+    <string name="music_search_recent">pesquisas recentes</string>
 </resources>

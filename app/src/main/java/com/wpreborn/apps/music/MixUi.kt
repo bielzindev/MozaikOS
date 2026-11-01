@@ -162,10 +162,17 @@ fun MixHome(
                 WpText("ZUNEX", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
                 WpText("Mix", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Light), color = Color.White, maxLines = 1, softWrap = false)
             }
-            Box(
-                Modifier.padding(start = 18.dp, top = 4.dp, bottom = 12.dp).size(30.dp).border(2.dp, Color.White, CircleShape).wpClickable { homeMenu = true },
-                contentAlignment = Alignment.Center,
-            ) { WpIcon(WpIcons.More, tint = Color.White, size = 16.dp) }
+            // Round buttons under the title: search, and the menu.
+            Row(Modifier.padding(start = 18.dp, top = 4.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Box(
+                    Modifier.size(30.dp).border(2.dp, Color.White, CircleShape).wpClickable(onClick = onSearch),
+                    contentAlignment = Alignment.Center,
+                ) { WpIcon(WpIcons.Search, tint = Color.White, size = 16.dp) }
+                Box(
+                    Modifier.size(30.dp).border(2.dp, Color.White, CircleShape).wpClickable { homeMenu = true },
+                    contentAlignment = Alignment.Center,
+                ) { WpIcon(WpIcons.More, tint = Color.White, size = 16.dp) }
+            }
 
             // The canvas, measured on MixRadio: a unit of ~18.5% of the screen width. First
             // group: the playing cover (2.6 units) with its time, "play me" (2 units) stepped in

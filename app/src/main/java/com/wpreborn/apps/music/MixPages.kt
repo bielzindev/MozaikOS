@@ -65,7 +65,7 @@ import kotlinx.coroutines.delay
 
 /** A square picture of an artist: a cover of theirs, or the accent with a person glyph. */
 @Composable
-private fun ArtistPicture(col: MusicCollection, name: String, modifier: Modifier) {
+internal fun ArtistPicture(col: MusicCollection, name: String, modifier: Modifier) {
     val uri = remember(col, name) { col.artists.firstOrNull { it.name == name }?.albums?.firstOrNull()?.artUri }
     val img by rememberThumbnail(uri, 256)
     Box(modifier.background(Wp.accent), contentAlignment = Alignment.Center) {

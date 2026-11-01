@@ -1,6 +1,10 @@
 package com.wpreborn.apps.music
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +55,15 @@ fun SearchPage(
     val controller = remember { MusicController.get(context) }
     var q by remember { mutableStateOf("") }
     var menu by remember { mutableStateOf<Song?>(null) }
+    val prefs = remember { context.getSharedPreferences("music", android.content.Context.MODE_PRIVATE) }
+    var recent by remember { mutableStateOf(prefs.getString("searches", "").orEmpty().split('\n').filter { it.isNotBlank() }) }
+    /** Keeps a search in the recent list (newest first, eight at most). */
+    fun saveSearch(text: String) {
+        val t = text.trim()
+        if (t.length < 2) return
+        recent = (listOf(t) + recent.filterNot { it.equals(t, true) }).take(8)
+        prefs.edit().putString("searches", recent.joinToString("\n")).apply()
+    }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val n = norm(q.trim())
@@ -67,13 +80,39 @@ fun SearchPage(
                 WpTextBox(q, { q = it }, Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = stringResource(R.string.music_search_hint), focusRequester = focus)
             }
             LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)) {
+                // Empty box: your recent searches.
+                if (n.isEmpty()) {
+                    if (recent.isNotEmpty()) item { Group(stringResource(R.string.music_search_recent)) }
+                    items(recent, key = { "r$it" }) { r ->
+                        WpText(r, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().wpClickable { q = r }.padding(vertical = 6.dp))
+                    }
+                }
                 if (n.isNotEmpty() && songs.isEmpty() && artists.isEmpty() && albums.isEmpty() && playlists.isEmpty()) {
                     item { WpText(stringResource(R.string.music_search_none), style = WpType.Large, color = Wp.palette.subtle) }
                 }
                 if (artists.isNotEmpty()) {
                     item { Group(stringResource(R.string.music_artists)) }
                     items(artists, key = { "a" + it.name }) { a ->
-                        WpText(a.name.lowercase(), style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.fillMaxWidth().wpClickable { onArtist(a.name) }.padding(vertical = 4.dp))
+                        // Artist with a picture, and a round button that plays a mix of them.
+                        androidx.compose.foundation.layout.Row(
+                            Modifier.fillMaxWidth().wpClickable { saveSearch(q); onArtist(a.name) }.padding(vertical = 5.dp),
+                            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                        ) {
+                            ArtistPicture(col!!, a.name, Modifier.size(64.dp))
+                            androidx.compose.foundation.layout.Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f)) {
+                                WpText(a.name, style = WpType.Large.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                WpText(context.resources.getQuantityString(R.plurals.songs_count, a.songs.size, a.songs.size), style = WpType.Small, color = Wp.palette.subtle)
+                            }
+                            androidx.compose.foundation.layout.Box(
+                                Modifier.size(40.dp).border(2.dp, Wp.palette.foreground, CircleShape).wpClickable {
+                                    saveSearch(q)
+                                    val list = com.wpreborn.data.media.PlayMe.fromArtists(col, listOf(a.name), com.wpreborn.data.media.Votes.get(context).votes.value)
+                                    if (list.isNotEmpty()) onPlay(list, 0)
+                                },
+                                contentAlignment = androidx.compose.ui.Alignment.Center,
+                            ) { com.wpreborn.core.ui.WpIcon(com.wpreborn.core.icons.WpIcons.Play, size = 18.dp) }
+                        }
                     }
                 }
                 if (albums.isNotEmpty()) {
@@ -89,7 +128,7 @@ fun SearchPage(
                     item { Group(stringResource(R.string.music_songs)) }
                     items(songs.size, key = { "s" + songs[it].id }) { i ->
                         val s = songs[i]
-                        Column(Modifier.fillMaxWidth().wpCombinedClickable(onLongClick = { menu = s }) { onPlay(songs, i) }.padding(vertical = 5.dp)) {
+                        Column(Modifier.fillMaxWidth().wpCombinedClickable(onLongClick = { menu = s }) { saveSearch(q); onPlay(songs, i) }.padding(vertical = 5.dp)) {
                             WpText(s.title, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             WpText(listOf(s.artist, s.album).filter { it.isNotBlank() }.joinToString(" · "), style = WpType.Subtle, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }

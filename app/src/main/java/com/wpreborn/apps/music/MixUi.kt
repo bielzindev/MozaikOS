@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.wpreborn.R
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.animation.togetherWith
 import androidx.compose.ui.graphics.graphicsLayer
@@ -408,13 +409,13 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                 Art(
                     playback, null,
                     Modifier.size(150.dp).background(accent).pointerInput(Unit) {
-                        androidx.compose.foundation.gestures.detectHorizontalDragGestures(
+                        detectHorizontalDragGestures(
                             onDragEnd = {
                                 if (dragX < -120f) controller.next() else if (dragX > 120f) controller.previousTrack()
                                 dragX = 0f
                             },
                             onDragCancel = { dragX = 0f },
-                        ) { change, amount -> change.consume(); dragX += amount }
+                        ) { change: androidx.compose.ui.input.pointer.PointerInputChange, amount: Float -> change.consume(); dragX += amount }
                     }.graphicsLayer { translationX = dragX * 0.5f },
                     grey = false,
                 )

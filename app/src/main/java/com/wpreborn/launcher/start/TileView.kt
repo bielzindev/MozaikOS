@@ -205,31 +205,76 @@ private fun PhotosTile(size: TileSize, photos: List<Uri>, live: Boolean, seed: I
     }
 }
 
+/**
+ * Music: a live tile in all sizes, like MixRadio's. Playing: the cover with the song and
+ * artist (medium flips between the cover and the text; small shows the cover). Idle: the
+ * covers of your favourite and most played artists slide by.
+ */
 @Composable
 private fun MusicTile(size: TileSize, playing: NowPlaying?, artUri: Uri?, live: Boolean, seed: Int) {
-    if (!live || playing == null || size == TileSize.Small) {
+    if (!live) {
         Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Music, size) }
         return
     }
-    FlipTile(enabled = true, seed = seed, front = {
-        Box(Modifier.fillMaxSize()) {
-            AlbumArt(playing.art, artUri)
+    if (playing == null) {
+        IdleMusicTile(size, seed)
+        return
+    }
+    if (size == TileSize.Small) {
+        Box(Modifier.fillMaxSize()) { AlbumArt(playing.art, artUri) }
+        return
+    }
+    @Composable
+    fun Caption(modifier: Modifier) {
+        Column(modifier) {
+            WpText(playing.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            WpText(playing.artist, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-    }, back = {
-        Box(Modifier.fillMaxSize()) {
-            Row(Modifier.fillMaxSize()) {
-                if (size != TileSize.Medium) {
-                    Box(Modifier.fillMaxHeight().weight(1f)) {
-                        AlbumArt(playing.art, artUri)
-                    }
-                }
-                Column(Modifier.weight(1f).fillMaxHeight().padding(8.dp), verticalArrangement = Arrangement.Top) {
-                    WpText(playing.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                    WpText(playing.artist, style = WpType.Small, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+    }
+    if (size == TileSize.Medium) {
+        FlipTile(enabled = true, seed = seed, front = {
+            Box(Modifier.fillMaxSize()) { AlbumArt(playing.art, artUri) }
+        }, back = {
+            Box(Modifier.fillMaxSize()) {
+                AlbumArt(playing.art, artUri)
+                Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)))
+                Caption(Modifier.padding(8.dp))
             }
+        })
+        return
+    }
+    // Wide / large: the cover over the whole tile, the song and artist on a soft shade.
+    Box(Modifier.fillMaxSize()) {
+        AlbumArt(playing.art, artUri)
+        Box(Modifier.fillMaxSize().background(androidx.compose.ui.graphics.Brush.horizontalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.7f))))
+        Caption(Modifier.align(Alignment.TopEnd).fillMaxWidth(0.55f).padding(8.dp))
+    }
+}
+
+@Composable
+private fun IdleMusicTile(size: TileSize, seed: Int) {
+    val context = LocalContext.current
+    val covers by produceState<List<Uri>>(emptyList()) {
+        value = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val col = com.wpreborn.data.media.MusicLibrary(context).load()
+                val fav = com.wpreborn.data.media.FavoriteArtists.get(context).artists.value
+                val plays = com.wpreborn.data.media.PlayStats.get(context).counts()
+                val top = col.artists.sortedByDescending { a -> (if (a.name in fav) 1000 else 0) + a.songs.sumOf { plays[it.id] ?: 0 } }
+                (top.flatMap { it.albums } + col.albums.sortedByDescending { it.songs.maxOfOrNull { s -> s.dateAdded } ?: 0 })
+                    .distinctBy { it.id }.take(8).map { it.artUri }
+            }.getOrDefault(emptyList())
         }
-    })
+    }
+    if (covers.isEmpty() || size == TileSize.Small) {
+        Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Music, size) }
+        return
+    }
+    CycleTile(covers, enabled = covers.size > 1, seed = seed) { uri ->
+        Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 512) {
+            Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Music, size) }
+        }
+    }
 }
 
 @Composable

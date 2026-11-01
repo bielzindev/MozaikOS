@@ -28,6 +28,26 @@ class Votes private constructor(context: Context) {
     }
 }
 
+/** The artists you add to your favourites (MixRadio's "favorites › artists"). */
+class FavoriteArtists private constructor(context: Context) {
+    private val prefs = context.getSharedPreferences("music_fav_artists", Context.MODE_PRIVATE)
+    private val _artists = MutableStateFlow(prefs.getStringSet("artists", emptySet()).orEmpty())
+    val artists: StateFlow<Set<String>> = _artists.asStateFlow()
+
+    fun add(names: Collection<String>) = save(_artists.value + names)
+    fun remove(names: Collection<String>) = save(_artists.value - names.toSet())
+
+    private fun save(s: Set<String>) {
+        _artists.value = s
+        prefs.edit().putStringSet("artists", s).apply()
+    }
+
+    companion object {
+        @Volatile private var instance: FavoriteArtists? = null
+        fun get(context: Context) = instance ?: synchronized(this) { instance ?: FavoriteArtists(context.applicationContext).also { instance = it } }
+    }
+}
+
 /**
  * "play me", offline: personal radio from your own music, in the spirit of MixRadio.
  * It starts from one of your favourite artists (most played, liked, starred), mixes in your
@@ -36,7 +56,7 @@ class Votes private constructor(context: Context) {
  * press is a different radio.
  */
 object PlayMe {
-    fun artistScores(col: MusicCollection, plays: Map<Long, Int>, favorites: Set<String>, votes: Map<String, Int>): Map<String, Double> {
+    fun artistScores(col: MusicCollection, plays: Map<Long, Int>, favorites: Set<String>, votes: Map<String, Int>, chosen: Set<String> = emptySet()): Map<String, Double> {
         val score = HashMap<String, Double>()
         for (s in col.songs) {
             if (s.artist.isBlank() || s.artist == MusicLibrary.UNKNOWN) continue
@@ -49,14 +69,16 @@ object PlayMe {
             }
             score[s.artist] = (score[s.artist] ?: 0.0) + v
         }
+        // Artists you added to your favourites lead the radio.
+        for (a in chosen) score[a] = (score[a] ?: 0.0) + 25
         return score
     }
 
     /** A radio of about [size] songs seeded from the [seed]-th favourite artist. */
-    fun build(col: MusicCollection, plays: Map<Long, Int>, favorites: Set<String>, votes: Map<String, Int>, seed: Int, size: Int = 40): Pair<String, List<Song>> {
+    fun build(col: MusicCollection, plays: Map<Long, Int>, favorites: Set<String>, votes: Map<String, Int>, seed: Int, size: Int = 40, chosen: Set<String> = emptySet()): Pair<String, List<Song>> {
         val allowed = col.songs.filter { votes[it.id.toString()] != -1 }
         if (allowed.isEmpty()) return "" to emptyList()
-        val scores = artistScores(col, plays, favorites, votes)
+        val scores = artistScores(col, plays, favorites, votes, chosen)
         val ranked = scores.entries.filter { it.value > 0 }.sortedByDescending { it.value }.map { it.key }
             .ifEmpty { allowed.map { it.artist }.filter { it.isNotBlank() }.distinct().shuffled() }
         if (ranked.isEmpty()) return "" to allowed.shuffled().take(size)

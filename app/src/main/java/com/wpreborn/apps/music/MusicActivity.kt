@@ -100,6 +100,9 @@ private sealed interface MusicPage {
     /** The classic collection pivot opened from the new interface, on one of its pages. */
     data class Library(val page: Int) : MusicPage
     data object Search : MusicPage
+    data object Favorites : MusicPage
+    data object Mixes : MusicPage
+    data object PlayMeIntro : MusicPage
 }
 
 /**
@@ -139,6 +142,8 @@ class MusicActivity : WpActivity() {
             MusicUi.setMix(context, on)
             mixOverride = on
         }
+        val scope = rememberCoroutineScope()
+        val playMeLabel = stringResource(R.string.mix_play_me).uppercase()
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
         LaunchedEffect(nowPlayingRequests) {
             if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
@@ -155,6 +160,9 @@ class MusicActivity : WpActivity() {
                                 onNowPlaying = { nav.navigate(MusicPage.NowPlaying) },
                                 onLibrary = { nav.navigate(MusicPage.Library(it)) },
                                 onSearch = { nav.navigate(MusicPage.Search) },
+                                onMixes = { nav.navigate(MusicPage.Mixes) },
+                                onFavorites = { nav.navigate(MusicPage.Favorites) },
+                                onPlayMeIntro = { nav.navigate(MusicPage.PlayMeIntro) },
                                 onClassic = { switchUi(false) },
                                 onChanged = { reload++ },
                             )
@@ -184,6 +192,20 @@ class MusicActivity : WpActivity() {
                             else NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
+                        MusicPage.Favorites -> FavoritesPage(
+                            col,
+                            onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
+                            onPlay = { list, i -> controller.playSongs(list, i); nav.navigate(MusicPage.NowPlaying) },
+                        )
+                        MusicPage.Mixes -> MixesPage(
+                            mixes,
+                            onPlay = { m -> controller.playSongs(m.songs, 0, source = m.title.uppercase()); nav.navigate(MusicPage.NowPlaying) },
+                            onSave = { m -> scope.launch { val lib = MusicLibrary(context); val p = lib.createPlaylist(m.title); lib.addToPlaylist(p.id, m.songs.map { it.id }); reload++ } },
+                        )
+                        MusicPage.PlayMeIntro -> PlayMeIntro(col) {
+                            val c = col
+                            if (c != null && startPlayMe(context, c, playMeLabel)) nav.replace(MusicPage.NowPlaying)
+                        }
                         MusicPage.Search -> SearchPage(
                             col,
                             onPlay = { list, i -> controller.playSongs(list, i); nav.navigate(MusicPage.NowPlaying) },

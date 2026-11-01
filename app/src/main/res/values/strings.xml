@@ -786,4 +786,17 @@
     <string name="music_rename_playlist">rename playlist</string>
     <string name="mix_create">create a mix</string>
     <string name="mix_create_hint">Choose up to three artists; the mix adds music like theirs.</string>
+    <string name="mix_my_music">my music</string>
+    <string name="mix_whats_new">what\'s new</string>
+    <string name="mix_fav_empty">Add your favourite artists with +; artists you play and like are added for you too.</string>
+    <string name="mix_added_for_you">added for you</string>
+    <string name="mix_add_artist">add artists</string>
+    <string name="mix_remove_artist">remove</string>
+    <string name="mix_mixes_hint">Tap a mix to play it; press and hold to save it as a playlist.</string>
+    <string name="mix_intro">Start by adding your favourite artists to play a personal mix that learns from the music you love.</string>
+    <string name="mix_vote_up_title">Great track!</string>
+    <string name="mix_vote_up">You will hear more of this sort of music in your personal mixes.</string>
+    <string name="mix_vote_down_title">Not for you?</string>
+    <string name="mix_vote_down">You won\'t hear this song in your personal mixes again.</string>
+    <string name="mix_share_three">share three songs</string>
 </resources>

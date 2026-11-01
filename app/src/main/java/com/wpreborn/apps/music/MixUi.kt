@@ -123,6 +123,9 @@ fun MixHome(
     onClassic: () -> Unit,
     onChanged: () -> Unit = {},
     onSearch: () -> Unit = {},
+    onMixes: () -> Unit = {},
+    onFavorites: () -> Unit = {},
+    onPlayMeIntro: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
@@ -139,18 +142,13 @@ fun MixHome(
     fun playMe() {
         val c = col ?: return
         if (c.songs.isEmpty()) return
-        // "play me": a radio seeded from one of your favourite artists, broadening to music
-        // like it; each press starts from the next favourite artist (see PlayMe).
-        val prefs = context.getSharedPreferences("music", android.content.Context.MODE_PRIVATE)
-        val seed = prefs.getInt("playMeSeed", 0)
-        prefs.edit().putInt("playMeSeed", seed + 1).apply()
-        val (artist, list) = com.wpreborn.data.media.PlayMe.build(
-            c, com.wpreborn.data.media.PlayStats.get(context).counts(), Favorites.get(context).ids.value,
-            com.wpreborn.data.media.Votes.get(context).votes.value, seed,
-        )
-        if (list.isEmpty()) return
-        controller.playSongs(list, 0, shuffle = false, source = playMeLabel + if (artist.isNotBlank()) " · $artist" else "")
-        onNowPlaying()
+        if (com.wpreborn.data.media.FavoriteArtists.get(context).artists.value.isEmpty() &&
+            com.wpreborn.data.media.PlayStats.get(context).counts().isEmpty()
+        ) {
+            onPlayMeIntro()
+            return
+        }
+        if (startPlayMe(context, c, playMeLabel)) onNowPlaying()
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
@@ -183,7 +181,7 @@ fun MixHome(
                 val small = u * 1.15f
                 val xB = art + g * 1.8f
                 val xC = xB + big + g * 1.8f
-                val canvasWidth = xC + big
+                val canvasWidth = xC + big * 2 + g
                 val bottom = maxHeight - labelSpace
                 Box(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp)) {
                     Box(Modifier.width(canvasWidth).fillMaxHeight()) {
@@ -233,21 +231,29 @@ fun MixHome(
                             smallTurn = !smallTurn
                         }
 
-                        // Third column: the library, in accent tiles.
-                        listOf(
-                            R.string.music_artists to 1, R.string.music_albums to 2, R.string.music_songs to 3,
-                            R.string.music_playlists to 4, R.string.music_mixes to 0,
-                        ).forEachIndexed { k, (label, page) ->
-                            val h = u * 1.45f
-                            if ((h + g) * (k + 1) - g <= bottom + u) {
-                                Box(
-                                    Modifier.offset(xC, (h + g) * k).size(big, h).background(accent)
-                                        .wpClickable { onLibrary(page) }.padding(8.dp),
-                                ) {
-                                    WpText(stringResource(label).lowercase(), style = WpType.Normal.copy(fontSize = 15.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
+                        // Third section, as on MixRadio: the hub tiles - mixes, create a mix,
+                        // favourites (wide), my music, playlists.
+                        @Composable
+                        fun Hub(x: Dp, y: Dp, w: Dp, label: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, plus: Boolean = false, onClick: () -> Unit) {
+                            Box(Modifier.offset(x, y).size(w, big).background(accent).wpClickable(onClick = onClick).padding(8.dp)) {
+                                Box(Modifier.align(Alignment.Center).offset(y = (-8).dp)) {
+                                    WpIcon(icon, tint = Color.White, size = big * 0.38f)
+                                    if (plus) {
+                                        Box(
+                                            Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-6).dp).size(big * 0.17f).background(Color.White, CircleShape),
+                                            contentAlignment = Alignment.Center,
+                                        ) { WpIcon(WpIcons.Add, tint = accent, size = big * 0.12f) }
+                                    }
                                 }
+                                WpText(stringResource(label).lowercase(), style = WpType.Normal.copy(fontSize = 15.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
                             }
                         }
+                        val x2 = xC + big + g
+                        Hub(xC, 0.dp, big, R.string.music_mixes, WpIcons.Music) { onMixes() }
+                        Hub(x2, 0.dp, big, R.string.mix_create, WpIcons.Music, plus = true) { createMix = true }
+                        Hub(xC, big + g, big * 2 + g, R.string.mix_favorites, WpIcons.Star) { onFavorites() }
+                        Hub(xC, (big + g) * 2, big, R.string.mix_my_music, WpIcons.MusicNote) { onLibrary(1) }
+                        Hub(x2, (big + g) * 2, big, R.string.music_playlists, WpIcons.Playlist) { onLibrary(4) }
                     }
                 }
                 // "recently added", at the bottom left like MixRadio's "recently played".
@@ -350,6 +356,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
     val votesStore = remember { com.wpreborn.data.media.Votes.get(context) }
     val votes by votesStore.votes.collectAsState()
     val source by controller.source.collectAsState()
+    var banner by remember { mutableStateOf<Boolean?>(null) }
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         Art(playback, null, Modifier.fillMaxSize(), grey = true, size = 720)
         Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f)))
@@ -383,11 +390,13 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                         // MixRadio's three: thumbs up, thumbs down (skips, and never again in
                         // "play me"), and the star (favourites).
                         val vote = playback.mediaId?.let { votes[it] } ?: 0
-                        RoundButton(ThumbUp, filled = vote == 1, accent = accent, size = 42.dp) { playback.mediaId?.let { votesStore.vote(it, 1) } }
-                        RoundButton(ThumbUp, filled = vote == -1, accent = accent, size = 42.dp, rotate = 180f) {
+                        RoundButton(ThumbUpIcon, filled = vote == 1, accent = accent, size = 42.dp) {
+                            playback.mediaId?.let { votesStore.vote(it, 1); if (votesStore.votes.value[it] == 1) banner = true }
+                        }
+                        RoundButton(ThumbUpIcon, filled = vote == -1, accent = accent, size = 42.dp, rotate = 180f) {
                             playback.mediaId?.let { id ->
                                 votesStore.vote(id, -1)
-                                if (votesStore.votes.value[id] == -1) controller.next()
+                                if (votesStore.votes.value[id] == -1) { controller.next(); banner = false }
                             }
                         }
                         RoundButton(WpIcons.Star, filled = fav, accent = accent, size = 42.dp) { playback.mediaId?.let { Favorites.get(context).toggle(it) } }
@@ -426,6 +435,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
 
         if (queue) QueueEditor(playback, accent) { queue = false }
         if (sleepMenu) SleepMenu { sleepMenu = false }
+        banner?.let { up -> Box(Modifier.align(Alignment.TopCenter)) { VoteBanner(up) { banner = null } } }
         if (menu) {
             val fade = com.wpreborn.services.music.Crossfade.seconds(context)
             MenuOverlay(
@@ -438,6 +448,9 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                         Unit
                     },
                     sleepLabel() to { sleepMenu = true; Unit },
+                    stringResource(R.string.mix_share_three) to {
+                        shareThree(context, listOfNotNull(playback.mediaId?.toLongOrNull()) + controller.upNext(2).mapNotNull { it.mediaId.toLongOrNull() })
+                    },
                     stringResource(R.string.music_go_album) to { playback.mediaId?.let(onAlbum); Unit },
                     stringResource(R.string.music_go_artist) to { playback.mediaId?.let(onArtist); Unit },
                     stringResource(R.string.eq_title) to onEqualizer,
@@ -620,7 +633,7 @@ private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, f
 }
 
 /** Thumb (Material Design "thumb up" path, Apache 2.0); rotated for thumbs down. */
-private val ThumbUp: androidx.compose.ui.graphics.vector.ImageVector by lazy {
+internal val ThumbUpIcon: androidx.compose.ui.graphics.vector.ImageVector by lazy {
     androidx.compose.ui.graphics.vector.ImageVector.Builder("thumb", 24.dp, 24.dp, 24f, 24f).addPath(
         androidx.compose.ui.graphics.vector.PathParser().parsePathString(
             "M1,21h4V9H1v12zM23,10c0,-1.1 -0.9,-2 -2,-2h-6.31l0.95,-4.57 0.03,-0.32c0,-0.41 -0.17,-0.79 -0.44,-1.06L14.17,1 7.59,7.59C7.22,7.95 7,8.45 7,9v10c0,1.1 0.9,2 2,2h9c0.83,0 1.54,-0.5 1.84,-1.22l3.02,-7.05c0.09,-0.23 0.14,-0.47 0.14,-0.73v-2z",
@@ -660,4 +673,22 @@ private fun ArtistPicker(col: MusicCollection, onDone: (List<String>) -> Unit) {
             com.wpreborn.core.ui.WpButton(stringResource(R.string.cancel), Modifier.weight(1f)) { onDone(emptyList()) }
         }
     }
+}
+
+/**
+ * Starts "play me" (see PlayMe): a radio seeded from one of your favourite artists; each call
+ * seeds from the next one. Returns false when there's nothing to play.
+ */
+fun startPlayMe(context: android.content.Context, col: MusicCollection, label: String): Boolean {
+    val prefs = context.getSharedPreferences("music", android.content.Context.MODE_PRIVATE)
+    val seed = prefs.getInt("playMeSeed", 0)
+    prefs.edit().putInt("playMeSeed", seed + 1).apply()
+    val (artist, list) = com.wpreborn.data.media.PlayMe.build(
+        col, com.wpreborn.data.media.PlayStats.get(context).counts(), Favorites.get(context).ids.value,
+        com.wpreborn.data.media.Votes.get(context).votes.value, seed,
+        chosen = com.wpreborn.data.media.FavoriteArtists.get(context).artists.value,
+    )
+    if (list.isEmpty()) return false
+    MusicController.get(context).playSongs(list, 0, shuffle = false, source = label + if (artist.isNotBlank()) " · $artist" else "")
+    return true
 }

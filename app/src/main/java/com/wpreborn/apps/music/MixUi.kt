@@ -183,21 +183,21 @@ fun MixHome(
                             Art(playback, bgSong, Modifier.fillMaxSize(), grey = false)
                             WpText(
                                 if (playback != null) fmt(playback.positionMs) else "0:00",
-                                style = WpType.Header.copy(fontSize = (art.value * 0.42f).sp, lineHeight = (art.value * 0.42f).sp, fontWeight = FontWeight.SemiBold),
-                                color = Color.White.copy(alpha = 0.72f),
+                                style = WpType.Header.copy(fontSize = (art.value * 0.46f).sp, lineHeight = (art.value * 0.46f).sp, fontWeight = FontWeight.Bold),
+                                color = Color.White.copy(alpha = 0.78f),
                                 maxLines = 1,
                                 softWrap = false,
-                                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-2).dp, y = art * 0.07f),
+                                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-4).dp, y = art * 0.13f),
                             )
                         }
                         // "play me"
-                        Box(Modifier.offset(u * 0.9f, art + g).size(big).background(accent).wpClickable { playMe() }.padding(8.dp)) {
+                        Box(Modifier.offset(art - big, art + g).size(big).background(accent).wpClickable { playMe() }.padding(8.dp)) {
                             WpIcon(WpIcons.Play, tint = Color.White, size = big * 0.45f, modifier = Modifier.align(Alignment.Center).offset(y = (-6).dp))
                             WpText(stringResource(R.string.mix_play_me).lowercase(), style = WpType.Normal.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
                         }
                         // Small square stepped once more: shuffle everything.
                         Box(
-                            Modifier.offset(u * 1.6f, art + big + g * 2).size(small).background(accent.copy(alpha = 0.7f)).wpClickable {
+                            Modifier.offset(art - small, art + big + g * 2).size(small).background(accent.copy(alpha = 0.7f)).wpClickable {
                                 col?.songs?.takeIf { it.isNotEmpty() }?.let { controller.playSongs(it.shuffled(), 0, shuffle = true); onNowPlaying() }
                             },
                             contentAlignment = Alignment.Center,

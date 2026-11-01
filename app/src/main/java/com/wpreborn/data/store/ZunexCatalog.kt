@@ -58,7 +58,7 @@ object ZunexCatalog {
             permissions = listOf(R.string.perm_label_sms, R.string.perm_label_contacts), dependsOn = listOf(BuiltInApp.People),
         ),
         CatalogApp(
-            BuiltInApp.Music, "3.0.0", 30, StoreCategory.Media, R.string.store_desc_music, R.string.store_new_music, Color(0xFFFA6800),
+            BuiltInApp.Music, "3.1.0 beta", 31, StoreCategory.Media, R.string.store_desc_music, R.string.store_new_music, Color(0xFFFA6800),
             permissions = listOf(R.string.perm_label_audio, R.string.perm_label_notifications), featured = true,
             clearData = { c ->
                 prefs("music_queue", "music_favorites", "play_stats", "equalizer")(c)

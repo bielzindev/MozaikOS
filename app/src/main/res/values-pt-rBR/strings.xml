@@ -481,7 +481,7 @@
     <string name="store_desc_messaging">Conversas de texto nos balões do Windows Phone. Pode ser o app de SMS do celular.</string>
     <string name="store_new_messaging">Contagem de não lidas no bloco.</string>
     <string name="store_desc_music">Sua coleção de músicas, mixes no estilo MixRadio, player do Windows Phone, equalizador de verdade, favoritas e playlists.</string>
-    <string name="store_new_music">Tocando Agora em todo o sistema, widget na tela de bloqueio, equalizador, favoritas, renomear e excluir músicas.</string>
+    <string name="store_new_music">Nova interface (beta) no estilo do Nokia MixRadio: rádio \"toque e ouça\", tempo grande sobre o que está tocando, mixes num painel lateral, fotos em preto e branco e botões redondos no player. Alterne entre a interface nova e a clássica no menu .... Também: seleção e exclusão em massa, editar tags, ocultar artista desconhecido.</string>
     <string name="store_desc_photos">Rolo da câmera, álbuns, visualizador e editor com filtros.</string>
     <string name="store_new_photos">Cópias editadas salvas em Pictures/ZUNEX.</string>
     <string name="store_desc_camera">No estilo Lumia Camera: fotos e vídeos, flash, temporizador, grade, câmera frontal e exposição e zoom no modo pro.</string>
@@ -763,4 +763,6 @@
     <string name="browser_make_default">tornar o navegador padrão</string>
     <string name="store_desc_browser">Navegador no estilo Metro do Internet Explorer do Windows Phone 8.1, rodando em Chromium: barra de endereço embaixo, guias com miniaturas, InPrivate, favoritos e histórico, sites frequentes, localizar na página, versão para computador, downloads.</string>
     <string name="store_new_browser">Primeira versão.</string>
+    <string name="mix_try_beta">nova interface (beta)</string>
+    <string name="mix_get_beta">nova interface: atualize na Loja</string>
 </resources>

@@ -480,7 +480,7 @@
     <string name="store_desc_messaging">Text conversations in Windows Phone bubbles. Can be your phone\'s SMS app.</string>
     <string name="store_new_messaging">Unread count on the tile.</string>
     <string name="store_desc_music">Your music collection, MixRadio-style mixes, a Windows Phone player, a real equalizer, favourites and playlists.</string>
-    <string name="store_new_music">Playing Now everywhere, lock screen widget, equalizer, favourites, rename and delete songs.</string>
+    <string name="store_new_music">New interface (beta) in the style of Nokia MixRadio: \"play me\" radio, big time over what\'s playing, mixes in a sideways canvas, black-and-white pictures and round buttons in the player. Switch between the new and the classic interface in the ... menu. Also: select and delete in bulk, edit tags, hide the unknown artist.</string>
     <string name="store_desc_photos">Camera roll, albums, viewer and an editor with filters.</string>
     <string name="store_new_photos">Edited copies saved to Pictures/ZUNEX.</string>
     <string name="store_desc_camera">Lumia Camera style: photos and videos, flash, timer, grid, front camera and pro exposure and zoom.</string>
@@ -762,4 +762,6 @@
     <string name="browser_make_default">make it the default browser</string>
     <string name="store_desc_browser">A browser in the Metro style of Internet Explorer on Windows Phone 8.1, running on Chromium: address bar at the bottom, tabs with thumbnails, InPrivate, favourites and history, frequent sites, find on page, desktop version, downloads.</string>
     <string name="store_new_browser">First release.</string>
+    <string name="mix_try_beta">new interface (beta)</string>
+    <string name="mix_get_beta">new interface: update in the Store</string>
 </resources>

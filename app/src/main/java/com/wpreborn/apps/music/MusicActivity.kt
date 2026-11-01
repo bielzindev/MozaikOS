@@ -97,6 +97,8 @@ private sealed interface MusicPage {
     data object NowPlaying : MusicPage
     data object NewPlaylist : MusicPage
     data object Equalizer : MusicPage
+    /** The classic collection pivot opened from the new interface, on one of its pages. */
+    data class Library(val page: Int) : MusicPage
 }
 
 /**
@@ -124,6 +126,18 @@ class MusicActivity : WpActivity() {
         // Deleted songs leave the queue too, so the player never points at a missing file.
         val songActions = rememberSongActions(onDeleted = { controller.removeSongs(it) }) { reload++ }
 
+        // Classic or new (beta) interface, re-read when coming back (e.g. after the Store update).
+        val mixUi = remember(resumes) { MusicUi.isMix(context) }
+        var mixOverride by remember { mutableStateOf<Boolean?>(null) }
+        val useMix = mixOverride ?: mixUi
+        val favoriteIds by remember { com.wpreborn.data.media.Favorites.get(context) }.ids.collectAsState()
+        val mixes = remember(collection, favoriteIds) {
+            collection?.let { MixBuilder.build(context, it, com.wpreborn.data.media.PlayStats.get(context).counts(), favoriteIds) }.orEmpty()
+        }
+        fun switchUi(on: Boolean) {
+            MusicUi.setMix(context, on)
+            mixOverride = on
+        }
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
         LaunchedEffect(nowPlayingRequests) {
             if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
@@ -134,7 +148,19 @@ class MusicActivity : WpActivity() {
                 WpNavHost(nav) { page ->
                     val col = collection
                     when (page) {
-                        MusicPage.Collection -> CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }) {
+                        MusicPage.Collection -> if (useMix && perm.granted) {
+                            MixHome(
+                                col, mixes,
+                                onNowPlaying = { nav.navigate(MusicPage.NowPlaying) },
+                                onLibrary = { nav.navigate(MusicPage.Library(it)) },
+                                onClassic = { switchUi(false) },
+                            )
+                        } else {
+                            CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, onMixUi = { switchUi(true) }) {
+                                PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
+                            }
+                        }
+                        is MusicPage.Library -> CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, onMixUi = null, initialPage = page.page) {
                             PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
                         }
                         // When the artist, album or playlist no longer exists (its last song was
@@ -146,7 +172,8 @@ class MusicActivity : WpActivity() {
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ })
                         } ?: GoneBack(col != null) { nav.pop() }
-                        MusicPage.NowPlaying -> NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
+                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
+                            else NowPlayingScreen(onEqualizer = { nav.navigate(MusicPage.Equalizer) })
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
                     }
@@ -156,6 +183,13 @@ class MusicActivity : WpActivity() {
         // Dialogs last, so they cover the list instead of being covered by it.
         songActions.Dialogs()
         }
+    }
+
+    private var resumes by mutableStateOf(0)
+
+    override fun onResume() {
+        super.onResume()
+        resumes++
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -178,10 +212,13 @@ private fun CollectionPage(
     ui: PlayerUi,
     songActions: SongActions,
     onReload: () -> Unit,
+    /** Switches to the new interface; null where that makes no sense (opened from it). */
+    onMixUi: (() -> Unit)?,
+    initialPage: Int = 0,
     gate: @Composable () -> Unit,
 ) {
     val context = LocalContext.current
-    val pivot = rememberPivotState(5)
+    val pivot = rememberPivotState(5, initialPage)
     val favorites by remember { com.wpreborn.data.media.Favorites.get(context) }.ids.collectAsState()
     val external by com.wpreborn.data.media.ExternalMediaWatcher.state.collectAsState()
     val mixes = remember(col, favorites) { col?.let { MixBuilder.build(context, it, com.wpreborn.data.media.PlayStats.get(context).counts(), favorites) }.orEmpty() }
@@ -359,6 +396,14 @@ private fun CollectionPage(
                 },
                 menuItems = listOf(
                     AppBarMenuItem(stringResource(R.string.refresh)) { onReload() },
+                ) + (if (onMixUi == null) emptyList() else listOf(
+                    // The new interface arrives as an update of Music in the ZUNEX Store.
+                    AppBarMenuItem(stringResource(if (MusicUi.available(context)) R.string.mix_try_beta else R.string.mix_get_beta)) {
+                        if (MusicUi.available(context)) onMixUi() else runCatching {
+                            context.startActivity(android.content.Intent(context, com.wpreborn.apps.store.StoreActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    },
+                )) + listOf(
                     AppBarMenuItem(stringResource(if (MusicLibrary(context).hideUnknown) R.string.music_show_unknown else R.string.music_hide_unknown)) {
                         val lib = MusicLibrary(context)
                         lib.hideUnknown = !lib.hideUnknown

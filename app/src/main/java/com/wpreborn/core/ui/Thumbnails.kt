@@ -102,7 +102,14 @@ fun rememberThumbnail(uri: Uri?, sizePx: Int = 256): State<ImageBitmap?> {
     val context = LocalContext.current
     val initial = remember(uri, sizePx) { uri?.let { ImageLoader.cached(it, sizePx)?.asImageBitmap() } }
     return produceState(initial, uri, sizePx) {
-        if (uri != null && value == null) value = ImageLoader.thumbnail(context, uri, sizePx)?.asImageBitmap()
+        // When the picture changes (next song...), the state still holds the previous one:
+        // always load the new one (keeping the old visible meanwhile), or clear it if none.
+        val cached = uri?.let { ImageLoader.cached(it, sizePx) }
+        value = when {
+            uri == null -> null
+            cached != null -> cached.asImageBitmap()
+            else -> ImageLoader.thumbnail(context, uri, sizePx)?.asImageBitmap()
+        }
     }
 }
 

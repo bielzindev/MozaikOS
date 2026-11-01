@@ -153,83 +153,83 @@ fun MixHome(
                 contentAlignment = Alignment.Center,
             ) { WpIcon(WpIcons.More, tint = Color.White, size = 16.dp) }
 
-            // The canvas: square cells sized to the screen width (about seven across, so the
-            // mixes show beside the first group and the next column peeks in), scrolling sideways.
+            // The canvas, measured on MixRadio: a unit of ~18.5% of the screen width. First
+            // group: the playing cover (2.6 units) with its time, "play me" (2 units) stepped in
+            // under it, a small square stepped again. Then a column alternating a small cover and
+            // a large mix (2 units, caption on an accent band), and the library peeking in.
+            // One colour only - the accent - for every tile that isn't a picture.
             androidx.compose.foundation.layout.BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                 val g = 6.dp
-                val labelSpace = 56.dp
-                val byWidth = (maxWidth - 18.dp) / 7f - g
-                val byHeight = (maxHeight - labelSpace) / 7f - g
-                val cell = minOf(byWidth, byHeight).coerceIn(40.dp, 80.dp)
-                val step = cell + g
-                fun x(c: Int) = step * c
-                fun y(r: Int) = step * r
-                fun w(n: Int) = step * n - g
-
-                // Mixes: large covers with captions and small covers, two staggered columns.
-                val big = listOf(3 to 1, 5 to 0, 3 to 4, 5 to 3)
-                val small = listOf(3 to 0, 3 to 3, 5 to 2, 5 to 5, 3 to 6, 4 to 6)
-                val libraryCol = 8
-                val columns = libraryCol + 2
+                val labelSpace = 64.dp
+                val u = minOf(maxWidth * 0.185f, (maxHeight - labelSpace) / 6.4f).coerceAtLeast(48.dp)
+                val art = u * 2.6f
+                val big = u * 2f
+                val small = u * 1.15f
+                val xB = art + g * 2.5f
+                val xC = xB + big + g * 2.5f
+                val canvasWidth = xC + big
+                val bottom = maxHeight - labelSpace
                 Box(Modifier.fillMaxSize().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp)) {
-                    Box(Modifier.width(w(columns)).fillMaxHeight()) {
-                        // What's playing, with its time in big numerals (3 × 3).
-                        Box(Modifier.offset(x(0), y(0)).size(w(3)).background(Color.DarkGray).wpClickable(onClick = onNowPlaying)) {
+                    Box(Modifier.width(canvasWidth).fillMaxHeight()) {
+                        // What's playing, with its time in huge numerals running off the bottom.
+                        Box(Modifier.size(art).clipToBounds().background(Color.DarkGray).wpClickable(onClick = onNowPlaying)) {
                             Art(playback, bgSong, Modifier.fillMaxSize(), grey = false)
                             WpText(
                                 if (playback != null) fmt(playback.positionMs) else "0:00",
-                                style = WpType.Header.copy(fontSize = (cell.value * 0.95f).sp, lineHeight = (cell.value * 0.95f).sp, fontWeight = FontWeight.SemiBold),
-                                color = Color.White.copy(alpha = 0.7f),
+                                style = WpType.Header.copy(fontSize = (art.value * 0.42f).sp, lineHeight = (art.value * 0.42f).sp, fontWeight = FontWeight.SemiBold),
+                                color = Color.White.copy(alpha = 0.72f),
                                 maxLines = 1,
                                 softWrap = false,
-                                modifier = Modifier.align(Alignment.BottomStart).padding(start = 4.dp),
+                                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-2).dp, y = art * 0.07f),
                             )
                         }
-                        // "play me" (2 × 2), stepped in under the cover.
-                        Box(Modifier.offset(x(1), y(3)).size(w(2)).background(accent).wpClickable { playMe() }.padding(8.dp)) {
-                            WpIcon(WpIcons.Play, tint = Color.White, size = cell * 0.9f, modifier = Modifier.align(Alignment.Center).padding(bottom = 10.dp))
-                            WpText(stringResource(R.string.mix_play_me), style = WpType.Normal.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
+                        // "play me"
+                        Box(Modifier.offset(u * 0.9f, art + g).size(big).background(accent).wpClickable { playMe() }.padding(8.dp)) {
+                            WpIcon(WpIcons.Play, tint = Color.White, size = big * 0.45f, modifier = Modifier.align(Alignment.Center).offset(y = (-6).dp))
+                            WpText(stringResource(R.string.mix_play_me).lowercase(), style = WpType.Normal.copy(fontSize = 14.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
                         }
-                        // Shuffle (1 × 1) stepped once more.
+                        // Small square stepped once more: shuffle everything.
                         Box(
-                            Modifier.offset(x(2), y(5)).size(w(1)).background(accent.copy(alpha = 0.75f)).wpClickable {
+                            Modifier.offset(u * 1.6f, art + big + g * 2).size(small).background(accent.copy(alpha = 0.7f)).wpClickable {
                                 col?.songs?.takeIf { it.isNotEmpty() }?.let { controller.playSongs(it.shuffled(), 0, shuffle = true); onNowPlaying() }
                             },
                             contentAlignment = Alignment.Center,
-                        ) { WpIcon(WpIcons.Shuffle, tint = Color.White, size = cell * 0.42f) }
+                        ) { WpIcon(WpIcons.Shuffle, tint = Color.White, size = small * 0.38f) }
 
-                        // Mixes.
-                        mixes.take(big.size).forEachIndexed { i, m ->
-                            val (c, r) = big[i]
-                            MixTile(m, Modifier.offset(x(c), y(r)).size(w(2))) {
-                                controller.playSongs(m.songs, 0)
-                                onNowPlaying()
-                            }
-                        }
-                        // Small covers: the next mixes (or coloured squares when there are none).
-                        small.forEachIndexed { i, (c, r) ->
-                            val m = mixes.getOrNull(big.size + i)
-                            Box(
-                                Modifier.offset(x(c), y(r)).size(w(1)).background(accent.copy(alpha = 0.55f + 0.15f * (i % 3)))
-                                    .then(if (m != null) Modifier.wpClickable { controller.playSongs(m.songs, 0); onNowPlaying() } else Modifier),
-                            ) {
+                        // Second column: small cover, large mix, small cover, large mix... down the screen.
+                        var y = 0.dp
+                        var i = 0
+                        var smallTurn = true
+                        while (y + (if (smallTurn) small else big) <= bottom && i < 12) {
+                            val m = mixes.getOrNull(i)
+                            if (smallTurn) {
+                                SmallSquare(m, accent, Modifier.offset(xB, y).size(small)) { mm -> controller.playSongs(mm.songs, 0); onNowPlaying() }
+                                y += small + g
+                            } else {
                                 if (m != null) {
-                                    val art by rememberThumbnail(m.songs.firstOrNull()?.albumArtUri, 192)
-                                    art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+                                    MixTile(m, accent, Modifier.offset(xB, y).size(big)) { controller.playSongs(m.songs, 0); onNowPlaying() }
+                                } else {
+                                    Box(Modifier.offset(xB, y).size(big).background(accent.copy(alpha = 0.55f)))
                                 }
+                                y += big + g
                             }
+                            i++
+                            smallTurn = !smallTurn
                         }
 
-                        // The library (2 × 1 each).
+                        // Third column: the library, in accent tiles.
                         listOf(
                             R.string.music_artists to 1, R.string.music_albums to 2, R.string.music_songs to 3,
                             R.string.music_playlists to 4, R.string.music_mixes to 0,
-                        ).forEachIndexed { i, (label, page) ->
-                            Box(
-                                Modifier.offset(x(libraryCol), y(i + 1)).size(w(2), w(1)).background(if (i % 2 == 0) accent else accent.copy(alpha = 0.8f))
-                                    .wpClickable { onLibrary(page) }.padding(8.dp),
-                            ) {
-                                WpText(stringResource(label), style = WpType.Normal.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
+                        ).forEachIndexed { k, (label, page) ->
+                            val h = u * 1.45f
+                            if ((h + g) * (k + 1) - g <= bottom + u) {
+                                Box(
+                                    Modifier.offset(xC, (h + g) * k).size(big, h).background(accent)
+                                        .wpClickable { onLibrary(page) }.padding(8.dp),
+                                ) {
+                                    WpText(stringResource(label).lowercase(), style = WpType.Normal.copy(fontSize = 15.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.align(Alignment.BottomStart))
+                                }
                             }
                         }
                     }
@@ -240,7 +240,7 @@ fun MixHome(
                     style = WpType.Large.copy(fontSize = 22.sp, fontWeight = FontWeight.Light),
                     color = Color.White,
                     maxLines = 1,
-                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 12.dp).wpClickable {
+                    modifier = Modifier.align(Alignment.BottomStart).padding(start = 18.dp, bottom = 14.dp).wpClickable {
                         if (recent.isNotEmpty()) { controller.playSongs(recent, 0); onNowPlaying() }
                     },
                 )
@@ -249,13 +249,23 @@ fun MixHome(
     }
 }
 
+/** A small square of the mix column: the cover of a mix, or a translucent accent square. */
 @Composable
-private fun MixTile(m: Mix, modifier: Modifier, onClick: () -> Unit) {
-    val art by rememberThumbnail(m.songs.firstOrNull()?.albumArtUri, 384)
-    Box(modifier.background(m.color).wpClickable(onClick = onClick)) {
+private fun SmallSquare(m: Mix?, accent: Color, modifier: Modifier, onPlay: (Mix) -> Unit) {
+    val art by rememberThumbnail(m?.songs?.firstOrNull()?.albumArtUri, 256)
+    Box(modifier.background(accent.copy(alpha = 0.55f)).then(if (m != null) Modifier.wpClickable { onPlay(m) } else Modifier)) {
         art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
-        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(m.color.copy(alpha = 0.85f)).padding(horizontal = 8.dp, vertical = 5.dp)) {
-            WpText(m.title, style = WpType.Normal.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+@Composable
+private fun MixTile(m: Mix, accent: Color, modifier: Modifier, onClick: () -> Unit) {
+    val art by rememberThumbnail(m.songs.getOrNull(1)?.albumArtUri ?: m.songs.firstOrNull()?.albumArtUri, 384)
+    Box(modifier.background(accent).wpClickable(onClick = onClick)) {
+        art?.let { Image(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
+        // Caption on an accent band, as on MixRadio's mix tiles.
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().background(accent.copy(alpha = 0.82f)).padding(horizontal = 8.dp, vertical = 6.dp)) {
+            WpText(m.title, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

@@ -80,7 +80,7 @@ object ArtistBios {
 
     /** Cached for a month; looks the artist up on Wikipedia in the phone's language, else English. */
     suspend fun load(context: Context, name: String): ArtistBio? = withContext(Dispatchers.IO) {
-        val prefs = context.getSharedPreferences("artist_bios", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("artist_bios2", Context.MODE_PRIVATE)
         val key = name.lowercase()
         prefs.getString(key, null)?.let { s ->
             runCatching {

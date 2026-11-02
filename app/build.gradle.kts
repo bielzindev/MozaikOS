@@ -109,6 +109,10 @@ dependencies {
     implementation("com.google.mlkit:segmentation-selfie:16.0.0-beta6")
     // News: reading view (main text of an article page); MIT licence.
     implementation("org.jsoup:jsoup:1.18.1")
+    // Translator: on-device translation, language detection and text in photos (ML Kit).
+    implementation("com.google.mlkit:translate:17.0.3")
+    implementation("com.google.mlkit:language-id:17.0.6")
+    implementation("com.google.mlkit:text-recognition:16.0.1")
     implementation("org.maplibre.gl:android-sdk:11.8.8")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

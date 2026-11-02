@@ -193,6 +193,7 @@ fun AllAppsScreen(
         menuFor?.let { app ->
             val items = buildList {
                 if (!isPinned(app)) add(ContextMenuItem(context.getString(R.string.pin_to_start)) { onPin(app) })
+                add(ContextMenuItem(context.getString(R.string.hide_app)) { com.wpreborn.data.apps.HiddenApps.get(context).hide(app.key) })
                 if (app.builtIn == null) {
                     if (!repo.isSystemApp(app)) add(ContextMenuItem(context.getString(R.string.uninstall)) { repo.uninstall(app) })
                     add(ContextMenuItem(context.getString(R.string.app_info)) { repo.openAppInfo(app) })

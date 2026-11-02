@@ -267,6 +267,7 @@ private fun StartThemePage(onAccent: () -> Unit) {
         WpToggle(stringResource(R.string.set_show_duplicates), settings.showDuplicates, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setShowDuplicates(it)
         }
+        HiddenAppsSection()
         WpToggle(stringResource(R.string.set_brand_colors), settings.brandColors, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setBrandColors(it)
         }
@@ -526,5 +527,28 @@ private fun LauncherPage() {
         Spacer(Modifier.height(20.dp))
         WpIcon(WpIcons.Info, size = 28.dp, tint = Wp.palette.subtle)
         WpText(stringResource(R.string.launcher_reboot_note), style = WpType.Small, color = Wp.palette.subtle)
+    }
+}
+
+/** Apps hidden from Start and the app list, each with "show" to bring it back. */
+@Composable
+private fun HiddenAppsSection() {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val store = androidx.compose.runtime.remember { com.wpreborn.data.apps.HiddenApps.get(context) }
+    val hidden by store.keys.collectAsState()
+    val apps by androidx.compose.runtime.remember { com.wpreborn.data.apps.AppRepository.get(context) }.apps.collectAsState()
+    WpText(stringResource(R.string.hidden_apps), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp))
+    if (hidden.isEmpty()) {
+        WpText(stringResource(R.string.hidden_apps_none), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.padding(vertical = 6.dp))
+        return
+    }
+    hidden.sortedBy { k -> apps.firstOrNull { it.key == k }?.label?.lowercase() ?: k }.forEach { k ->
+        val app = apps.firstOrNull { it.key == k }
+        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            if (app != null) com.wpreborn.launcher.start.AppIcon(app, 36.dp, Modifier.background(Wp.accent).padding(4.dp))
+            Spacer(Modifier.width(12.dp))
+            WpText(app?.label ?: k.substringBefore('/'), style = WpType.Large, maxLines = 1, modifier = Modifier.weight(1f))
+            WpText(stringResource(R.string.hidden_apps_show), style = WpType.Normal, color = Wp.accent, modifier = Modifier.wpClickable { store.show(k) }.padding(8.dp))
+        }
     }
 }

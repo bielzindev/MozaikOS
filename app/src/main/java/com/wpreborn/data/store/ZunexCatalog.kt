@@ -133,6 +133,16 @@ object ZunexCatalog {
             clearData = prefs("browser"),
         ),
         CatalogApp(
+            BuiltInApp.Files, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_files, R.string.store_new_files, Color(0xFFF0A30A),
+            permissions = listOf(R.string.perm_label_files), featured = true,
+            clearData = prefs("files"),
+        ),
+        CatalogApp(
+            BuiltInApp.Translator, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_translator, R.string.store_new_translator, Color(0xFF00ABA9),
+            permissions = listOf(R.string.perm_label_internet, R.string.perm_label_camera, R.string.perm_label_microphone), featured = true,
+            clearData = prefs("translator"),
+        ),
+        CatalogApp(
             BuiltInApp.Settings, "8.1.0", 1, StoreCategory.System, R.string.store_desc_settings, R.string.store_new_settings, Color(0xFF647687), required = true,
         ),
         CatalogApp(

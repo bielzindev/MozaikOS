@@ -114,9 +114,12 @@ class MainActivity : ComponentActivity() {
 
         // System apps that duplicate ZUNEX apps are hidden from the list unless shown in settings.
         val duplicates = remember(apps) { vm.appRepo.duplicatePackages() }
-        val listedApps = remember(apps, duplicates, settings.showDuplicates) {
-            if (settings.showDuplicates) apps else apps.filter { it.builtIn != null || it.packageName !in duplicates }
+        // Apps the user hid are left out of the list and of Start (Settings shows and restores them).
+        val hidden by remember { com.wpreborn.data.apps.HiddenApps.get(context) }.keys.collectAsState()
+        val listedApps = remember(apps, duplicates, settings.showDuplicates, hidden) {
+            (if (settings.showDuplicates) apps else apps.filter { it.builtIn != null || it.packageName !in duplicates }).filter { it.key !in hidden }
         }
+        val shownTiles = remember(tiles, hidden) { tiles.filter { it.appKey !in hidden } }
         // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
         val appsByKey = remember(apps) { apps.associateBy { it.key } }
         val counts = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { (_, l) -> l.sumOf { it.messageCount } } }
@@ -154,7 +157,7 @@ class MainActivity : ComponentActivity() {
                 if (page == 0) {
                     StartScreen(
                         state = start,
-                        tiles = tiles,
+                        tiles = shownTiles,
                         appFor = { appsByKey[it.appKey] },
                         inputsFor = ::inputsFor,
                         onLaunch = { tile, app -> launchFromTile(tile, app) },

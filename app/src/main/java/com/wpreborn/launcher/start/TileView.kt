@@ -100,6 +100,8 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Maps -> IconTile(com.wpreborn.core.icons.Glyphs.MapPin, tile.size)
             BuiltInApp.News -> NewsTile(tile.size, inputs.liveEnabled, seed)
             BuiltInApp.Browser -> IconTile(WpIcons.Globe, tile.size)
+            BuiltInApp.Files -> IconTile(WpIcons.Folder, tile.size)
+            BuiltInApp.Translator -> IconTile(com.wpreborn.core.icons.Glyphs.Translate, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
         }
       }

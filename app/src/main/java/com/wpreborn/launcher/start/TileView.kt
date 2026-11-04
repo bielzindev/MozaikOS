@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -149,10 +150,19 @@ private fun BoxScope.CountTile(icon: androidx.compose.ui.graphics.vector.ImageVe
         )
         return
     }
-    Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-        WpIcon(icon, tint = LocalTileIconTint.current ?: Color.White, size = iconSizeFor(size))
-        Spacer(Modifier.width(8.dp))
-        WpText(count.coerceAtMost(99).toString(), style = WpType.TileCount, color = Color.White)
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val side = minOf(maxWidth, maxHeight)
+        val glyph = side * 0.40f
+        val num = (side * 0.34f).coerceAtMost((maxWidth - glyph - 24.dp) / 1.3f).coerceAtLeast(10.dp)
+        Row(Modifier.align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
+            WpIcon(icon, tint = LocalTileIconTint.current ?: Color.White, size = glyph)
+            Spacer(Modifier.width(side * 0.06f))
+            WpText(
+                count.coerceAtMost(99).toString(),
+                style = WpType.TileCount.copy(fontSize = num.tileSp(), lineHeight = (num * 1.1f).tileSp(), fontWeight = FontWeight.Light),
+                color = Color.White, maxLines = 1, softWrap = false,
+            )
+        }
     }
 }
 
@@ -417,7 +427,7 @@ private fun AndroidAppTile(app: AppEntry?, size: TileSize, inputs: TileInputs, s
         size == TileSize.Medium -> FlipTile(enabled = true, seed = seed, front = {
             Box(Modifier.fillMaxSize()) { IconicFace(app, size, count) }
         }, back = {
-            FlipBack(recent.first())
+            FlipBack(app, recent.first(), count)
         })
         size == TileSize.Wide -> WideIconic(app, recent.first(), count)
         else -> LargeIconic(app, recent, count)
@@ -426,71 +436,156 @@ private fun AndroidAppTile(app: AppEntry?, size: TileSize, inputs: TileInputs, s
 
 private fun countText(count: Int) = if (count > 99) "99+" else count.toString()
 
-/** Glyph, and the count to its right in light numerals, centred as one group. */
+/** A size in dp as text size, ignoring the system font scale: tile text must fit its tile. */
+@Composable
+private fun Dp.tileSp() = with(LocalDensity.current) { this@tileSp.toSp() }
+
+/**
+ * Glyph, and the count to its right in light numerals, centred as one group. Both are sized
+ * from the tile itself, so the group fits small screens, "more tiles" and large fonts alike.
+ */
 @Composable
 private fun BoxScope.IconicFace(app: AppEntry?, size: TileSize, count: Int) {
-    val icon = when (size) {
-        TileSize.Small -> if (count > 0) 26.dp else 32.dp
-        TileSize.Medium -> 54.dp
-        else -> 60.dp
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val side = minOf(maxWidth, maxHeight)
+        val shown = count > 0
+        val icon = when (size) {
+            TileSize.Small -> side * (if (shown) 0.42f else 0.5f)
+            TileSize.Medium -> side * (if (shown) 0.40f else 0.48f)
+            else -> side * (if (shown) 0.36f else 0.42f)
+        }
+        val digits = countText(count).length
+        // The numerals take at most the room left beside the glyph.
+        val numH = when (size) {
+            TileSize.Small -> side * 0.30f
+            else -> (side * 0.34f).coerceAtMost((maxWidth - icon - 24.dp) / (0.62f * digits)).coerceAtLeast(10.dp)
+        }
+        Row(
+            Modifier.align(Alignment.Center).padding(bottom = if (size == TileSize.Small) 0.dp else side * 0.06f),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (app != null) AppIcon(app, icon)
+            if (shown) {
+                Spacer(Modifier.width(if (size == TileSize.Small) 2.dp else side * 0.06f))
+                WpText(
+                    countText(count),
+                    style = WpType.TileCount.copy(fontSize = numH.tileSp(), lineHeight = (numH * 1.1f).tileSp(), fontWeight = FontWeight.Light),
+                    color = Color.White,
+                    maxLines = 1,
+                    softWrap = false,
+                )
+            }
+        }
     }
-    Row(Modifier.align(Alignment.Center).padding(bottom = if (size == TileSize.Small) 0.dp else 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (app != null) AppIcon(app, icon)
-        if (count > 0) {
-            Spacer(Modifier.width(if (size == TileSize.Small) 3.dp else 8.dp))
+}
+
+/** Contact photo of a message (square, as on Windows Phone), or nothing without one. */
+@Composable
+private fun Avatar(n: WpNotification, side: Dp) {
+    val bmp = n.avatar ?: return
+    val image = remember(bmp) { bmp.asImageBitmap() }
+    Image(image, null, Modifier.size(side), contentScale = ContentScale.Crop)
+}
+
+/**
+ * Back of the medium tile. A message shows the photo and the name side by side, the message
+ * under them; other notifications the title and text. Lines are counted from the tile height,
+ * so text ends on a whole line instead of being cut through.
+ */
+@Composable
+private fun FlipBack(app: AppEntry?, n: WpNotification, count: Int) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val side = minOf(maxWidth, maxHeight)
+        val pad = side * 0.08f
+        val nameSize = side * 0.15f
+        val textSize = side * 0.135f
+        val line = textSize * 1.25f
+        val photo = if (n.avatar != null) side * 0.32f else 0.dp
+        val corner = side * 0.22f
+        val headH = maxOf(photo, nameSize * 1.3f)
+        val lines = ((side - pad * 2 - headH - corner) / line).toInt().coerceIn(1, 4)
+        Column(Modifier.fillMaxSize().padding(start = pad, top = pad, end = pad)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                if (photo > 0.dp) {
+                    Avatar(n, photo)
+                    Spacer(Modifier.width(pad * 0.8f))
+                }
+                WpText(
+                    n.title, style = WpType.Normal.copy(fontSize = nameSize.tileSp(), lineHeight = (nameSize * 1.25f).tileSp(), fontWeight = FontWeight.SemiBold),
+                    color = Color.White, maxLines = if (photo > 0.dp) 2 else 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
+            Spacer(Modifier.height(side * 0.03f))
             WpText(
-                countText(count),
-                style = if (size == TileSize.Small) WpType.Normal.copy(fontSize = 16.sp, lineHeight = 18.sp) else WpType.TileCount.copy(fontSize = 40.sp, lineHeight = 42.sp, fontWeight = FontWeight.Light),
-                color = Color.White,
+                n.text, style = WpType.Normal.copy(fontSize = textSize.tileSp(), lineHeight = line.tileSp()),
+                color = Color.White.copy(alpha = 0.92f), maxLines = lines, overflow = TextOverflow.Ellipsis,
             )
         }
+        CornerCount(app, count, side * 0.17f)
     }
 }
 
-/** Back of the medium tile: who wrote and what, in the tile's own text style. */
+/** Corner group of the tiles with text: count, then the small glyph. */
 @Composable
-private fun FlipBack(n: WpNotification) {
-    Column(Modifier.fillMaxSize().padding(start = 9.dp, top = 7.dp, end = 9.dp, bottom = 24.dp)) {
-        WpText(n.title, style = WpType.Normal.copy(fontSize = 16.sp, lineHeight = 19.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        WpText(n.text, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 19.sp), color = Color.White, maxLines = 4, overflow = TextOverflow.Ellipsis)
-    }
-}
-
-/** Corner group of the wide/large tiles: count, then the small glyph. */
-@Composable
-private fun BoxScope.CornerCount(app: AppEntry?, count: Int) {
-    Row(Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+private fun BoxScope.CornerCount(app: AppEntry?, count: Int, glyph: Dp = 24.dp) {
+    Row(Modifier.align(Alignment.BottomEnd).padding(end = glyph * 0.3f, bottom = glyph * 0.22f), verticalAlignment = Alignment.CenterVertically) {
         if (count > 0) {
-            WpText(countText(count), style = WpType.Large.copy(fontSize = 20.sp, lineHeight = 22.sp), color = Color.White)
-            Spacer(Modifier.width(5.dp))
+            WpText(countText(count), style = WpType.Large.copy(fontSize = (glyph * 0.78f).tileSp(), lineHeight = (glyph * 0.9f).tileSp()), color = Color.White, maxLines = 1)
+            Spacer(Modifier.width(glyph * 0.2f))
         }
-        if (app != null) AppIcon(app, 26.dp)
+        if (app != null) AppIcon(app, glyph)
     }
 }
 
+/**
+ * Wide: a message has the contact photo filling the left square and the name and message to
+ * its right; other notifications use the whole width for title and text.
+ */
 @Composable
 private fun WideIconic(app: AppEntry?, n: WpNotification, count: Int) {
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(start = 10.dp, top = 6.dp, end = 12.dp)) {
-            WpText(n.title, style = WpType.Large.copy(fontSize = 21.sp, lineHeight = 26.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            WpText(n.text, style = WpType.Normal.copy(fontSize = 15.sp, lineHeight = 19.sp), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val h = maxHeight
+        val pad = h * 0.08f
+        val photo = n.avatar != null
+        val nameSize = h * 0.17f
+        val textSize = h * 0.135f
+        val line = textSize * 1.25f
+        val corner = h * 0.24f
+        val lines = ((h - pad - nameSize * 1.3f - corner) / line).toInt().coerceIn(1, 3)
+        Row(Modifier.fillMaxSize()) {
+            if (photo) Avatar(n, h)
+            Column(Modifier.weight(1f).padding(start = pad, top = pad * 0.7f, end = pad)) {
+                WpText(n.title, style = WpType.Large.copy(fontSize = nameSize.tileSp(), lineHeight = (nameSize * 1.3f).tileSp()), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                WpText(n.text, style = WpType.Normal.copy(fontSize = textSize.tileSp(), lineHeight = line.tileSp()), color = Color.White.copy(alpha = 0.92f), maxLines = lines, overflow = TextOverflow.Ellipsis)
+            }
         }
-        CornerCount(app, count)
+        CornerCount(app, count, h * 0.19f)
     }
 }
 
+/** Large: the latest conversations, each with its photo, name and message. */
 @Composable
 private fun LargeIconic(app: AppEntry?, recent: List<WpNotification>, count: Int) {
-    Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxWidth().padding(start = 10.dp, top = 6.dp, end = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val side = minOf(maxWidth, maxHeight)
+        val pad = side * 0.045f
+        val row = (side - pad * 2 - side * 0.13f) / 3
+        val photo = row * 0.78f
+        Column(Modifier.fillMaxWidth().padding(start = pad, top = pad, end = pad)) {
             recent.take(3).forEach { n ->
-                Column {
-                    WpText(n.title, style = WpType.Large.copy(fontSize = 19.sp, lineHeight = 23.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    WpText(n.text, style = WpType.Normal.copy(fontSize = 14.sp, lineHeight = 18.sp), color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Row(Modifier.fillMaxWidth().height(row), verticalAlignment = Alignment.CenterVertically) {
+                    if (n.avatar != null) {
+                        Avatar(n, photo)
+                        Spacer(Modifier.width(pad * 1.4f))
+                    }
+                    Column(Modifier.weight(1f)) {
+                        WpText(n.title, style = WpType.Large.copy(fontSize = (row * 0.24f).tileSp(), lineHeight = (row * 0.3f).tileSp()), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        WpText(n.text, style = WpType.Normal.copy(fontSize = (row * 0.19f).tileSp(), lineHeight = (row * 0.24f).tileSp()), color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
                 }
             }
         }
-        CornerCount(app, count)
+        CornerCount(app, count, side * 0.1f)
     }
 }
 

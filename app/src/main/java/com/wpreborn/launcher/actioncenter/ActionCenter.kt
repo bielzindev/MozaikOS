@@ -235,7 +235,10 @@ fun ActionCenter(state: ActionCenterState) {
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         WpText(playback.title, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        WpText(playback.artist, style = WpType.Small, color = Color(0xB3FFFFFF), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        WpText(
+                            listOf(playback.artist, com.wpreborn.apps.common.playbackSource(playback)).filter { it.isNotBlank() }.joinToString(" · "),
+                            style = WpType.Small, color = Color(0xB3FFFFFF), maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        )
                         Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(2.dp).background(Color(0x33FFFFFF))) {
                             Box(Modifier.fillMaxWidth(playback.progress.coerceAtLeast(0.001f)).height(2.dp).background(Wp.accent))
                         }

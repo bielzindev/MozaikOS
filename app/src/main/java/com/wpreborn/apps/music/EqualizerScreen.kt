@@ -74,7 +74,7 @@ fun EqualizerScreen() {
     val settings by AudioEffects.settings.collectAsState()
     val device by AudioEffects.device.collectAsState()
     val supported by AudioEffects.supported.collectAsState()
-    val playback = rememberPlayback()
+    val playback = rememberPlayback(includeExternal = false)
     val on = stringResource(R.string.on)
     val off = stringResource(R.string.off)
 

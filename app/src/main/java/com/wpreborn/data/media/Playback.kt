@@ -21,7 +21,7 @@ import kotlinx.coroutines.delay
 /**
  * What is playing right now, for every surface of the system (the Playing Now bar, the
  * status bar, the lock screen, Action Center, the Music tile and the full player). There is
- * a single source of truth: the ZUNEX player (MusicService through [MusicController]) or,
+ * a single source of truth: the PulseRadio player (MusicService through [MusicController]) or,
  * when it is idle, another app's media session (Spotify...) through [ExternalMediaWatcher].
  */
 data class Playback(
@@ -69,10 +69,13 @@ data class Playback(
     }
 
     companion object {
-        /** Our player wins while it has something loaded and is playing, or nothing else plays. */
+        /**
+         * PulseRadio wins while it plays, or while it has music loaded and no other app plays;
+         * otherwise another app's player (Spotify, YouTube Music, Deezer...) is shown and
+         * controlled, marked with that app's name and icon.
+         */
         fun of(ui: PlayerUi, external: NowPlaying?, now: Long = SystemClock.elapsedRealtime()): Playback? = when {
-            // ZUNEX Music only: other apps' players (Spotify...) are not shown or controlled.
-            ui.hasMedia -> Playback(
+            ui.hasMedia && (ui.playing || external?.playing != true) -> Playback(
                 own = true,
                 title = ui.title,
                 artist = ui.artist,
@@ -89,6 +92,22 @@ data class Playback(
                 nextTitles = ui.nextTitles,
                 session = ui.session,
             )
+            external != null && (external.title.isNotBlank() || external.artist.isNotBlank()) -> Playback(
+                own = false,
+                title = external.title,
+                artist = external.artist,
+                album = external.album,
+                artUri = null,
+                artBitmap = external.art,
+                playing = external.playing,
+                positionMs = external.position(now),
+                durationMs = external.durationMs,
+                packageName = external.packageName,
+                mediaId = null,
+                shuffle = false,
+                repeatMode = Player.REPEAT_MODE_OFF,
+                nextTitles = emptyList(),
+            )
             else -> null
         }
     }
@@ -99,11 +118,13 @@ data class Playback(
  * which only report it on changes).
  */
 @Composable
-fun rememberPlayback(): Playback? {
+fun rememberPlayback(includeExternal: Boolean = true): Playback? {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
     val ui by controller.ui.collectAsState()
-    val external: NowPlaying? = null
+    // Inside PulseRadio only its own player counts; everywhere else other apps' too.
+    val ext by ExternalMediaWatcher.state.collectAsState()
+    val external: NowPlaying? = if (includeExternal) ext else null
     var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
     LaunchedEffect(external?.playing) {
         while (external?.playing == true) {

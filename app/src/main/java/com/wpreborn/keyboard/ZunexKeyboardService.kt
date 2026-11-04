@@ -252,14 +252,17 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             correctionShown = null
             updateSuggestions()
         } else if (!typing && newSelStart != oldSelStart && candidatesStart < 0) {
-            // Cursor moved with nothing being typed: fresh suggestions for the new place.
+            // Cursor moved with nothing being typed: fresh suggestions for the new place, once
+            // it settles (deleting moves it many times a second).
             undoCorrection = null
-            updateSuggestions()
+            mainHandler.removeCallbacks(afterDelete)
+            mainHandler.postDelayed(afterDelete, 140)
         }
     }
 
     override fun onFinishInput() {
         super.onFinishInput()
+        mainHandler.removeCallbacks(afterDelete)
         commitComposing()
         predictor.save(language.code)
     }
@@ -531,8 +534,22 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         updateSuggestions()
     }
 
+    private val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+
+    /**
+     * Suggestions and auto-capitals after deleting, run once the deleting pauses: finding a
+     * correction compares the word with thousands of dictionary words, and doing it for every
+     * repeated backspace (about 18 a second) froze the keyboard and the app behind it.
+     */
+    private val afterDelete = Runnable {
+        updateAutoCaps()
+        updateSuggestions()
+    }
+
     private fun backspace() {
         swipeAlternatives = emptyList()
+        // The correction found for the longer word no longer applies.
+        correctionShown = null
         // Undo the last autocorrection, like WP did when you tapped backspace right after.
         undoCorrection?.let { (typed, corr) ->
             val before = ic()?.getTextBeforeCursor(corr.length + 1, 0)?.toString()
@@ -542,6 +559,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
                 showComposing()
                 undoCorrection = null
                 predictor.learn(language, typed, null)
+                mainHandler.removeCallbacks(afterDelete)
                 updateSuggestions()
                 return
             }
@@ -567,8 +585,8 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
                 sendDownUpKeyEvents(KeyEvent.KEYCODE_DEL)
             }
         }
-        updateAutoCaps()
-        updateSuggestions()
+        mainHandler.removeCallbacks(afterDelete)
+        mainHandler.postDelayed(afterDelete, 140)
     }
 
     override fun onDeleteWord() {

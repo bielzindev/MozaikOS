@@ -135,7 +135,7 @@ fun MixHome(
 ) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
-    val playback = rememberPlayback()
+    val playback = rememberPlayback(includeExternal = false)
     val accent = Wp.accent
     val recent = remember(col) { col?.songs?.sortedByDescending { it.dateAdded }?.take(40).orEmpty() }
     val bgSong = recent.firstOrNull() ?: col?.songs?.firstOrNull()
@@ -355,7 +355,7 @@ private fun MixTile(m: Mix, accent: Color, modifier: Modifier, onClick: () -> Un
 fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: (String) -> Unit = {}, onArtist: (String) -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
-    val playback = rememberPlayback()
+    val playback = rememberPlayback(includeExternal = false)
     val favorites by remember { Favorites.get(context) }.ids.collectAsState()
     val accent = Wp.accent
     val chrome = LocalChrome.current

@@ -79,7 +79,7 @@ import kotlin.math.roundToInt
 fun NowPlayingScreen(onEqualizer: () -> Unit, onArtist: (String) -> Unit = {}, onAlbum: (String) -> Unit = {}) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
-    val playback = rememberPlayback()
+    val playback = rememberPlayback(includeExternal = false)
     val favorites by remember { Favorites.get(context) }.ids.collectAsState()
     var showQueue by remember { mutableStateOf(false) }
     var savingQueue by remember { mutableStateOf<List<Long>?>(null) }

@@ -81,7 +81,8 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
     val glyph = remember(app.packageName, app.label, app.category) {
         if (builtIn != null) null else MetroIconPack.glyphFor(app.packageName, app.label, app.category)
     }
-    if (metro && glyph != null) {
+    // Chosen "Metro" for this app: the Mozaik glyph first.
+    if (metro && glyph != null && custom.pack == IconPack.Metro) {
         WpIcon(glyph, modifier, tint = chosen ?: tint, size = size)
         return
     }
@@ -90,10 +91,21 @@ fun AppIcon(app: AppEntry, size: Dp, modifier: Modifier = Modifier, tint: Color 
     val px = with(LocalDensity.current) { size.roundToPx() }
     val filter = chosen?.let { ColorFilter.tint(it) }
     if (metro) {
-        // Not in the pack: the app's own logo, without the round mask.
+        // By default other apps use Android's own monochrome (themed) icon, drawn white like a
+        // Metro glyph; only Mozaik's apps use the Metro glyphs. Without a monochrome icon: the
+        // Metro glyph when there is one, else the app's logo without the round mask.
         var brand by remember(app.key, px) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
-        LaunchedEffect(app.key, px) { if (brand == null) brand = repo.brandIcon(app, px) }
-        brand?.let { Image(it.logo.asImageBitmap(), null, modifier.size(size), colorFilter = filter) }
+        var loaded by remember(app.key, px) { mutableStateOf(brand != null) }
+        LaunchedEffect(app.key, px) {
+            if (brand == null) brand = repo.brandIcon(app, px)
+            loaded = true
+        }
+        val b = brand
+        when {
+            b != null && b.mono -> Image(b.logo.asImageBitmap(), null, modifier.size(size), colorFilter = ColorFilter.tint(chosen ?: tint))
+            glyph != null && loaded -> WpIcon(glyph, modifier, tint = chosen ?: tint, size = size)
+            b != null -> Image(b.logo.asImageBitmap(), null, modifier.size(size), colorFilter = filter)
+        }
         return
     }
     // Original: the app's artwork without the rounded mask (the tile carries its colour).
@@ -126,13 +138,16 @@ fun rememberBrandColor(app: AppEntry?): Color? {
     if (app == null || app.builtIn != null) return null
     val metro = custom.usesMetro()
     if (metro && !Wp.settings.brandColors) return null
-    if (metro && remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null) return null
+    val hasGlyph = remember(app.packageName) { MetroIconPack.glyphFor(app.packageName, app.label, app.category) } != null
+    if (metro && hasGlyph && custom.pack == IconPack.Metro) return null
     val context = LocalContext.current
     val repo = remember { AppRepository.get(context) }
     val px = with(LocalDensity.current) { 48.dp.roundToPx() }
     var brand by remember(app.key) { mutableStateOf(repo.cachedBrandIcon(app, px)) }
     LaunchedEffect(app.key) { if (brand == null) brand = repo.brandIcon(app, px) }
     val b = brand ?: return null
+    // Drawn with a Metro glyph (no monochrome icon): the accent, as before.
+    if (metro && hasGlyph && !b.mono) return null
     // A white monochrome glyph reads on the icon's main colour even when its background is white.
     return (if (metro && !b.mono) b.color else b.color ?: b.dominant)?.let { Color(it) }
 }

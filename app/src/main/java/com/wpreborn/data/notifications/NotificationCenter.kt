@@ -30,6 +30,10 @@ data class WpNotification(
     val messageCount: Int = 1,
     /** The person who wrote the latest message, when it's a conversation. */
     val sender: String = "",
+    /** Picture of the person (the contact photo of a chat), small, ready to draw. */
+    val avatar: Bitmap? = null,
+    /** A conversation (WhatsApp, Telegram, SMS...): tiles show the photo with the message. */
+    val isMessage: Boolean = false,
 )
 
 /**
@@ -49,6 +53,9 @@ object NotificationCenter {
 
     internal var listener: WpNotificationListener? = null
 
+    /** Decoded avatars by notification key and time: each picture is decoded once. */
+    private val avatars = HashMap<String, Bitmap?>()
+
     internal fun setConnected(value: Boolean) {
         _connected.value = value
         if (!value) _items.value = emptyList()
@@ -60,12 +67,17 @@ object NotificationCenter {
         // apps (WhatsApp at times) post only the summary, which then stands for the group.
         val withChildren = all.filter { it.notification.flags and Notification.FLAG_GROUP_SUMMARY == 0 && it.groupKey != null }
             .map { it.groupKey }.toSet()
-        _items.value = all.mapNotNull { sbn ->
+        val items = all.mapNotNull { sbn ->
             val summary = sbn.notification.flags and Notification.FLAG_GROUP_SUMMARY != 0
             if (summary && sbn.groupKey in withChildren) null
             // One unreadable notification must not stop the others.
             else runCatching { sbn.toWp(context) }.getOrNull()
         }.sortedByDescending { it.postTime }
+        synchronized(avatars) {
+            val live = items.map { it.key + "@" + it.postTime }.toSet()
+            avatars.keys.retainAll(live)
+        }
+        _items.value = items
     }
 
     fun dismiss(key: String) {
@@ -111,11 +123,15 @@ object NotificationCenter {
         // how many messages are waiting, instead of "3 new messages".
         var count = 1
         var sender = ""
+        var personIcon: androidx.core.graphics.drawable.IconCompat? = null
+        var chat = n.category == Notification.CATEGORY_MESSAGE
         runCatching {
             androidx.core.app.NotificationCompat.MessagingStyle.extractMessagingStyleFromNotification(n)?.let { style ->
                 val msgs = style.messages
                 val last = msgs.lastOrNull()
                 if (last != null) {
+                    chat = true
+                    personIcon = last.person?.icon
                     sender = last.person?.name?.toString().orEmpty()
                     val conv = style.conversationTitle?.toString()
                     title = conv?.takeIf { it.isNotBlank() } ?: sender.ifBlank { title }
@@ -135,6 +151,21 @@ object NotificationCenter {
         }
         @Suppress("DEPRECATION")
         val picture = runCatching { extras.get(Notification.EXTRA_PICTURE) as? Bitmap }.getOrNull()
+        val avatarKey = key + "@" + postTime
+        val avatar = synchronized(avatars) {
+            if (avatarKey in avatars) avatars[avatarKey]
+            else runCatching {
+                val d = personIcon?.loadDrawable(context) ?: n.getLargeIcon()?.loadDrawable(context)
+                d?.let { androidx.core.graphics.drawable.DrawableCompat.wrap(it) }?.let { dr ->
+                    val size = 128
+                    val bmp = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+                    val c = android.graphics.Canvas(bmp)
+                    dr.setBounds(0, 0, size, size)
+                    dr.draw(c)
+                    bmp
+                }
+            }.getOrNull().also { avatars[avatarKey] = it }
+        }
         return WpNotification(
             key = key,
             packageName = packageName,
@@ -148,6 +179,8 @@ object NotificationCenter {
             picture = picture,
             messageCount = count,
             sender = sender,
+            avatar = avatar,
+            isMessage = chat,
         )
     }
 }

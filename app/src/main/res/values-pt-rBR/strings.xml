@@ -880,4 +880,32 @@
     <plurals name="files_to_copy"><item quantity="one">%d item para copiar: abra a pasta e toque em colar aqui.</item><item quantity="other">%d itens para copiar: abra a pasta e toque em colar aqui.</item></plurals>
     <plurals name="files_to_move"><item quantity="one">%d item para mover: abra a pasta e toque em colar aqui.</item><item quantity="other">%d itens para mover: abra a pasta e toque em colar aqui.</item></plurals>
     <plurals name="files_delete"><item quantity="one">%d item será excluído de vez.</item><item quantity="other">%d itens serão excluídos de vez.</item></plurals>
+    <string name="browser_reader">modo de leitura</string>
+    <string name="browser_reader_empty">Esta página não tem um artigo para ler.</string>
+    <string name="browser_translate">traduzir página</string>
+    <string name="browser_print">imprimir ou salvar em PDF</string>
+    <string name="browser_downloads">downloads</string>
+    <string name="browser_open_new_tab">abrir em nova guia</string>
+    <string name="browser_open_inprivate">abrir em guia InPrivate</string>
+    <string name="browser_copy_link">copiar link</string>
+    <string name="browser_share_link">compartilhar link</string>
+    <string name="browser_save_image">salvar imagem</string>
+    <string name="browser_open_image">abrir imagem em nova guia</string>
+    <string name="browser_link_copied">Link copiado</string>
+    <string name="browser_adblock">Bloquear anúncios e rastreadores</string>
+    <string name="browser_blocked">%1$d anúncios e rastreadores bloqueados nesta página</string>
+    <string name="browser_force_dark">Páginas escuras (todos os sites em cores escuras)</string>
+    <string name="browser_text_size">Tamanho do texto</string>
+    <string name="browser_search_for">pesquisar “%1$s”</string>
+    <string name="browser_search_history">pesquisar no histórico</string>
+    <string name="browser_secure">conexão segura</string>
+    <string name="browser_not_secure">não seguro</string>
+    <string name="welcome_get_started">vamos começar</string>
+    <string name="welcome_next">avançar</string>
+    <string name="welcome_look_title">escolha seu visual</string>
+    <string name="welcome_look_body">Escolha um fundo e uma cor de destaque. A tela inicial, os blocos e os apps usam essas cores. Você pode mudar depois em Configurações.</string>
+    <string name="welcome_dark">escuro</string>
+    <string name="welcome_light">claro</string>
+    <string name="welcome_setting_up">Estamos preparando tudo para você.</string>
+    <string name="welcome_wont_take_long">Isso não vai demorar.</string>
 </resources>

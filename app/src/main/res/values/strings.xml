@@ -879,4 +879,32 @@
     <plurals name="files_to_copy"><item quantity="one">%d item to copy: open the folder and tap paste here.</item><item quantity="other">%d items to copy: open the folder and tap paste here.</item></plurals>
     <plurals name="files_to_move"><item quantity="one">%d item to move: open the folder and tap paste here.</item><item quantity="other">%d items to move: open the folder and tap paste here.</item></plurals>
     <plurals name="files_delete"><item quantity="one">%d item will be deleted for good.</item><item quantity="other">%d items will be deleted for good.</item></plurals>
+    <string name="browser_reader">reading view</string>
+    <string name="browser_reader_empty">This page has no article to read.</string>
+    <string name="browser_translate">translate page</string>
+    <string name="browser_print">print or save as PDF</string>
+    <string name="browser_downloads">downloads</string>
+    <string name="browser_open_new_tab">open in new tab</string>
+    <string name="browser_open_inprivate">open in InPrivate tab</string>
+    <string name="browser_copy_link">copy link</string>
+    <string name="browser_share_link">share link</string>
+    <string name="browser_save_image">save image</string>
+    <string name="browser_open_image">open image in new tab</string>
+    <string name="browser_link_copied">Link copied</string>
+    <string name="browser_adblock">Block ads and trackers</string>
+    <string name="browser_blocked">%1$d ads and trackers blocked on this page</string>
+    <string name="browser_force_dark">Dark pages (every site in dark colours)</string>
+    <string name="browser_text_size">Text size</string>
+    <string name="browser_search_for">search for “%1$s”</string>
+    <string name="browser_search_history">search history</string>
+    <string name="browser_secure">secure connection</string>
+    <string name="browser_not_secure">not secure</string>
+    <string name="welcome_get_started">get started</string>
+    <string name="welcome_next">next</string>
+    <string name="welcome_look_title">choose your look</string>
+    <string name="welcome_look_body">Pick a background and an accent colour. Start, the tiles and the apps use them. You can change them later in Settings.</string>
+    <string name="welcome_dark">dark</string>
+    <string name="welcome_light">light</string>
+    <string name="welcome_setting_up">We\'re setting things up for you.</string>
+    <string name="welcome_wont_take_long">This won\'t take long.</string>
 </resources>

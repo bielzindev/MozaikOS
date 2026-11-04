@@ -367,6 +367,7 @@ private fun LockMedia(playback: com.wpreborn.data.media.Playback) {
         Column(Modifier.weight(1f)) {
             WpText(playback.title, style = WpType.Normal.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
             WpText(playback.artist, style = WpType.Normal, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(com.wpreborn.apps.common.playbackSource(playback), style = WpType.Small, color = Color.White.copy(alpha = 0.7f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         com.wpreborn.core.ui.RoundButton(com.wpreborn.core.icons.WpIcons.Previous, size = 40.dp, color = Color.White) { playback.previous(context) }
         Spacer(Modifier.width(8.dp))

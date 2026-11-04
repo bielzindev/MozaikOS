@@ -112,7 +112,7 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
                 Column {
                     WpText(playback.title, style = WpType.Normal, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     WpText(
-                        if (playback.own) playback.artist else listOf(playback.artist, appLabel(playback.packageName)).filter { it.isNotBlank() }.joinToString(" · "),
+                        listOf(playback.artist, playbackSource(playback)).filter { it.isNotBlank() }.joinToString(" · "),
                         style = WpType.Small,
                         color = Wp.palette.subtle,
                         maxLines = 1,
@@ -138,6 +138,11 @@ fun PlayingNowBar(playback: Playback, modifier: Modifier = Modifier) {
     }
 }
 
+/** Where the music comes from: "PulseRadio", or the other app's name (Spotify...). */
+@Composable
+fun playbackSource(playback: Playback): String =
+    if (playback.own) stringResource(R.string.app_music) else appLabel(playback.packageName)
+
 @Composable
 private fun appLabel(pkg: String?): String {
     val context = LocalContext.current
@@ -157,6 +162,23 @@ fun PlaybackArt(playback: Playback, modifier: Modifier, sizePx: Int = 256, conte
             Image(img, null, Modifier.fillMaxSize(), contentScale = contentScale)
         } else if (playback.artUri != null) {
             Thumbnail(playback.artUri, Modifier.fillMaxSize(), sizePx = sizePx, contentScale = contentScale)
+        }
+        // Another app's music: its icon in the corner, so it never looks like PulseRadio.
+        val pkg = playback.packageName
+        if (!playback.own && pkg != null) {
+            val context = LocalContext.current
+            val icon = remember(pkg) {
+                runCatching {
+                    val d = context.packageManager.getApplicationIcon(pkg)
+                    val b = android.graphics.Bitmap.createBitmap(64, 64, android.graphics.Bitmap.Config.ARGB_8888)
+                    d.setBounds(0, 0, 64, 64)
+                    d.draw(android.graphics.Canvas(b))
+                    b.asImageBitmap()
+                }.getOrNull()
+            }
+            if (icon != null) {
+                Image(icon, null, Modifier.align(Alignment.BottomEnd).fillMaxSize(0.38f).padding(1.dp))
+            }
         }
     }
 }

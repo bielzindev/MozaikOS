@@ -9,7 +9,16 @@ import android.net.Uri
 import android.os.Environment
 import android.view.View
 import android.view.ViewGroup
+import android.Manifest
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.pm.PackageManager
+import android.os.Message
+import android.print.PrintManager
 import android.webkit.CookieManager
+import android.webkit.GeolocationPermissions
+import android.webkit.PermissionRequest
+import android.webkit.WebResourceResponse
 import android.webkit.URLUtil
 import android.webkit.ValueCallback
 import android.webkit.WebChromeClient
@@ -37,6 +46,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -100,9 +110,17 @@ class BrowserTab(val id: Long, val private: Boolean) {
     var loading by mutableStateOf(false)
     var thumb by mutableStateOf<Bitmap?>(null)
     var desktop by mutableStateOf(false)
+    /** Ads and trackers blocked on the page shown. */
+    var blocked by mutableIntStateOf(0)
 }
 
-private enum class Panel { None, Tabs, Menu, Hub, Settings, Find }
+/** What was pressed and held on a page: a link, a picture, or a picture that is a link. */
+class LinkMenu(val link: String?, val image: String?)
+
+/** The reading view of a page: its title and its text as headings and paragraphs. */
+class ReaderPage(val title: String, val blocks: List<Pair<Boolean, String>>)
+
+private enum class Panel { None, Tabs, Menu, Hub, Settings, Find, Reader }
 
 private const val MAX_TABS = 9
 private const val DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -125,6 +143,7 @@ class BrowserActivity : WpActivity() {
     val tabs = mutableStateListOf<BrowserTab>()
     var current by mutableIntStateOf(0)
     var customView by mutableStateOf<View?>(null)
+    var linkMenu by mutableStateOf<LinkMenu?>(null)
     private var customCallback: WebChromeClient.CustomViewCallback? = null
     private var nextId = 1L
     private val store by lazy { BrowserStore.get(this) }
@@ -238,6 +257,89 @@ class BrowserActivity : WpActivity() {
         Toast.makeText(this, getString(R.string.browser_cleared), Toast.LENGTH_SHORT).show()
     }
 
+    fun download(url: String, ua: String?, disposition: String?, mime: String?) {
+        runCatching {
+            val name = URLUtil.guessFileName(url, disposition, mime)
+            val req = DownloadManager.Request(Uri.parse(url))
+                .setTitle(name)
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
+            if (!mime.isNullOrBlank()) req.setMimeType(mime)
+            if (!ua.isNullOrBlank()) req.addRequestHeader("User-Agent", ua)
+            CookieManager.getInstance().getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
+            (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            Toast.makeText(this, getString(R.string.browser_downloading, name), Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    fun copyLink(url: String) {
+        getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText(url, url))
+        Toast.makeText(this, getString(R.string.browser_link_copied), Toast.LENGTH_SHORT).show()
+    }
+
+    fun shareLink(url: String, title: String = "") {
+        runCatching {
+            startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, url).putExtra(Intent.EXTRA_SUBJECT, title), null))
+        }
+    }
+
+    fun printPage(t: BrowserTab) {
+        val w = t.web ?: return
+        runCatching {
+            val name = t.title.ifBlank { displayAddress(t) }.ifBlank { "page" }
+            getSystemService(PrintManager::class.java)?.print(name, w.createPrintDocumentAdapter(name), null)
+        }
+    }
+
+    fun translatePage(t: BrowserTab) {
+        if (t.url.isBlank()) return
+        val lang = java.util.Locale.getDefault().language.ifBlank { "en" }
+        load(t, "https://translate.google.com/translate?sl=auto&tl=$lang&u=" + Uri.encode(t.url))
+    }
+
+    /** Text size and dark pages, from the settings, on every open tab. */
+    fun applyLook() {
+        tabs.forEach { t ->
+            t.web?.settings?.textZoom = store.textZoom
+            t.web?.let { applyDark(it) }
+        }
+    }
+
+    private fun applyDark(w: WebView) {
+        val on = store.forceDark
+        w.evaluateJavascript(
+            "(function(){var id='mozaik-dark';var e=document.getElementById(id);" +
+                "if(!$on){if(e)e.remove();return;}if(e)return;e=document.createElement('style');e.id=id;" +
+                "e.textContent='html{filter:invert(1) hue-rotate(180deg)!important;background:#fff!important}" +
+                "img,video,picture,canvas,iframe,svg image,[style*=\"background-image\"]{filter:invert(1) hue-rotate(180deg)!important}';" +
+                "(document.head||document.documentElement).appendChild(e);})()",
+            null,
+        )
+    }
+
+    /** Reads the article of the page (the text of its <article> or <main>) for the reading view. */
+    fun readPage(t: BrowserTab, onResult: (ReaderPage?) -> Unit) {
+        val w = t.web ?: return onResult(null)
+        val js = "(function(){var r=document.querySelector('article')||document.querySelector('main')||document.querySelector('[role=main]')||document.body;" +
+            "var n=r.querySelectorAll('h1,h2,h3,p,li,blockquote,pre');var o=[];" +
+            "for(var i=0;i<n.length;i++){var x=n[i];if(x.closest('nav,footer,aside,header,form,[aria-hidden=true]'))continue;" +
+            "var s=(x.innerText||'').replace(/\\s+/g,' ').trim();var h=/^H/.test(x.tagName);" +
+            "if((h&&s.length>2)||s.length>=40)o.push([h?1:0,s]);}" +
+            "return JSON.stringify({t:document.title,p:o});})()"
+        w.evaluateJavascript(js) { raw ->
+            val page = runCatching {
+                val json = org.json.JSONObject(org.json.JSONTokener(raw).nextValue() as String)
+                val p = json.getJSONArray("p")
+                val blocks = List(p.length()) { i -> p.getJSONArray(i).let { (it.getInt(0) == 1) to it.getString(1) } }
+                    .distinctBy { it.second }
+                ReaderPage(json.optString("t"), blocks)
+            }.getOrNull()
+            onResult(page?.takeIf { it.blocks.count { b -> !b.first } >= 2 })
+        }
+    }
+
+    private fun has(permission: String) = checkSelfPermission(permission) == PackageManager.PERMISSION_GRANTED
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun makeWebView(t: BrowserTab): WebView = WebView(this).apply {
         layoutParams = ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -250,10 +352,42 @@ class BrowserActivity : WpActivity() {
             displayZoomControls = false
             setSupportZoom(true)
             mediaPlaybackRequiresUserGesture = true
+            textZoom = store.textZoom
+            // target="_blank" links and window.open open a new tab (see onCreateWindow).
+            setSupportMultipleWindows(true)
+            javaScriptCanOpenWindowsAutomatically = false
+            setGeolocationEnabled(true)
             if (t.private) cacheMode = android.webkit.WebSettings.LOAD_NO_CACHE
         }
         CookieManager.getInstance().setAcceptThirdPartyCookies(this, !t.private)
+        setOnLongClickListener {
+            val hit = hitTestResult
+            when (hit.type) {
+                WebView.HitTestResult.SRC_ANCHOR_TYPE -> hit.extra?.let { linkMenu = LinkMenu(it, null) }
+                WebView.HitTestResult.IMAGE_TYPE -> hit.extra?.let { linkMenu = LinkMenu(null, it) }
+                WebView.HitTestResult.SRC_IMAGE_ANCHOR_TYPE -> {
+                    // extra is the picture; the link it sits in comes from requestFocusNodeHref.
+                    val msg = android.os.Handler(android.os.Looper.getMainLooper()).obtainMessage()
+                    requestFocusNodeHref(msg)
+                    val href = msg.data?.getString("url")?.takeIf { it.isNotBlank() }
+                    linkMenu = LinkMenu(href ?: hit.extra, hit.extra)
+                }
+                else -> return@setOnLongClickListener false
+            }
+            linkMenu != null
+        }
         webViewClient = object : WebViewClient() {
+            override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+                if (!store.adBlock) return null
+                val r = AdBlock.intercept(request.url, request.isForMainFrame)
+                if (r != null) view.post { t.blocked++ }
+                return r
+            }
+
+            override fun onPageCommitVisible(view: WebView, url: String) {
+                if (store.forceDark) applyDark(view)
+            }
+
             override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
                 val u = request.url
                 val scheme = u.scheme?.lowercase()
@@ -276,12 +410,14 @@ class BrowserActivity : WpActivity() {
             override fun onPageStarted(view: WebView, url: String, favicon: Bitmap?) {
                 t.url = url
                 t.loading = true
+                t.blocked = 0
             }
 
             override fun onPageFinished(view: WebView, url: String) {
                 t.url = url
                 t.loading = false
                 t.title = view.title.orEmpty()
+                if (store.forceDark) applyDark(view)
                 if (!t.private) store.visit(t.title, url)
             }
         }
@@ -305,26 +441,49 @@ class BrowserActivity : WpActivity() {
 
             override fun onHideCustomView() = exitFullscreen()
 
+            override fun onCreateWindow(view: WebView, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message): Boolean {
+                // Only windows the user asked for (a tap on a link): pop-ups stay blocked.
+                if (!isUserGesture || tabs.size >= MAX_TABS) return false
+                val nt = BrowserTab(nextId++, t.private)
+                val web = makeWebView(nt)
+                nt.web = web
+                tabs += nt
+                current = tabs.lastIndex
+                (resultMsg.obj as? WebView.WebViewTransport)?.webView = web
+                resultMsg.sendToTarget()
+                return true
+            }
+
+            override fun onCloseWindow(window: WebView) {
+                tabs.firstOrNull { it.web === window }?.let { closeTab(it) }
+            }
+
+            // Sites that ask for the location, camera or microphone get them when Mozaik has them.
+            override fun onGeolocationPermissionsShowPrompt(origin: String, callback: GeolocationPermissions.Callback) {
+                val ok = has(Manifest.permission.ACCESS_FINE_LOCATION) || has(Manifest.permission.ACCESS_COARSE_LOCATION)
+                if (!ok) requestPermissions(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION), 7)
+                callback.invoke(origin, ok, false)
+            }
+
+            override fun onPermissionRequest(request: PermissionRequest) {
+                val granted = request.resources.filter {
+                    when (it) {
+                        PermissionRequest.RESOURCE_VIDEO_CAPTURE -> has(Manifest.permission.CAMERA)
+                        PermissionRequest.RESOURCE_AUDIO_CAPTURE -> has(Manifest.permission.RECORD_AUDIO)
+                        PermissionRequest.RESOURCE_PROTECTED_MEDIA_ID -> true
+                        else -> false
+                    }
+                }
+                if (granted.isEmpty()) request.deny() else request.grant(granted.toTypedArray())
+            }
+
             override fun onShowFileChooser(view: WebView, callback: ValueCallback<Array<Uri>>, params: FileChooserParams): Boolean {
                 fileCallback?.onReceiveValue(null)
                 fileCallback = callback
                 return runCatching { fileLauncher.launch(params.createIntent()) }.isSuccess.also { if (!it) fileCallback = null }
             }
         }
-        setDownloadListener { url, ua, disposition, mime, _ ->
-            runCatching {
-                val name = URLUtil.guessFileName(url, disposition, mime)
-                val req = DownloadManager.Request(Uri.parse(url))
-                    .setMimeType(mime)
-                    .addRequestHeader("User-Agent", ua)
-                    .setTitle(name)
-                    .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                    .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, name)
-                CookieManager.getInstance().getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
-                (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
-                Toast.makeText(this@BrowserActivity, getString(R.string.browser_downloading, name), Toast.LENGTH_SHORT).show()
-            }
-        }
+        setDownloadListener { url, ua, disposition, mime, _ -> download(url, ua, disposition, mime) }
     }
 }
 
@@ -338,11 +497,15 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
     var field by remember { mutableStateOf(TextFieldValue("")) }
     val focusRequester = remember { FocusRequester() }
     var findText by remember { mutableStateOf("") }
+    var reader by remember { mutableStateOf<ReaderPage?>(null) }
+    // On the dark InPrivate bar the buttons are white, in any theme.
+    val barFg = if (t.private) Color.White else Wp.palette.foreground
 
     // Back: full screen video → panels → address bar → page history → close.
     BackHandler(enabled = a.customView != null || panel != Panel.None || editing || t.web?.canGoBack() == true || true) {
         when {
             a.customView != null -> a.exitFullscreen()
+            a.linkMenu != null -> a.linkMenu = null
             panel != Panel.None -> {
                 if (panel == Panel.Find) t.web?.clearMatches()
                 panel = Panel.None
@@ -370,7 +533,7 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                     },
                 )
                 if (t.url.isBlank()) StartPage(store, t.private) { a.load(t, it) }
-                if (editing && field.text.isNotBlank()) Suggestions(store, field.text) {
+                if (editing && field.text.isNotBlank()) Suggestions(store, field.text, store.engine.label) {
                     focus.clearFocus()
                     a.load(t, it)
                 }
@@ -392,6 +555,11 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                 Modifier.fillMaxWidth().height(56.dp).background(if (t.private) Color(0xFF1F1F1F) else Wp.palette.chrome).padding(horizontal = 8.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                if (!editing && t.url.startsWith("https://")) {
+                    WpIcon(WpIcons.Lock, tint = barFg.copy(alpha = 0.7f), size = 14.dp, modifier = Modifier.padding(start = 4.dp))
+                } else if (!editing && t.url.startsWith("http://")) {
+                    WpIcon(WpIcons.Info, tint = barFg.copy(alpha = 0.7f), size = 14.dp, modifier = Modifier.padding(start = 4.dp))
+                }
                 if (t.private && !editing) {
                     Box(Modifier.background(Wp.accent).padding(horizontal = 5.dp, vertical = 2.dp)) {
                         WpText("InPrivate", style = WpType.Small, color = Color.White)
@@ -403,7 +571,8 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                     value = shown,
                     onValueChange = { field = it },
                     singleLine = true,
-                    textStyle = WpType.Normal.copy(color = if (t.private) Color.White else Wp.palette.foreground, fontSize = 16.sp),
+                    // While typing the box is white, so the text is black in every theme.
+                    textStyle = WpType.Normal.copy(color = if (editing) Color.Black else barFg, fontSize = 16.sp),
                     cursorBrush = SolidColor(Wp.accent),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Go, autoCorrectEnabled = false),
                     keyboardActions = KeyboardActions(onGo = {
@@ -426,13 +595,13 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                         },
                     decorationBox = { inner ->
                         Box(contentAlignment = Alignment.CenterStart) {
-                            if (shown.text.isEmpty()) WpText(stringResource(R.string.browser_address_hint), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
+                            if (shown.text.isEmpty()) WpText(stringResource(R.string.browser_address_hint), style = WpType.Normal, color = if (editing) Color(0xFF8A8A8A) else barFg.copy(alpha = 0.6f), maxLines = 1)
                             inner()
                         }
                     },
                 )
                 if (!editing) {
-                    BarButton(if (t.loading) WpIcons.Close else WpIcons.Refresh, stringResource(if (t.loading) R.string.browser_stop else R.string.refresh)) {
+                    BarButton(if (t.loading) WpIcons.Close else WpIcons.Refresh, stringResource(if (t.loading) R.string.browser_stop else R.string.refresh), barFg) {
                         if (t.loading) t.web?.stopLoading() else t.web?.reload()
                     }
                     // Tabs: a square with the number of tabs.
@@ -443,22 +612,31 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                         },
                         contentAlignment = Alignment.Center,
                     ) {
-                        Box(Modifier.size(24.dp).border(2.dp, Wp.palette.foreground), contentAlignment = Alignment.Center) {
-                            WpText(a.tabs.size.toString(), style = WpType.Small.copy(fontSize = 12.sp), color = Wp.palette.foreground)
+                        Box(Modifier.size(24.dp).border(2.dp, barFg), contentAlignment = Alignment.Center) {
+                            WpText(a.tabs.size.toString(), style = WpType.Small.copy(fontSize = 12.sp), color = barFg)
                         }
                     }
-                    BarButton(WpIcons.More, stringResource(R.string.browser_more)) { panel = if (panel == Panel.Menu) Panel.None else Panel.Menu }
+                    BarButton(WpIcons.More, stringResource(R.string.browser_more), barFg) { panel = if (panel == Panel.Menu) Panel.None else Panel.Menu }
                 }
             }
         }
 
         when (panel) {
             Panel.Tabs -> TabsPage(a, onClose = { panel = Panel.None })
-            Panel.Menu -> MenuPanel(a, store, t, onDismiss = { panel = Panel.None }) { panel = it }
+            Panel.Menu -> MenuPanel(a, store, t, onDismiss = { panel = Panel.None }) { p ->
+                if (p == Panel.Reader) {
+                    a.readPage(t) { page ->
+                        if (page == null) Toast.makeText(a, a.getString(R.string.browser_reader_empty), Toast.LENGTH_SHORT).show()
+                        else { reader = page; panel = Panel.Reader }
+                    }
+                } else panel = p
+            }
             Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
             Panel.Settings -> SettingsPage(a, store)
+            Panel.Reader -> reader?.let { ReaderView(it, store) }
             else -> {}
         }
+        a.linkMenu?.let { m -> LinkMenuPanel(a, m, t.private) { a.linkMenu = null } }
         a.customView?.let { v ->
             AndroidView(
                 factory = { ctx -> FrameLayout(ctx).apply { setBackgroundColor(android.graphics.Color.BLACK) } },
@@ -482,9 +660,9 @@ private fun displayAddress(t: BrowserTab): String {
 }
 
 @Composable
-private fun BarButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun BarButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, tint: Color = Wp.palette.foreground, onClick: () -> Unit) {
     Box(Modifier.size(44.dp).wpClickable(onClick = onClick), contentAlignment = Alignment.Center) {
-        WpIcon(icon, tint = Wp.palette.foreground, size = 24.dp)
+        WpIcon(icon, tint = tint, size = 24.dp)
     }
 }
 
@@ -537,15 +715,23 @@ private fun EntryRow(e: WebEntry, onLongClick: (() -> Unit)? = null, onOpen: () 
 
 /** While typing: matching favourites and history above the address bar. */
 @Composable
-private fun Suggestions(store: BrowserStore, text: String, onPick: (String) -> Unit) {
-    val q = text.lowercase()
+private fun Suggestions(store: BrowserStore, text: String, engine: String, onPick: (String) -> Unit) {
+    val q = text.trim().lowercase()
     val list = remember(text) {
-        (store.favorites + store.history).filter { it.url.lowercase().contains(q) || it.title.lowercase().contains(q) }.distinctBy { it.url }.take(6)
+        (store.favorites + store.history).filter { it.url.lowercase().contains(q) || it.title.lowercase().contains(q) }.distinctBy { it.url }.take(5)
     }
-    if (list.isEmpty()) return
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
         Column(Modifier.fillMaxWidth().background(Wp.palette.chrome).padding(horizontal = 16.dp, vertical = 6.dp)) {
             list.forEach { e -> EntryRow(e) { onPick(e.url) } }
+            // Always offered: search the words with the chosen engine.
+            Row(Modifier.fillMaxWidth().wpClickable { onPick(text) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                WpIcon(WpIcons.Search, tint = Wp.accent, size = 20.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    WpText(stringResource(R.string.browser_search_for, text.trim()), style = WpType.Large.copy(fontSize = 19.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    WpText(engine, style = WpType.Small, color = Wp.palette.subtle)
+                }
+            }
         }
     }
 }
@@ -573,7 +759,9 @@ private fun MenuPanel(a: BrowserActivity, store: BrowserStore, t: BrowserTab, on
     Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss)) {
         Column(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Wp.palette.chrome).clickable(remember { MutableInteractionSource() }, null) {}
-                .padding(bottom = 62.dp, top = 8.dp),
+                .padding(bottom = 62.dp, top = 8.dp)
+                .heightIn(max = 560.dp)
+                .verticalScroll(rememberScrollState()),
         ) {
             @Composable
             fun Item(label: String, enabled: Boolean = true, onClick: () -> Unit) {
@@ -591,14 +779,23 @@ private fun MenuPanel(a: BrowserActivity, store: BrowserStore, t: BrowserTab, on
                 store.toggleFavorite(t.title, t.url)
             }
             Item(stringResource(R.string.browser_hub)) { open(Panel.Hub) }
-            Item(stringResource(R.string.share), enabled = t.url.isNotBlank()) {
-                runCatching {
-                    a.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, t.url).putExtra(Intent.EXTRA_SUBJECT, t.title), null))
-                }
-            }
+            Item(stringResource(R.string.browser_reader), enabled = t.url.isNotBlank()) { open(Panel.Reader) }
+            Item(stringResource(R.string.share), enabled = t.url.isNotBlank()) { a.shareLink(t.url, t.title) }
             Item(stringResource(R.string.browser_find), enabled = t.url.isNotBlank()) { open(Panel.Find) }
+            Item(stringResource(R.string.browser_translate), enabled = t.url.isNotBlank()) { a.translatePage(t) }
+            Item(stringResource(R.string.browser_print), enabled = t.url.isNotBlank()) { a.printPage(t) }
+            Item(stringResource(R.string.browser_downloads)) {
+                runCatching { a.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+            }
             Item(stringResource(if (t.desktop) R.string.browser_mobile_site else R.string.browser_desktop_site), enabled = t.url.isNotBlank()) { a.setDesktop(t, !t.desktop) }
             Item(stringResource(R.string.browser_settings)) { open(Panel.Settings) }
+            if (t.blocked > 0) {
+                WpText(
+                    pluralSafe(stringResource(R.string.browser_blocked), t.blocked),
+                    style = WpType.Small, color = Wp.palette.subtle,
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
+                )
+            }
         }
     }
 }
@@ -659,16 +856,35 @@ private fun HubPage(store: BrowserStore, onOpen: (String) -> Unit) {
             title = stringResource(R.string.app_browser),
             headers = listOf(stringResource(R.string.browser_favorites), stringResource(R.string.browser_history)),
         ) { index ->
-            val list = if (index == 0) store.favorites.toList() else store.history.toList()
+            var query by remember { mutableStateOf("") }
+            val all = if (index == 0) store.favorites.toList() else store.history.toList()
+            val q = query.trim().lowercase()
+            val list = if (q.isEmpty()) all else all.filter { it.title.lowercase().contains(q) || it.url.lowercase().contains(q) }
+            Column(Modifier.fillMaxSize()) {
+            if (index == 1 && all.isNotEmpty()) {
+                BasicTextField(
+                    query, { query = it }, singleLine = true,
+                    textStyle = WpType.Normal.copy(color = Color.Black, fontSize = 16.sp),
+                    cursorBrush = SolidColor(Wp.accent),
+                    modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp).fillMaxWidth().background(Color.White).border(2.dp, Wp.palette.subtle).padding(8.dp),
+                    decorationBox = { inner ->
+                        Box(contentAlignment = Alignment.CenterStart) {
+                            if (query.isEmpty()) WpText(stringResource(R.string.browser_search_history), style = WpType.Normal, color = Color(0xFF8A8A8A), maxLines = 1)
+                            inner()
+                        }
+                    },
+                )
+            }
             if (list.isEmpty()) {
                 WpText(stringResource(if (index == 0) R.string.browser_no_favorites else R.string.browser_no_history), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.padding(20.dp))
             } else {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
+                LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
                     items(list, key = { it.url + it.time }) { e ->
                         // Press and hold removes it.
                         EntryRow(e, onLongClick = { if (index == 0) store.removeFavorite(e) else store.removeHistory(e) }) { onOpen(e.url) }
                     }
                 }
+            }
             }
         }
     }
@@ -690,12 +906,98 @@ private fun SettingsPage(a: BrowserActivity, store: BrowserStore) {
                 WpText(e.label, style = WpType.Large)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        var adBlock by remember { mutableStateOf(store.adBlock) }
+        com.wpreborn.core.ui.WpToggle(stringResource(R.string.browser_adblock), adBlock) { adBlock = it; store.adBlock = it }
+        var dark by remember { mutableStateOf(store.forceDark) }
+        com.wpreborn.core.ui.WpToggle(stringResource(R.string.browser_force_dark), dark) { dark = it; store.forceDark = it; a.applyLook() }
+        Spacer(Modifier.height(8.dp))
+        WpText(stringResource(R.string.browser_text_size), style = WpType.Subtle, color = Wp.palette.subtle)
+        var zoom by remember { mutableIntStateOf(store.textZoom) }
+        Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            listOf(85, 100, 115, 130, 150, 175).forEach { z ->
+                val on = zoom == z
+                Box(
+                    Modifier.weight(1f).height(40.dp).background(if (on) Wp.accent else Color.Transparent).border(2.dp, if (on) Wp.accent else Wp.palette.subtle)
+                        .wpClickable { zoom = z; store.textZoom = z; a.applyLook() },
+                    contentAlignment = Alignment.Center,
+                ) { WpText("$z%", style = WpType.Small, color = if (on) Color.White else Wp.palette.foreground) }
+            }
+        }
         Spacer(Modifier.height(16.dp))
         com.wpreborn.core.ui.WpButton(stringResource(R.string.browser_clear)) { a.clearData() }
         WpText(stringResource(R.string.browser_engine_info), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 16.dp))
         Spacer(Modifier.height(10.dp))
         com.wpreborn.core.ui.WpButton(stringResource(R.string.browser_make_default)) {
             runCatching { a.startActivity(Intent(android.provider.Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS)) }
+        }
+    }
+}
+
+private fun pluralSafe(format: String, n: Int): String = runCatching { String.format(format, n) }.getOrDefault(n.toString())
+
+/** Press and hold on a link or picture: what to do with it, as a Windows Phone context menu. */
+@Composable
+private fun LinkMenuPanel(a: BrowserActivity, m: LinkMenu, private: Boolean, onDismiss: () -> Unit) {
+    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss)) {
+        Column(
+            Modifier.align(Alignment.Center).fillMaxWidth().background(Wp.palette.chrome).clickable(remember { MutableInteractionSource() }, null) {}
+                .padding(vertical = 10.dp),
+        ) {
+            WpText(
+                m.link ?: m.image.orEmpty(), style = WpType.Small, color = Wp.palette.subtle, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
+            )
+            @Composable
+            fun Item(label: String, onClick: () -> Unit) {
+                WpText(
+                    label, style = WpType.Large.copy(fontSize = 20.sp),
+                    modifier = Modifier.fillMaxWidth().wpClickable { onDismiss(); onClick() }.padding(horizontal = 20.dp, vertical = 10.dp),
+                )
+            }
+            m.link?.let { link ->
+                Item(stringResource(R.string.browser_open_new_tab)) { a.newTab(link, private = private) }
+                if (!private) Item(stringResource(R.string.browser_open_inprivate)) { a.newTab(link, private = true) }
+                Item(stringResource(R.string.browser_copy_link)) { a.copyLink(link) }
+                Item(stringResource(R.string.browser_share_link)) { a.shareLink(link) }
+            }
+            m.image?.let { img ->
+                if (img.startsWith("http")) Item(stringResource(R.string.browser_save_image)) { a.download(img, null, null, null) }
+                Item(stringResource(R.string.browser_open_image)) { a.newTab(img, private = private) }
+            }
+        }
+    }
+}
+
+/** Reading view: the article alone, in large text, without ads or menus. */
+@Composable
+private fun ReaderView(page: ReaderPage, store: BrowserStore) {
+    var size by remember { mutableIntStateOf(store.readerSize) }
+    Column(Modifier.fillMaxSize().background(Wp.palette.background)) {
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            WpText(stringResource(R.string.browser_reader).uppercase(), style = WpType.AppTitle, modifier = Modifier.weight(1f))
+            listOf(-2 to "A-", 2 to "A+").forEach { (d, label) ->
+                Box(
+                    Modifier.size(44.dp).wpClickable { size = (size + d).coerceIn(14, 32); store.readerSize = size },
+                    contentAlignment = Alignment.Center,
+                ) { WpText(label, style = WpType.Large, color = Wp.palette.foreground) }
+            }
+        }
+        LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 32.dp)) {
+            item {
+                WpText(
+                    page.title, style = WpType.Header.copy(fontSize = (size + 11).sp, lineHeight = (size + 17).sp),
+                    modifier = Modifier.padding(bottom = 16.dp),
+                )
+            }
+            items(page.blocks.size) { i ->
+                val (heading, text) = page.blocks[i]
+                if (heading) {
+                    WpText(text, style = WpType.Large.copy(fontSize = (size + 4).sp, lineHeight = (size + 10).sp), modifier = Modifier.padding(top = 10.dp, bottom = 6.dp))
+                } else {
+                    WpText(text, style = WpType.Normal.copy(fontSize = size.sp, lineHeight = (size * 1.5f).sp), modifier = Modifier.padding(bottom = 12.dp))
+                }
+            }
         }
     }
 }

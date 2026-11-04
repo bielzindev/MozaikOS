@@ -39,6 +39,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.key
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -84,7 +85,9 @@ import com.wpreborn.data.tiles.TileSpec
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlin.math.cos
 import kotlin.math.roundToInt
+import kotlin.math.sin
 
 /** Geometry of the Start grid, derived from the screen width like the 8.1 layout. */
 data class StartGeometry(val columns: Int, val unit: Dp, val gap: Dp, val margin: Dp) {
@@ -156,7 +159,8 @@ fun StartScreen(
         val rows = TileLayout.rows(tiles, placements)
         val unitPx = with(density) { (geo.unit + geo.gap).toPx() }
         val marginPx = with(density) { geo.margin.toPx() }
-        val topPad = 36.dp
+        // Windows Phone 8.1 starts the tiles just under the status bar, one margin down.
+        val topPad = geo.margin + geo.gap
         val topPadPx = with(density) { topPad.toPx() }
 
         // Drag bookkeeping, in content coordinates.
@@ -199,7 +203,18 @@ fun StartScreen(
         }
 
         // At least the screen height, so pressing and holding below the last tile is caught too.
-        val contentHeight = maxOf(geo.y(rows) + topPad + 140.dp, maxHeight)
+        // Below the last row only room for the "all apps" gesture, as on the phone.
+        val contentHeight = maxOf(geo.y(rows) + topPad + geo.unit * 0.9f, maxHeight)
+
+        // Edit mode: every tile floats gently, each on its own path, like tiles lifted off the
+        // screen. One clock for all of them, read while drawing, so no tile recomposes per frame.
+        val floatClock = remember { mutableFloatStateOf(0f) }
+        LaunchedEffect(state.editId != null) {
+            if (state.editId == null) return@LaunchedEffect
+            val t0 = withFrameNanos { it }
+            while (isActive) withFrameNanos { floatClock.floatValue = (it - t0) / 1_000_000_000f }
+        }
+        val floatAmp = with(density) { 3.dp.toPx() }
         androidx.compose.runtime.CompositionLocalProvider(LocalTurnstile provides state.turnstile) {
             Box(
                 Modifier
@@ -320,6 +335,17 @@ fun StartScreen(
                                     scaleX = scale
                                     scaleY = scale
                                     alpha = if (editing && !selected) 0.75f else 1f
+                                    if (editing && !dragging) {
+                                        val c = floatClock.floatValue
+                                        val phase = (tile.id.hashCode() and 0xFFFF) / 65535f * 6.2832f
+                                        val amp = if (selected) floatAmp * 0.6f else floatAmp
+                                        translationX = sin(c * 1.7f + phase) * amp
+                                        translationY = cos(c * 1.3f + phase * 1.9f) * amp
+                                        rotationZ = sin(c * 1.1f + phase * 0.7f) * 0.8f
+                                    }
+                                    if (selected || dragging) {
+                                        shadowElevation = if (dragging) 18f else 10f
+                                    }
                                 },
                         ) {
                             Box(

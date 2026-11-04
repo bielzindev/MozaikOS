@@ -669,6 +669,13 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
         handler.removeCallbacks(repeat)
     }
 
+    // The keyboard can close while a key is still held: never keep deleting behind it.
+    override fun onDetachedFromWindow() {
+        stopRepeat()
+        handler.removeCallbacks(longPress)
+        super.onDetachedFromWindow()
+    }
+
     fun haptic() {
         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
     }

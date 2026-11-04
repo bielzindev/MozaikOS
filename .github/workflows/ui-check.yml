@@ -1,8 +1,7 @@
 name: UI check (emulator)
 
+# Manual only: the emulator run takes up to 45 minutes of Actions time per push.
 on:
-  push:
-    branches-ignore: ["ci-screenshots"]
   workflow_dispatch:
 
 permissions:

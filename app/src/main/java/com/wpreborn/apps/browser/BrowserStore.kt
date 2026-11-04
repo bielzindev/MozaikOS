@@ -24,6 +24,25 @@ class BrowserStore private constructor(context: Context) {
         get() = runCatching { SearchEngine.valueOf(prefs.getString("engine", null) ?: "") }.getOrDefault(SearchEngine.Google)
         set(v) = prefs.edit().putString("engine", v.name).apply()
 
+    var adBlock: Boolean
+        get() = prefs.getBoolean("adblock", true)
+        set(v) = prefs.edit().putBoolean("adblock", v).apply()
+
+    /** Dark pages: every site in dark colours (the page is inverted, pictures kept). */
+    var forceDark: Boolean
+        get() = prefs.getBoolean("force_dark", false)
+        set(v) = prefs.edit().putBoolean("force_dark", v).apply()
+
+    /** Text size of pages, in percent. */
+    var textZoom: Int
+        get() = prefs.getInt("text_zoom", 100)
+        set(v) = prefs.edit().putInt("text_zoom", v).apply()
+
+    /** Text size of the reading view, in sp. */
+    var readerSize: Int
+        get() = prefs.getInt("reader_size", 19)
+        set(v) = prefs.edit().putInt("reader_size", v).apply()
+
     var openTabs: List<String>
         get() = runCatching { JSONArray(prefs.getString("tabs", "[]")).let { a -> List(a.length()) { a.getString(it) } } }.getOrDefault(emptyList())
         set(v) = prefs.edit().putString("tabs", JSONArray(v).toString()).apply()

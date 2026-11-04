@@ -1,0 +1,5 @@
+11-04 23:53:00.381  2760  4832 E native  : E0000 00:00:1793836380.381505    4832 proto_data_store.cc:36] Could not open file /data/user/0/com.wpreborn.launcher/files/com.google.mlkit.acceleration/com.google.perception.acceleration_analytics_storage_v2.: No such file or directory
+11-04 23:55:40.639   347   347 E SurfaceFlinger: [SurfaceView - com.wpreborn.launcher/com.wpreborn.apps.maps.MapsActivity#0] rejecting buffer: bufWidth=1080, bufHeight=1910, front.active_legacy.{w=1080, h=1827}
+11-04 23:55:41.670  2760  2760 E Mbgl-LocationComponent: 	at com.wpreborn.apps.maps.MapsActivity$Content$3$1.invokeSuspend$lambda$1(MapsActivity.kt:211)
+11-04 23:55:41.670  2760  2760 E Mbgl-LocationComponent: 	at com.wpreborn.apps.maps.MapsActivity$Content$3$1.$r8$lambda$39WlHGif9irPaLkSQI7UL9PS-aY(Unknown Source:0)
+11-04 23:55:41.670  2760  2760 E Mbgl-LocationComponent: 	at com.wpreborn.apps.maps.MapsActivity$Content$3$1$$ExternalSyntheticLambda0.onStyleLoaded(D8$$SyntheticClass:0)

@@ -68,7 +68,7 @@ import java.net.URLEncoder
 data class ArtistBio(val title: String, val text: String, val image: String?, val page: String)
 
 object ArtistBios {
-    private const val AGENT = "ZUNEX launcher (https://github.com/joaogabrielsilvademourap3-spec/zunex)"
+    private const val AGENT = "Mozaik launcher (https://github.com/joaogabrielsilvademourap3-spec/zunex)"
 
     private fun get(url: String): String {
         val c = URL(url).openConnection() as HttpURLConnection

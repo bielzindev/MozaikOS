@@ -268,7 +268,7 @@ object WebImages {
             val file = File(dir, url.hashCode().toString() + "_" + url.length)
             if (!file.exists()) {
                 val conn = URL(url).openConnection() as HttpURLConnection
-                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) ZUNEX-News")
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) Mozaik-News")
                 conn.instanceFollowRedirects = true
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 15_000

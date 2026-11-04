@@ -295,7 +295,7 @@ private fun DetailsPage(c: CatalogApp, nav: WpNavigator<StorePage>) {
                         Spacer(Modifier.width(16.dp))
                         Column {
                             WpText(name, style = WpType.ExtraLarge, maxLines = 2)
-                            WpText("ZUNEX · João Gabriel", style = WpType.Normal, color = Wp.palette.subtle)
+                            WpText("Mozaik · João Gabriel", style = WpType.Normal, color = Wp.palette.subtle)
                             WpText(stringResource(c.category.label), style = WpType.Small, color = Wp.palette.subtle)
                             WpText(
                                 stateLabel(c, s, manager),
@@ -338,7 +338,7 @@ private fun DetailsPage(c: CatalogApp, nav: WpNavigator<StorePage>) {
                     Section(stringResource(R.string.store_information), 5)
                     InfoLine(stringResource(R.string.store_version), c.version)
                     if (s.installed && s.versionCode < c.versionCode) InfoLine(stringResource(R.string.store_installed_version), stringResource(R.string.store_older))
-                    InfoLine(stringResource(R.string.store_publisher), "João Gabriel (ZUNEX)")
+                    InfoLine(stringResource(R.string.store_publisher), "João Gabriel (Mozaik)")
                     InfoLine(stringResource(R.string.store_category), stringResource(c.category.label))
                     if (c.permissions.isNotEmpty()) {
                         Section(stringResource(R.string.store_permissions), 6)

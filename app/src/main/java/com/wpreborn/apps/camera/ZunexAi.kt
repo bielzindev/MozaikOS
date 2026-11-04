@@ -139,7 +139,7 @@ private fun tuning(scene: Scene): Tuning = when (scene) {
 }
 
 /**
- * Processes a captured JPEG with the AI and saves it to Pictures/ZUNEX. Falls back to the
+ * Processes a captured JPEG with the AI and saves it to Pictures/Mozaik. Falls back to the
  * camera's own JPEG if anything fails (e.g. memory). Returns the saved picture.
  */
 suspend fun saveAiPhoto(
@@ -155,7 +155,7 @@ suspend fun saveAiPhoto(
     val values = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, name)
         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/ZUNEX")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Mozaik")
         put(MediaStore.MediaColumns.IS_PENDING, 1)
     }
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext null
@@ -193,7 +193,7 @@ suspend fun saveAiPhoto(
                         for (tag in EXIF_TAGS) o.getAttribute(tag)?.let { exif.setAttribute(tag, it) }
                     }
                     exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-                    exif.setAttribute(ExifInterface.TAG_SOFTWARE, "ZUNEX Camera AI")
+                    exif.setAttribute(ExifInterface.TAG_SOFTWARE, "Mozaik Camera AI")
                     exif.saveAttributes()
                 }
             }
@@ -219,14 +219,14 @@ suspend fun saveAiPhoto(
 
 /**
  * Saves a ZUNEX Fusion picture (already merged, tone-mapped and upright): scene colour,
- * sharpening and, for portraits, the background blur, then Pictures/ZUNEX.
+ * sharpening and, for portraits, the background blur, then Pictures/Mozaik.
  */
 suspend fun saveFusedPhoto(context: Context, upright: Bitmap, scene: Scene, portrait: Boolean, name: String): Uri? = withContext(Dispatchers.Default) {
     val resolver = context.contentResolver
     val values = ContentValues().apply {
         put(MediaStore.MediaColumns.DISPLAY_NAME, name)
         put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/ZUNEX")
+        put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Mozaik")
         put(MediaStore.MediaColumns.IS_PENDING, 1)
     }
     val uri = resolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return@withContext null
@@ -251,7 +251,7 @@ suspend fun saveFusedPhoto(context: Context, upright: Bitmap, scene: Scene, port
                 exif.setAttribute(ExifInterface.TAG_MAKE, android.os.Build.MANUFACTURER)
                 exif.setAttribute(ExifInterface.TAG_MODEL, android.os.Build.MODEL)
                 exif.setAttribute(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL.toString())
-                exif.setAttribute(ExifInterface.TAG_SOFTWARE, "ZUNEX Camera Fusion")
+                exif.setAttribute(ExifInterface.TAG_SOFTWARE, "Mozaik Camera Fusion")
                 exif.saveAttributes()
             }
         }

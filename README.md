@@ -1,6 +1,6 @@
-# ZUNEX
+# Mozaik
 
-Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência do **Windows Phone 8.1** — Start Screen com blocos dinâmicos, lista de aplicativos, Central de Ações, controle de volume, tela de bloqueio estilo Lumia e a família de aplicativos ZUNEX: Telefone, Pessoas, Mensagens, Música, Fotos, Câmera, Calendário, Notas, Calculadora, Clima, Teclado Word Flow, Configurações e a ZUNEX Store.
+Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência do **Windows Phone 8.1** — Start Screen com blocos dinâmicos, lista de aplicativos, Central de Ações, controle de volume, tela de bloqueio estilo Lumia e a família de aplicativos Mozaik: Telefone, Pessoas, Mensagens, Música, Fotos, Câmera, Calendário, Notas, Calculadora, Clima, Teclado Word Flow, Configurações e a Mozaik Store.
 
 **Desenvolvedor:** João Gabriel
 
@@ -10,16 +10,16 @@ Um launcher Android nativo (Kotlin + Jetpack Compose) que recria a experiência 
 
 Há duas edições:
 
-- **Lite** (`ZUNEX-Lite.apk`, pacote `com.wpreborn.launcher.lite`): sem permissões de SMS, registro de chamadas e chamada direta, o que reduz os bloqueios do Play Protect. Mensagens abre o app de mensagens do Android; o histórico de chamadas fica no app Telefone do Android; os contadores dos blocos Telefone/Mensagens vêm das notificações desses apps.
-- **Completa** (`ZUNEX.apk`): Mensagens próprio (pode ser o app de SMS padrão) e histórico de chamadas.
+- **Lite** (`Mozaik-Lite.apk`, pacote `com.wpreborn.launcher.lite`): sem permissões de SMS, registro de chamadas e chamada direta, o que reduz os bloqueios do Play Protect. Mensagens abre o app de mensagens do Android; o histórico de chamadas fica no app Telefone do Android; os contadores dos blocos Telefone/Mensagens vêm das notificações desses apps.
+- **Completa** (`Mozaik.apk`): Mensagens próprio (pode ser o app de SMS padrão) e histórico de chamadas.
 
-O link direto está em **GitHub → Releases**. Se o Play Protect bloquear: "Mais detalhes" → "Instalar mesmo assim" (ou desative temporariamente a verificação em Play Store › Play Protect › engrenagem). No Android 13+, se uma permissão aparecer como "configuração restrita": Configurações › Apps › ZUNEX › ⋮ › "Permitir configurações restritas".
+O link direto está em **GitHub → Releases**. Se o Play Protect bloquear: "Mais detalhes" → "Instalar mesmo assim" (ou desative temporariamente a verificação em Play Store › Play Protect › engrenagem). No Android 13+, se uma permissão aparecer como "configuração restrita": Configurações › Apps › Mozaik › ⋮ › "Permitir configurações restritas".
 
 1. Baixe o APK em **GitHub → Actions → Android build → (último run) → Artifacts → `windows-phone-reborn-apk`**.
    - `app-release.apk` (otimizado com R8) ou `app-debug.apk`.
 2. Instale (permita "instalar apps desconhecidos" para o navegador/gerenciador de arquivos).
-3. Abra o **ZUNEX**. Na tela de boas-vindas toque em **definir como padrão**.
-   - Ou: Configurações do Android › Apps › Apps padrão › **App de tela inicial** › ZUNEX.
+3. Abra o **Mozaik**. Na tela de boas-vindas toque em **definir como padrão**.
+   - Ou: Configurações do Android › Apps › Apps padrão › **App de tela inicial** › Mozaik.
 4. Recomendado: em *Configurações › notificações+ações*, ative o **acesso às notificações** (Central de Ações, contadores nos blocos, bloco Música com outros players).
 
 Como app de tela inicial padrão, o launcher volta automaticamente após reiniciar o telefone.
@@ -99,7 +99,7 @@ app/src/main/java/com/wpreborn/
 - **Configurações**: pivots "sistema" e "aplicativos"; início+tema, cor de destaque, tela de bloqueio, notificações, brilho, armazenamento, sobre, tela inicial padrão — o resto abre a tela nativa via intents oficiais.
 - Interface em **português (Brasil)** e inglês.
 
-## Teclado ZUNEX (Word Flow)
+## Teclado Mozaik (Word Flow)
 
 Teclado do sistema no estilo do Windows Phone 8.1. Abra o app **Teclado** e siga os dois passos: ativar e escolher.
 

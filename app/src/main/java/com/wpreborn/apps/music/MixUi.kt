@@ -167,8 +167,8 @@ fun MixHome(
         Column(Modifier.fillMaxSize()) {
             // Header: the title in two weights and a round button under it, as on MixRadio.
             Row(Modifier.fillMaxWidth().padding(start = 18.dp, top = 6.dp, end = 18.dp)) {
-                WpText("ZUNEX", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
-                WpText("Mix", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Light), color = Color.White, maxLines = 1, softWrap = false)
+                WpText("Pulse", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, softWrap = false)
+                WpText("Radio", style = WpType.Header.copy(fontSize = 40.sp, lineHeight = 46.sp, fontWeight = FontWeight.Light), color = Color.White, maxLines = 1, softWrap = false)
             }
             // Round buttons under the title: search, and the menu.
             Row(Modifier.padding(start = 18.dp, top = 4.dp, bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -691,7 +691,7 @@ private fun ArtistPicker(col: MusicCollection, onDone: (List<String>) -> Unit) {
     androidx.activity.compose.BackHandler { onDone(emptyList()) }
     val artists = remember(col) { col.artists.map { it.name }.filter { it.isNotBlank() && it != com.wpreborn.data.media.MusicLibrary.UNKNOWN } }
     Column(Modifier.fillMaxSize().background(Wp.palette.background).padding(start = 20.dp, top = 14.dp, end = 16.dp)) {
-        WpText("ZUNEX MIX", style = WpType.AppTitle)
+        WpText("PULSERADIO", style = WpType.AppTitle)
         WpText(stringResource(R.string.mix_create), style = WpType.Header, maxLines = 1, softWrap = false)
         WpText(stringResource(R.string.mix_create_hint), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 8.dp))
         androidx.compose.foundation.lazy.LazyColumn(Modifier.weight(1f)) {

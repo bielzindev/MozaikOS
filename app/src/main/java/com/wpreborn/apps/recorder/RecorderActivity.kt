@@ -133,11 +133,11 @@ private fun RecordPage(onSaved: () -> Unit) {
     }
 
     fun start() {
-        val name = "ZUNEX " + SimpleDateFormat("yyyy-MM-dd HH.mm.ss", Locale.US).format(Date())
+        val name = "Mozaik " + SimpleDateFormat("yyyy-MM-dd HH.mm.ss", Locale.US).format(Date())
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, "$name.m4a")
             put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, if (Build.VERSION.SDK_INT >= 31) "Recordings/ZUNEX" else "Music/ZUNEX Recordings")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, if (Build.VERSION.SDK_INT >= 31) "Recordings/Mozaik" else "Music/Mozaik Recordings")
             put(MediaStore.Audio.Media.IS_MUSIC, 0)
             put(MediaStore.MediaColumns.IS_PENDING, 1)
         }
@@ -276,13 +276,14 @@ private fun RecordingsPage(refresh: Int) {
 
 private suspend fun loadRecordings(context: Context): List<Recording> = withContext(Dispatchers.IO) {
     val out = ArrayList<Recording>()
-    val path = if (Build.VERSION.SDK_INT >= 31) "Recordings/ZUNEX%" else "Music/ZUNEX Recordings%"
+    // Recordings made before the rename to Mozaik stay in the old ZUNEX folder: list both.
+    val paths = if (Build.VERSION.SDK_INT >= 31) arrayOf("Recordings/Mozaik%", "Recordings/ZUNEX%") else arrayOf("Music/Mozaik Recordings%", "Music/ZUNEX Recordings%")
     runCatching {
         context.contentResolver.query(
             MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
             arrayOf(MediaStore.Audio.Media._ID, MediaStore.Audio.Media.TITLE, MediaStore.Audio.Media.DURATION, MediaStore.Audio.Media.DATE_ADDED),
-            "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
-            arrayOf(path),
+            "${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ? OR ${MediaStore.MediaColumns.RELATIVE_PATH} LIKE ?",
+            paths,
             "${MediaStore.Audio.Media.DATE_ADDED} DESC",
         )?.use { c ->
             while (c.moveToNext()) {

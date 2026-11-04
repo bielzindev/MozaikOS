@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">ZUNEX</string>
+    <string name="app_name">Mozaik</string>
     <string name="app_phone">Telefone</string>
     <string name="app_messaging">Mensagens</string>
-    <string name="app_music">Música</string>
+    <string name="app_music">PulseRadio</string>
     <string name="app_people">Pessoas</string>
     <string name="app_calendar">Calendário</string>
     <string name="app_photos">Fotos</string>
@@ -64,7 +64,7 @@
     <string name="ac_flashlight">Lanterna</string>
     <string name="ac_vibrate">Vibrar</string>
     <string name="ac_internet">Internet</string>
-    <string name="ac_no_access">Para mostrar notificações aqui, permita o acesso às notificações para o ZUNEX.</string>
+    <string name="ac_no_access">Para mostrar notificações aqui, permita o acesso às notificações para o Mozaik.</string>
     <string name="ac_no_notifications">Nenhuma notificação nova</string>
     <string name="ac_clear_all">limpar tudo</string>
     <string name="volume_ringer">toque + notificações</string>
@@ -72,9 +72,9 @@
     <string name="volume_vibrate_on">vibrar ativado</string>
     <string name="volume_vibrate_off">vibrar desativado</string>
     <string name="welcome_title">olá</string>
-    <string name="welcome_body">O ZUNEX traz de volta a experiência do Windows Phone 8.1. Vamos configurar algumas coisas. Você pode alterá-las depois em Configurações.</string>
+    <string name="welcome_body">O Mozaik traz de volta a experiência do Windows Phone 8.1. Vamos configurar algumas coisas. Você pode alterá-las depois em Configurações.</string>
     <string name="welcome_default_title">Torne-a sua tela inicial</string>
-    <string name="welcome_default_body">Defina o ZUNEX como aplicativo de tela inicial padrão para que o botão Início sempre traga você aqui.</string>
+    <string name="welcome_default_body">Defina o Mozaik como aplicativo de tela inicial padrão para que o botão Início sempre traga você aqui.</string>
     <string name="welcome_default_button">definir como padrão</string>
     <string name="welcome_notifications_title">Blocos dinâmicos e Central de Ações</string>
     <string name="welcome_notifications_body">O acesso às notificações permite que os blocos mostrem contadores, que a Central de Ações liste suas notificações e que o bloco Música mostre o que está tocando.</string>
@@ -187,7 +187,7 @@
     <string name="set_not_default_app">não é o app de SMS padrão</string>
     <string name="set_default_apps">aplicativos padrão</string>
     <string name="set_all_apps">todos os aplicativos Android</string>
-    <string name="set_app_permissions">permissões do ZUNEX</string>
+    <string name="set_app_permissions">permissões do Mozaik</string>
     <string name="set_android_settings">configurações do Android</string>
     <string name="set_background">Tela de fundo</string>
     <string name="theme_dark">escura</string>
@@ -207,7 +207,7 @@
     <string name="lock_preview">visualizar</string>
     <string name="lock_system">bloqueio de tela do Android</string>
     <string name="lock_system_hint">PIN, padrão, biometria</string>
-    <string name="notif_explain">O acesso às notificações permite que o ZUNEX mostre suas notificações na Central de Ações, conte-as nos blocos dinâmicos e na tela de bloqueio, e mostre o que outros apps de música estão tocando.</string>
+    <string name="notif_explain">O acesso às notificações permite que o Mozaik mostre suas notificações na Central de Ações, conte-as nos blocos dinâmicos e na tela de bloqueio, e mostre o que outros apps de música estão tocando.</string>
     <string name="notif_access">Acesso às notificações</string>
     <string name="notif_android">notificações do aplicativo</string>
     <string name="notif_dnd">horas de silêncio</string>
@@ -221,11 +221,11 @@
     <string name="about_name">Nome do telefone</string>
     <string name="about_manufacturer">Fabricante</string>
     <string name="about_android">Software</string>
-    <string name="about_launcher">ZUNEX</string>
+    <string name="about_launcher">Mozaik</string>
     <string name="about_ram">RAM</string>
     <string name="about_more">mais informações</string>
-    <string name="about_disclaimer">O ZUNEX é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Desenvolvedor: João Gabriel. Fonte Open Sans (SIL Open Font License). Ícones de clima: Meteocons, de Bas Milius (MIT). Fotos do clima: Wikimedia Commons, domínio público / CC0. Previsão: Open-Meteo.</string>
-    <string name="launcher_explain">O ZUNEX funciona como seu app de tela inicial: o botão Início abre a tela Iniciar e ele inicia automaticamente quando o telefone reinicia.</string>
+    <string name="about_disclaimer">O Mozaik é uma recriação feita por fãs, sem afiliação ou endosso da Microsoft ou da Nokia. Desenvolvedor: João Gabriel. Fonte Open Sans (SIL Open Font License). Ícones de clima: Meteocons, de Bas Milius (MIT). Fotos do clima: Wikimedia Commons, domínio público / CC0. Previsão: Open-Meteo.</string>
+    <string name="launcher_explain">O Mozaik funciona como seu app de tela inicial: o botão Início abre a tela Iniciar e ele inicia automaticamente quando o telefone reinicia.</string>
     <string name="launcher_is_default">É seu app de tela inicial.</string>
     <string name="launcher_not_default">Ainda não é seu app de tela inicial.</string>
     <string name="launcher_reboot_note">Se outro launcher foi escolhido, abra Configurações do Android › Apps › Apps padrão › App de tela inicial.</string>
@@ -247,7 +247,7 @@
     <string name="filter_cool">frio</string>
     <string name="filter_warm">quente</string>
     <string name="icons_title">Ícones</string>
-    <string name="icons_metro">Metro ZUNEX</string>
+    <string name="icons_metro">Metro Mozaik</string>
     <string name="icons_original">Originais do Android</string>
     <string name="personalize_title">personalizar</string>
     <string name="photos_edit">editar</string>
@@ -260,7 +260,7 @@
     <string name="photos_brightness">brilho</string>
     <string name="photos_contrast">contraste</string>
     <string name="photos_saturation">cor</string>
-    <string name="photos_saved">Cópia salva em Imagens/ZUNEX.</string>
+    <string name="photos_saved">Cópia salva em Imagens/Mozaik.</string>
     <string name="photos_save_failed">Não foi possível salvar a foto.</string>
     <string name="lock_photos">Apresentação de fotos (sem imagem escolhida)</string>
     <string name="app_keyboard">Teclado</string>
@@ -271,8 +271,8 @@
     <string name="kb_setup">configurar</string>
     <string name="kb_languages">idiomas</string>
     <string name="kb_typing">digitação</string>
-    <string name="kb_intro">O teclado ZUNEX traz de volta o Word Flow do Windows Phone 8.1: deslize sobre as letras para escrever, receba sugestões e correção automática em vários idiomas, segure as teclas para acentos e deslize na barra de espaço para mover o cursor.</string>
-    <string name="kb_step1">1. Ative o teclado ZUNEX</string>
+    <string name="kb_intro">O teclado Mozaik traz de volta o Word Flow do Windows Phone 8.1: deslize sobre as letras para escrever, receba sugestões e correção automática em vários idiomas, segure as teclas para acentos e deslize na barra de espaço para mover o cursor.</string>
+    <string name="kb_step1">1. Ative o teclado Mozaik</string>
     <string name="kb_step2">2. Torne-o seu teclado</string>
     <string name="kb_done_state">Pronto</string>
     <string name="kb_todo_state">Ainda não</string>
@@ -290,12 +290,12 @@
     <string name="kb_number_row">Linha de números</string>
     <string name="kb_sound">Sons das teclas</string>
     <string name="kb_vibrate">Vibrar ao tocar</string>
-    <string name="set_show_duplicates">Mostrar apps do sistema que o ZUNEX substitui (telefone, mensagens, música, calendário, contatos, galeria, configurações)</string>
+    <string name="set_show_duplicates">Mostrar apps do sistema que o Mozaik substitui (telefone, mensagens, música, calendário, contatos, galeria, configurações)</string>
     <string name="set_brand_colors">Cores dos apps nos blocos</string>
     <string name="app_camera">Câmera</string>
     <string name="app_calculator">Calculadora</string>
     <string name="app_notes">Notas</string>
-    <string name="perm_camera">Para tirar fotos e gravar vídeos, permita que o ZUNEX use a câmera.</string>
+    <string name="perm_camera">Para tirar fotos e gravar vídeos, permita que o Mozaik use a câmera.</string>
     <string name="camera_unavailable">A câmera não está disponível agora.</string>
     <string name="camera_save_failed">Não foi possível salvar a foto.</string>
     <string name="camera_flash_hint">flash</string>
@@ -338,11 +338,11 @@
     <string name="mix_decade_sub">uma viagem no tempo</string>
     <string name="mix_artist">Mix %1$s</string>
     <string name="mix_artist_sub">mix do artista</string>
-    <string name="spotify_not_installed">Instale o Spotify para usá-lo daqui: o ZUNEX mostra o que o Spotify toca, controla a reprodução e toca músicas pelo nome.</string>
+    <string name="spotify_not_installed">Instale o Spotify para usá-lo daqui: o Mozaik mostra o que o Spotify toca, controla a reprodução e toca músicas pelo nome.</string>
     <string name="spotify_get">obter o Spotify</string>
     <string name="spotify_playing">TOCANDO NO SPOTIFY</string>
     <string name="spotify_paused">PAUSADO NO SPOTIFY</string>
-    <string name="spotify_need_access">Para mostrar e controlar o que o Spotify toca, permita que o ZUNEX leia as notificações.</string>
+    <string name="spotify_need_access">Para mostrar e controlar o que o Spotify toca, permita que o Mozaik leia as notificações.</string>
     <string name="spotify_idle">O Spotify não está tocando agora. Comece algo abaixo ou no Spotify e vai aparecer aqui, no bloco Música e na tela de bloqueio.</string>
     <string name="spotify_play_search">tocar no Spotify</string>
     <string name="spotify_search_hint">Música, artista, álbum ou playlist</string>
@@ -417,7 +417,7 @@
     <string name="eq_electronic">Eletrônica</string>
     <string name="eq_bass">Reforço de graves</string>
     <string name="eq_vocal">Vocal</string>
-    <string name="app_store">ZUNEX Store</string>
+    <string name="app_store">Mozaik Store</string>
     <string name="store_cat_communication">Comunicação</string>
     <string name="store_cat_media">Música + fotos</string>
     <string name="store_cat_productivity">Produtividade</string>
@@ -436,7 +436,7 @@
     <string name="store_state_off">desativado</string>
     <string name="store_state_installed">instalado</string>
     <string name="store_nothing_here">Nada por aqui.</string>
-    <string name="store_search_hint">Pesquisar apps ZUNEX</string>
+    <string name="store_search_hint">Pesquisar apps Mozaik</string>
     <string name="store_no_results">Nenhum app encontrado.</string>
     <string name="store_details">detalhes</string>
     <string name="store_related">relacionados</string>
@@ -483,7 +483,7 @@
     <string name="store_desc_music">Sua coleção de músicas, mixes no estilo MixRadio, player do Windows Phone, equalizador de verdade, favoritas e playlists.</string>
     <string name="store_new_music">Nova interface (beta) no estilo do Nokia MixRadio: rádio \"toque e ouça\", tempo grande sobre o que está tocando, mixes num painel lateral, fotos em preto e branco e botões redondos no player. Alterne entre a interface nova e a clássica no menu .... Também: seleção e exclusão em massa, editar tags, ocultar artista desconhecido.</string>
     <string name="store_desc_photos">Rolo da câmera, álbuns, visualizador e editor com filtros.</string>
-    <string name="store_new_photos">Cópias editadas salvas em Pictures/ZUNEX.</string>
+    <string name="store_new_photos">Cópias editadas salvas em Pictures/Mozaik.</string>
     <string name="store_desc_camera">No estilo Lumia Camera: fotos e vídeos, flash, temporizador, grade, câmera frontal e exposição e zoom no modo pro.</string>
     <string name="store_new_camera">As teclas de volume tiram a foto.</string>
     <string name="store_desc_calendar">Visões de agenda e de mês das suas agendas do Android.</string>
@@ -494,11 +494,11 @@
     <string name="store_new_calculator">Resultado em tempo real enquanto você digita.</string>
     <string name="store_desc_weather">Previsão no estilo MSN Weather sobre um céu animado. Dados do Open-Meteo.</string>
     <string name="store_new_weather">Sol, nuvens, chuva, neve, tempestades e noites animados.</string>
-    <string name="store_desc_keyboard">Configurações do teclado ZUNEX Word Flow: idiomas, previsão e deslizar.</string>
+    <string name="store_desc_keyboard">Configurações do teclado Mozaik Word Flow: idiomas, previsão e deslizar.</string>
     <string name="store_new_keyboard">Mais idiomas.</string>
-    <string name="store_desc_settings">Personalize o ZUNEX: tema, cor de destaque, Início, tela de bloqueio e mais.</string>
+    <string name="store_desc_settings">Personalize o Mozaik: tema, cor de destaque, Início, tela de bloqueio e mais.</string>
     <string name="store_new_settings">Escolha da barra de status.</string>
-    <string name="store_desc_store">Obtenha, atualize, desative e remova os apps da família ZUNEX.</string>
+    <string name="store_desc_store">Obtenha, atualize, desative e remova os apps da família Mozaik.</string>
     <string name="store_new_store">Primeira versão.</string>
     <string name="store_short">loja</string>
     <string name="music_favorite">adicionar às favoritas</string>
@@ -541,7 +541,7 @@
     <string name="rec_tap_to_record">Toque para gravar</string>
     <string name="rec_tap_to_stop">Toque para parar e salvar</string>
     <string name="rec_empty">Nenhuma gravação ainda.</string>
-    <string name="perm_microphone">Para gravar, permita que o ZUNEX use o microfone.</string>
+    <string name="perm_microphone">Para gravar, permita que o Mozaik use o microfone.</string>
     <string name="light_torch">flash</string>
     <string name="light_sos">sos</string>
     <string name="light_screen">tela</string>
@@ -668,9 +668,9 @@
     <string name="camera_res_binned">12 MP (melhor)</string>
     <string name="camera_res_full">máxima</string>
     <string name="camera_set_resolution_hint">12 MP junta os pixels de sensores de alta resolução (50-108 MP) para fotos mais limpas e claras, como a câmera do próprio celular. Máxima mantém todos os pixels, mas tem mais ruído com pouca luz.</string>
-    <string name="camera_ai">IA ZUNEX</string>
+    <string name="camera_ai">IA Mozaik</string>
     <string name="camera_ai_short">IA</string>
-    <string name="camera_ai_hint">Fusão ZUNEX: cada foto é uma rajada de 6 a 8 quadros, alinhados e combinados (menos ruído, céu e sombras preservados, como HDR+ e Deep Fusion); depois a IA reconhece a cena (pessoas, comida, paisagem, céu, plantas, animais, pôr do sol, noite) e ajusta cor e nitidez. No celular, sem internet.</string>
+    <string name="camera_ai_hint">Fusão Mozaik: cada foto é uma rajada de 6 a 8 quadros, alinhados e combinados (menos ruído, céu e sombras preservados, como HDR+ e Deep Fusion); depois a IA reconhece a cena (pessoas, comida, paisagem, céu, plantas, animais, pôr do sol, noite) e ajusta cor e nitidez. No celular, sem internet.</string>
     <string name="camera_ai_processing">IA processando…</string>
     <string name="camera_scene_general">auto</string>
     <string name="camera_scene_people">pessoas</string>
@@ -819,7 +819,7 @@
     <string name="hidden_apps_show">mostrar</string>
     <string name="app_files">Arquivos</string>
     <string name="files_access_title">Permita o acesso aos seus arquivos</string>
-    <string name="files_access">Para navegar, copiar, mover e excluir tudo no armazenamento do celular e no cartão SD, o Android pede que você permita o \"acesso a todos os arquivos\" para o ZUNEX.</string>
+    <string name="files_access">Para navegar, copiar, mover e excluir tudo no armazenamento do celular e no cartão SD, o Android pede que você permita o \"acesso a todos os arquivos\" para o Mozaik.</string>
     <string name="files_allow">permitir</string>
     <string name="files_this_phone">Este celular</string>
     <string name="files_downloads">Downloads</string>

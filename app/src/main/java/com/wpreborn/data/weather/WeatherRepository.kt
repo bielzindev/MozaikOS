@@ -247,7 +247,7 @@ class WeatherRepository private constructor(private val context: Context) {
         val conn = URL(url).openConnection() as HttpURLConnection
         conn.connectTimeout = 10_000
         conn.readTimeout = 15_000
-        conn.setRequestProperty("User-Agent", "ZUNEX")
+        conn.setRequestProperty("User-Agent", "Mozaik")
         return try {
             if (conn.responseCode !in 200..299) throw java.io.IOException("HTTP ${conn.responseCode}")
             conn.inputStream.bufferedReader().use { it.readText() }

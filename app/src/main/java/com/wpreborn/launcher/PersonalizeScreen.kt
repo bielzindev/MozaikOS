@@ -81,7 +81,7 @@ fun PersonalizeScreen(turnstile: TurnstileState, onClose: () -> Unit) {
             .verticalScroll(rememberScrollState())
             .padding(start = 20.dp, end = 20.dp, top = 14.dp, bottom = 32.dp),
     ) {
-        WpText("ZUNEX", style = WpType.AppTitle)
+        WpText("MOZAIK", style = WpType.AppTitle)
         WpText(stringResource(R.string.personalize_title), style = WpType.Header, maxLines = 1, modifier = Modifier.padding(bottom = 12.dp))
 
         Section(stringResource(R.string.set_background), 1)

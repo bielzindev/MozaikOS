@@ -258,7 +258,7 @@ class NewsRepository private constructor(private val context: Context) {
     }
 
     companion object {
-        private const val AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 ZUNEX-News"
+        private const val AGENT = "Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36 Mozaik-News"
 
         @Volatile private var instance: NewsRepository? = null
         fun get(context: Context): NewsRepository =

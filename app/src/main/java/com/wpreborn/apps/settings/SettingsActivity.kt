@@ -167,7 +167,7 @@ private fun SettingsHome(go: (SettingsPage) -> Unit) {
         Entry(stringResource(R.string.set_location), null) { context.open(Settings.ACTION_LOCATION_SOURCE_SETTINGS) },
         Entry(stringResource(R.string.set_date_time), null) { context.open(Settings.ACTION_DATE_SETTINGS) },
         Entry(stringResource(R.string.set_language), null) { context.open(Settings.ACTION_LOCALE_SETTINGS) },
-        Entry(stringResource(R.string.set_keyboard), stringResource(R.string.app_keyboard) + " ZUNEX") {
+        Entry(stringResource(R.string.set_keyboard), stringResource(R.string.app_keyboard) + " Mozaik") {
             context.startActivity(Intent(context, com.wpreborn.keyboard.KeyboardSettingsActivity::class.java))
         },
         Entry(stringResource(R.string.set_ease_of_access), null) { context.open(Settings.ACTION_ACCESSIBILITY_SETTINGS) },
@@ -482,7 +482,7 @@ private fun AboutPage() {
             stringResource(R.string.about_name) to Build.MODEL,
             stringResource(R.string.about_manufacturer) to Build.MANUFACTURER.replaceFirstChar { it.uppercase() },
             stringResource(R.string.about_android) to "Android ${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})",
-            stringResource(R.string.about_launcher) to "ZUNEX ${BuildConfig.VERSION_NAME}",
+            stringResource(R.string.about_launcher) to "Mozaik ${BuildConfig.VERSION_NAME}",
             stringResource(R.string.about_developer) to "João Gabriel",
             stringResource(R.string.about_ram) to Formatter.formatShortFileSize(
                 context,

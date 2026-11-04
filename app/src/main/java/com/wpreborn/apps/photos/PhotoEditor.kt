@@ -138,13 +138,13 @@ object PhotoEditing {
         return out
     }
 
-    /** Saves a new JPEG in Pictures/ZUNEX. The original photo is never modified. */
+    /** Saves a new JPEG in Pictures/Mozaik. The original photo is never modified. */
     suspend fun saveCopy(context: Context, bitmap: Bitmap): Uri? = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
-            put(MediaStore.Images.Media.DISPLAY_NAME, "ZUNEX_${System.currentTimeMillis()}.jpg")
+            put(MediaStore.Images.Media.DISPLAY_NAME, "Mozaik_${System.currentTimeMillis()}.jpg")
             put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
             put(MediaStore.Images.Media.DATE_TAKEN, System.currentTimeMillis())
-            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/ZUNEX")
+            put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/Mozaik")
             put(MediaStore.Images.Media.IS_PENDING, 1)
         }
         val resolver = context.contentResolver

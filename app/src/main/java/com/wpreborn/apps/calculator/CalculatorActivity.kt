@@ -195,7 +195,7 @@ class CalculatorActivity : WpActivity() {
                 menuItems = listOf(
                     AppBarMenuItem(stringResource(R.string.calc_copy)) {
                         val value = shown ?: preview() ?: return@AppBarMenuItem
-                        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("ZUNEX", Calc.display(value, sep)))
+                        context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(ClipData.newPlainText("Mozaik", Calc.display(value, sep)))
                     },
                     AppBarMenuItem(stringResource(R.string.calc_clear_history)) { history.clear() },
                 ),

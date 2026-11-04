@@ -58,7 +58,7 @@ data class Step(
 
 data class Route(val distanceM: Double, val durationS: Double, val points: List<Pair<Double, Double>>, val steps: List<Step>)
 
-private const val AGENT = "ZUNEX launcher (https://github.com/joaogabrielsilvademourap3-spec/zunex)"
+private const val AGENT = "Mozaik launcher (https://github.com/joaogabrielsilvademourap3-spec/zunex)"
 
 private fun get(url: String): String {
     val conn = URL(url).openConnection() as HttpURLConnection

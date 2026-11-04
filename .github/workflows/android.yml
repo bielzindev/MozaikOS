@@ -61,24 +61,24 @@ jobs:
       - name: Rename APKs
         run: |
           mkdir -p dist
-          cp app/build/outputs/apk/full/release/app-full-release.apk dist/ZUNEX.apk
-          cp app/build/outputs/apk/lite/release/app-lite-release.apk dist/ZUNEX-Lite.apk
+          cp app/build/outputs/apk/full/release/app-full-release.apk dist/Mozaik.apk
+          cp app/build/outputs/apk/lite/release/app-lite-release.apk dist/Mozaik-Lite.apk
 
       - name: Publish release with the APK
         if: github.event_name == 'push'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: build-${{ github.run_number }}
-          name: ZUNEX (build ${{ github.run_number }})
+          name: Mozaik (build ${{ github.run_number }})
           target_commitish: ${{ github.sha }}
           make_latest: true
           body: |
-            - **ZUNEX-Lite.apk**: versão leve, sem permissões de SMS, registro de chamadas e chamada direta (menos bloqueios do Play Protect). Mensagens e o histórico de chamadas abrem os apps do Android.
-            - **ZUNEX.apk**: versão completa (Mensagens próprio, app de SMS padrão, histórico de chamadas).
+            - **Mozaik-Lite.apk**: versão leve, sem permissões de SMS, registro de chamadas e chamada direta (menos bloqueios do Play Protect). Mensagens e o histórico de chamadas abrem os apps do Android.
+            - **Mozaik.apk**: versão completa (Mensagens próprio, app de SMS padrão, histórico de chamadas).
 
             Instale no Android (permita "instalar apps desconhecidos") e defina como app de tela inicial padrão.
 
             Todas as builds a partir da build-25 usam a mesma assinatura: atualizações instalam por cima, sem desinstalar. (Vindo de uma build anterior, desinstale uma última vez.)
           files: |
-            dist/ZUNEX-Lite.apk
-            dist/ZUNEX.apk
+            dist/Mozaik-Lite.apk
+            dist/Mozaik.apk

@@ -16,8 +16,10 @@ android {
         val build = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull() ?: 1
         versionCode = build
         versionName = "0.1.$build"
-        // Phones (ARM) and the x86_64 emulator; keeps the map engine's native code small.
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
+        // Phones are ARM. The x86_64 emulator code only goes into debug builds: translation, OCR
+        // and the map engine ship native code per ABI, and a third ABI made the phone APK so big
+        // that installers rejected it as an invalid package.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     // One fixed key for every build: Android only accepts an update signed with the same key as
@@ -56,6 +58,7 @@ android {
     buildTypes {
         debug {
             signingConfig = signing
+            ndk { abiFilters += "x86_64" }
         }
         release {
             isMinifyEnabled = true
@@ -112,7 +115,8 @@ dependencies {
     // Translator: on-device translation, language detection and text in photos (ML Kit).
     implementation("com.google.mlkit:translate:17.0.3")
     implementation("com.google.mlkit:language-id:17.0.6")
-    implementation("com.google.mlkit:text-recognition:16.0.1")
+    // Play Services variant: the OCR model is downloaded by Google Play services, not bundled.
+    implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("org.maplibre.gl:android-sdk:11.8.8")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

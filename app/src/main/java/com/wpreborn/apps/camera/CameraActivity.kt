@@ -134,7 +134,7 @@ private enum class FlashMode(val capture: Int) { Auto(ImageCapture.FLASH_MODE_AU
  * control column (flash, front/back, timer, grid), the round shutter, photo/video switch
  * and the last shot in the corner. Photo modes use the phone maker's own processing (HDR,
  * night, portrait, auto) where offered; "pro" gives manual EV, ISO, shutter, white balance,
- * focus and zoom. Pictures and videos go to Pictures/ZUNEX and Movies/ZUNEX. Volume keys and
+ * focus and zoom. Pictures and videos go to Pictures/Mozaik and Movies/Mozaik. Volume keys and
  * the camera key shoot.
  */
 class CameraActivity : WpActivity() {
@@ -658,11 +658,11 @@ private fun CameraScreen(activity: CameraActivity) {
 
     fun takePhoto() {
         if (fusionOn) {
-            fusionShot("ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()), activeLook == Look.AiPortrait)
+            fusionShot("Mozaik_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()), activeLook == Look.AiPortrait)
             return
         }
         val ic = imageCapture ?: return
-        val name = "ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val name = "Mozaik_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val portraitAi = activeLook == Look.AiPortrait
         if ((settings.ai && activeLook == Look.Normal || portraitAi) && !settings.fullRes) {
             // ZUNEX AI: the picture comes to memory, is processed for its scene and saved.
@@ -714,7 +714,7 @@ private fun CameraScreen(activity: CameraActivity) {
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "image/jpeg")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/ZUNEX")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Pictures/Mozaik")
         }
         // Selfies: saved the way others see you unless "mirror" is on (CameraX would mirror them).
         val metadata = ImageCapture.Metadata().apply { isReversedHorizontal = isFront && settings.mirror }
@@ -748,11 +748,11 @@ private fun CameraScreen(activity: CameraActivity) {
             return
         }
         val vc = videoCapture ?: return
-        val name = "ZUNEX_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
+        val name = "Mozaik_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
         val values = ContentValues().apply {
             put(MediaStore.MediaColumns.DISPLAY_NAME, name)
             put(MediaStore.MediaColumns.MIME_TYPE, "video/mp4")
-            put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/ZUNEX")
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Movies/Mozaik")
         }
         val output = MediaStoreOutputOptions.Builder(context.contentResolver, MediaStore.Video.Media.EXTERNAL_CONTENT_URI).setContentValues(values).build()
         val pending = vc.output.prepareRecording(context, output)
@@ -1179,7 +1179,7 @@ private fun ModeIcon(icon: androidx.compose.ui.graphics.vector.ImageVector, sele
     }
 }
 
-/** The newest picture or video in Pictures/ZUNEX or Movies/ZUNEX, for the thumbnail. */
+/** The newest picture or video in Pictures/Mozaik or Movies/Mozaik, for the thumbnail. */
 private suspend fun latestCapture(context: Context): Uri? = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
     if (Build.VERSION.SDK_INT < 29) return@withContext null
     runCatching {

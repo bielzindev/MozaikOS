@@ -66,7 +66,11 @@ data class TileInputs(
     val nowPlaying: NowPlaying?,
     val nowPlayingArt: Uri?,
     val liveEnabled: Boolean,
+    /** Set for a folder tile: its name and apps. */
+    val folder: FolderInfo? = null,
 )
+
+class FolderInfo(val name: String, val apps: List<AppEntry>)
 
 /**
  * The face of a tile. Built-in apps get their real live tile templates; Android apps show
@@ -80,7 +84,9 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
     val iconTint = rememberIconCustom(app).tintColor()
     Box(Modifier.fillMaxSize()) {
       androidx.compose.runtime.CompositionLocalProvider(LocalTileIconTint provides iconTint) {
-        when (builtIn) {
+        when {
+            inputs.folder != null -> FolderTile(tile.size, inputs.folder)
+            else -> when (builtIn) {
             BuiltInApp.Phone -> CountTile(WpIcons.Phone, inputs.live.missedCalls, tile.size)
             BuiltInApp.Messaging -> CountTile(WpIcons.Messaging, inputs.live.unreadSms, tile.size)
             BuiltInApp.People -> PeopleTile(tile.size, inputs.live.contactPhotos, inputs.liveEnabled, seed)
@@ -104,19 +110,53 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Files -> IconTile(WpIcons.Folder, tile.size)
             BuiltInApp.Translator -> IconTile(com.wpreborn.core.icons.Glyphs.Translate, tile.size)
             null -> AndroidAppTile(app, tile.size, inputs, seed)
+            }
         }
       }
         val showLabel = !small && !(builtIn == BuiltInApp.Photos && inputs.live.photos.isNotEmpty() && inputs.liveEnabled) &&
             !(builtIn == BuiltInApp.Calendar && tile.size != TileSize.Medium && inputs.live.events.isNotEmpty() && inputs.liveEnabled)
-        if (showLabel && app != null) {
+        val labelText = inputs.folder?.name ?: app?.label
+        if (showLabel && labelText != null) {
             WpText(
-                app.label,
+                labelText,
                 style = WpType.TileLabel,
                 color = Color.White,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.align(Alignment.BottomStart).padding(start = 8.dp, bottom = 6.dp, end = 8.dp),
             )
+        }
+    }
+}
+
+/** A folder: small squares with the first apps in it, like a little Start screen. */
+@Composable
+private fun FolderTile(size: TileSize, f: FolderInfo) {
+    if (size == TileSize.Small || f.apps.isEmpty()) {
+        Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Folder, size) }
+        return
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val cols = when (size) { TileSize.Large -> 3; TileSize.Wide -> 4; else -> 2 }
+        val rows = if (size == TileSize.Large) 3 else 2
+        val pad = minOf(maxWidth, maxHeight) * 0.07f
+        val gap = pad * 0.45f
+        val label = minOf(maxWidth, maxHeight) * 0.2f
+        val cell = minOf(
+            (maxWidth - pad * 2 - gap * (cols - 1)) / cols,
+            (maxHeight - pad - label - gap * (rows - 1)) / rows,
+        )
+        Column(Modifier.padding(start = pad, top = pad), verticalArrangement = Arrangement.spacedBy(gap)) {
+            for (r in 0 until rows) {
+                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                    for (c in 0 until cols) {
+                        val app = f.apps.getOrNull(r * cols + c)
+                        Box(Modifier.size(cell).background(Color.White.copy(alpha = if (app != null) 0.18f else 0.08f)), contentAlignment = Alignment.Center) {
+                            if (app != null) AppIcon(app, cell * 0.66f)
+                        }
+                    }
+                }
+            }
         }
     }
 }

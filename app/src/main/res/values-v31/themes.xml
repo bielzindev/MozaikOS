@@ -10,10 +10,12 @@
         <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
         <item name="android:colorAccent">@color/wp_cobalt</item>
         <item name="android:windowShowWallpaper">false</item>
-        <!-- Lumia-like splash: the accent tile on black. -->
+        <!-- Android 12+ draws its own splash (an icon) before every app. It is left plain
+             black and empty, so the only splash seen is Mozaik's own, in the app's colour. -->
         <item name="android:windowSplashScreenBackground">@color/wp_black</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/wp_cobalt</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+        <item name="android:windowSplashScreenAnimationDuration">0</item>
     </style>
 
     <style name="Theme.WpReborn.Lock">

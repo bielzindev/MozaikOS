@@ -173,6 +173,7 @@ fun StartScreen(
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val geo = startGeometry(maxWidth, settings.moreTiles)
+        val screenWidth = maxWidth
         val viewportPx = with(density) { maxHeight.toPx() }
         val widthPx = with(density) { maxWidth.toPx() }
         val placements = remember(tiles, geo.columns, settings.smallTilesRow) { TileLayout.pack(tiles, geo.columns, settings.smallTilesRow) }
@@ -538,7 +539,7 @@ fun StartScreen(
                             drawPath(p, bandColor)
                         }
                         Box(
-                            Modifier.offset(geo.margin, bandTop).width(maxWidth - geo.margin * 2).height(bandHeader),
+                            Modifier.offset(geo.margin, bandTop).width(screenWidth - geo.margin * 2).height(bandHeader),
                             contentAlignment = Alignment.CenterStart,
                         ) {
                             if (state.renamingFolder) {

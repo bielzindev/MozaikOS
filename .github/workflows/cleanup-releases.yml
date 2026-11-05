@@ -1,0 +1,39 @@
+name: Clean up releases
+
+# Manual only: deletes every release (and its tag) except the one named in "keep".
+on:
+  workflow_dispatch:
+    inputs:
+      keep:
+        description: "Release tag to keep"
+        required: true
+        default: "build-110"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the other releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+          KEEP: ${{ inputs.keep }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -e
+          if ! gh release view "$KEEP" --repo "$REPO" >/dev/null 2>&1; then
+            echo "::error::Release $KEEP not found; nothing deleted"
+            exit 1
+          fi
+          gh release list --repo "$REPO" --limit 1000 --json tagName --jq '.[].tagName' > tags.txt
+          echo "Releases: $(wc -l < tags.txt)"
+          while read -r tag; do
+            [ -z "$tag" ] && continue
+            [ "$tag" = "$KEEP" ] && continue
+            echo "Deleting $tag"
+            gh release delete "$tag" --repo "$REPO" --yes --cleanup-tag || echo "::warning::could not delete $tag"
+          done < tags.txt
+          echo "Left:"
+          gh release list --repo "$REPO" --limit 1000

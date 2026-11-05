@@ -729,7 +729,7 @@
         <item quantity="one">edit tags of %d song</item>
         <item quantity="other">edit tags of %d songs</item>
     </plurals>
-    <string name="app_browser">Internet</string>
+    <string name="app_browser">Explorer</string>
     <string name="browser_address_hint">Search or enter address</string>
     <string name="browser_stop">stop</string>
     <string name="browser_more">more</string>
@@ -970,4 +970,5 @@
     <string name="music_autoplay_off">autoplay radio: off</string>
     <string name="glance_title">Glance screen (always on)</string>
     <string name="glance_info">With the screen off, shows the time, weather and notification icons in dim accent-coloured type, like the Lumia. Double-tap to wake. Always on while charging, 15 minutes on battery, off in a pocket. Needs \'display over other apps\'; turn off the phone\'s own always-on display.</string>
+    <string name="browser_open_link">Open in Explorer</string>
 </resources>

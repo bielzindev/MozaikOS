@@ -730,7 +730,7 @@
         <item quantity="one">editar tags de %d música</item>
         <item quantity="other">editar tags de %d músicas</item>
     </plurals>
-    <string name="app_browser">Internet</string>
+    <string name="app_browser">Explorer</string>
     <string name="browser_address_hint">Pesquise ou digite um endereço</string>
     <string name="browser_stop">parar</string>
     <string name="browser_more">mais</string>
@@ -971,4 +971,5 @@
     <string name="music_autoplay_off">rádio automático: desligado</string>
     <string name="glance_title">Tela de relance (sempre ligada)</string>
     <string name="glance_info">Com a tela desligada, mostra a hora, o clima e os ícones de notificação em letras finas na cor de destaque, como no Lumia. Toque duas vezes para acordar. Sempre ligada enquanto carrega, 15 minutos na bateria e desligada no bolso. Precisa de \"sobrepor a outros apps\"; desative o always on display do próprio celular.</string>
+    <string name="browser_open_link">Abrir no Explorer</string>
 </resources>

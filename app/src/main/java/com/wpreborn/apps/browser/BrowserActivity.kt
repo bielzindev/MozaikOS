@@ -152,9 +152,10 @@ class BrowserActivity : WpActivity() {
     override fun Content() {
         LaunchedEffect(Unit) {
             if (tabs.isEmpty()) {
-                val incoming = intent?.dataString
-                store.openTabs.forEach { newTab(it, private = false, select = false) }
-                if (incoming != null) newTab(incoming) else if (tabs.isEmpty()) newTab("")
+                val incoming = incomingUrl(intent)
+                // The tabs left open last time, then the link Android asked to open, in front.
+                store.openTabs.take(MAX_TABS - 1).forEach { newTab(it, private = false, select = false) }
+                if (incoming != null) openLink(incoming) else if (tabs.isEmpty()) newTab("")
                 current = current.coerceIn(0, tabs.lastIndex)
             }
         }
@@ -163,7 +164,33 @@ class BrowserActivity : WpActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        intent.dataString?.let { newTab(it) }
+        setIntent(intent)
+        incomingUrl(intent)?.let { openLink(it) }
+    }
+
+    /** The address another app asked to open: a link (VIEW), or a link shared as text. */
+    private fun incomingUrl(i: Intent?): String? {
+        i ?: return null
+        i.dataString?.takeIf { it.isNotBlank() }?.let { return it }
+        if (i.action == Intent.ACTION_SEND || i.action == Intent.ACTION_WEB_SEARCH) {
+            val text = (i.getStringExtra(Intent.EXTRA_TEXT) ?: i.getStringExtra(android.app.SearchManager.QUERY)).orEmpty().trim()
+            if (text.isEmpty()) return null
+            return Regex("https?://\\S+").find(text)?.value ?: text
+        }
+        return null
+    }
+
+    /**
+     * Opens a link from outside in a tab of its own, in front: the tab already showing it, or a
+     * new one. With every tab in use the oldest one makes room (the link is never refused).
+     */
+    fun openLink(url: String) {
+        tabs.indexOfFirst { !it.private && it.url == url }.takeIf { it >= 0 }?.let { current = it; return }
+        if (tabs.size >= MAX_TABS) {
+            val oldest = tabs.firstOrNull { it !== tab() } ?: tabs.first()
+            closeTab(oldest)
+        }
+        newTab(url)
     }
 
     override fun onStop() {

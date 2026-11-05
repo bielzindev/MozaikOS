@@ -167,7 +167,7 @@ fun StartScreen(
     // Start background (8.1): an image seen through the tiles.
     val background by produceState<ImageBitmap?>(null, settings.startBackground) {
         value = settings.startBackground?.let { uri ->
-            ImageLoader.full(context, Uri.parse(uri), 1600)?.asImageBitmap()
+            ImageLoader.full(context, Uri.parse(uri), 2400)?.asImageBitmap()
         }
     }
 
@@ -659,19 +659,34 @@ private fun EditButton(icon: androidx.compose.ui.graphics.vector.ImageVector, mo
  */
 private fun Modifier.drawBackgroundSlice(image: ImageBitmap, pos: IntOffset, viewport: IntSize, scroll: ScrollState): Modifier =
     this.drawBehind {
-        val scale = maxOf(image.width / viewport.width.toFloat(), image.height / (viewport.height * 1.15f))
-        val parallax = scroll.value * 0.15f
-        val viewportY = pos.y - scroll.value + parallax
-        val srcX = (pos.x * scale).roundToInt().coerceIn(0, image.width - 1)
-        val srcY = (viewportY * scale).roundToInt().coerceIn(0, image.height - 1)
-        val srcW = (size.width * scale).roundToInt().coerceIn(1, image.width - srcX)
-        val srcH = (size.height * scale).roundToInt().coerceIn(1, image.height - srcY)
         drawRect(Color.Black)
+        val vw = viewport.width.toFloat().coerceAtLeast(1f)
+        val vh = viewport.height.toFloat().coerceAtLeast(1f)
+        // The picture covers the screen plus a little extra height for the parallax, cropped
+        // in the middle (never smaller than the screen, so nothing is stretched).
+        val extra = vh * 0.15f
+        val s = minOf(image.width / vw, image.height / (vh + extra))
+        val offX = (image.width - vw * s) / 2f
+        val offY = (image.height - (vh + extra) * s) / 2f
+        // Scrolling moves the picture by the extra height over the whole list, slower than the tiles.
+        val progress = if (scroll.maxValue > 0) scroll.value.toFloat() / scroll.maxValue else 0f
+        val y = pos.y - scroll.value + extra * progress
+        val sx = offX + pos.x * s
+        val sy = offY + y * s
+        val sw = size.width * s
+        val sh = size.height * s
+        // Only the part that is inside the picture (a tile above the screen is cut, not stretched).
+        val left = maxOf(0f, sx)
+        val top = maxOf(0f, sy)
+        val right = minOf(image.width.toFloat(), sx + sw)
+        val bottom = minOf(image.height.toFloat(), sy + sh)
+        if (right - left < 1f || bottom - top < 1f) return@drawBehind
         drawImage(
             image,
-            srcOffset = IntOffset(srcX, srcY),
-            srcSize = IntSize(srcW, srcH),
-            dstSize = IntSize(size.width.roundToInt(), size.height.roundToInt()),
+            srcOffset = IntOffset(left.roundToInt(), top.roundToInt()),
+            srcSize = IntSize((right - left).roundToInt().coerceAtLeast(1), (bottom - top).roundToInt().coerceAtLeast(1)),
+            dstOffset = IntOffset(((left - sx) / s).roundToInt(), ((top - sy) / s).roundToInt()),
+            dstSize = IntSize(((right - left) / s).roundToInt().coerceAtLeast(1), ((bottom - top) / s).roundToInt().coerceAtLeast(1)),
         )
     }
 

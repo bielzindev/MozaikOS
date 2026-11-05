@@ -80,6 +80,7 @@ android {
     }
     packaging {
         resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        resources.excludes += "/META-INF/{NOTICE.md,LICENSE.md,DEPENDENCIES}"
     }
 }
 
@@ -118,5 +119,9 @@ dependencies {
     // Play Services variant: the OCR model is downloaded by Google Play services, not bundled.
     implementation("com.google.android.gms:play-services-mlkit-text-recognition:19.0.1")
     implementation("org.maplibre.gl:android-sdk:11.8.8")
+    // Mail: IMAP / SMTP (JavaMail for Android) and the periodic inbox check.
+    implementation("com.sun.mail:android-mail:1.6.7")
+    implementation("com.sun.mail:android-activation:1.6.7")
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

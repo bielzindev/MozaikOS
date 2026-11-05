@@ -9,6 +9,8 @@ class WpApp : Application() {
         super.onCreate()
         // Crashes and freezes are written down, to be shared from Settings > About.
         com.wpreborn.core.diag.CrashLog.install(this)
+        // New mail is checked in the background while there is an account.
+        runCatching { com.wpreborn.data.mail.MailSyncWorker.schedule(this) }
         // Read the theme synchronously so the very first frame already has the right colors.
         SettingsRepository.get(this).warmUp()
         LockActivity.register(this)

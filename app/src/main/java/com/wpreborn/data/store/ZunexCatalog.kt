@@ -143,6 +143,11 @@ object ZunexCatalog {
             clearData = prefs("translator"),
         ),
         CatalogApp(
+            BuiltInApp.Mail, "1.0.0", 10, StoreCategory.Utilities, R.string.store_desc_mail, R.string.store_new_mail, Color(0xFF0050EF),
+            permissions = listOf(R.string.perm_label_internet), featured = true,
+            clearData = prefs("mail"),
+        ),
+        CatalogApp(
             BuiltInApp.Settings, "8.1.0", 1, StoreCategory.System, R.string.store_desc_settings, R.string.store_new_settings, Color(0xFF647687), required = true,
         ),
         CatalogApp(

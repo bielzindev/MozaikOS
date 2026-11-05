@@ -110,6 +110,11 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
             BuiltInApp.Browser -> IconTile(WpIcons.Globe, tile.size)
             BuiltInApp.Files -> IconTile(WpIcons.Folder, tile.size)
             BuiltInApp.Translator -> IconTile(com.wpreborn.core.icons.Glyphs.Translate, tile.size)
+            BuiltInApp.Mail -> {
+                val ctx = LocalContext.current
+                val unread by remember { com.wpreborn.data.mail.MailStatus.get(ctx) }.collectAsState()
+                CountTile(WpIcons.Mail, unread.coerceAtLeast(0), tile.size)
+            }
             null -> AndroidAppTile(app, tile.size, inputs, seed)
             }
         }

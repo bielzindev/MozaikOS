@@ -43,7 +43,8 @@ enum class BuiltInApp(
     News("news", R.string.app_news, com.wpreborn.core.icons.Glyphs.News, com.wpreborn.apps.news.NewsActivity::class.java, TileSize.Wide),
     Browser("browser", R.string.app_browser, WpIcons.Globe, com.wpreborn.apps.browser.BrowserActivity::class.java, TileSize.Medium),
     Files("files", R.string.app_files, WpIcons.Folder, com.wpreborn.apps.files.FilesActivity::class.java, TileSize.Small),
-    Translator("translator", R.string.app_translator, com.wpreborn.core.icons.Glyphs.Translate, com.wpreborn.apps.translator.TranslatorActivity::class.java, TileSize.Medium);
+    Translator("translator", R.string.app_translator, com.wpreborn.core.icons.Glyphs.Translate, com.wpreborn.apps.translator.TranslatorActivity::class.java, TileSize.Medium),
+    Mail("mail", R.string.app_mail, WpIcons.Mail, com.wpreborn.apps.mail.MailActivity::class.java, TileSize.Wide);
 
     companion object {
         fun byId(id: String) = entries.firstOrNull { it.id == id }

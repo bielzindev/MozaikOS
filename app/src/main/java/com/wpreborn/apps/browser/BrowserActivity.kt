@@ -747,9 +747,9 @@ private fun FindBar(text: String, onText: (String) -> Unit, onNext: () -> Unit, 
             cursorBrush = SolidColor(Wp.accent),
             modifier = Modifier.weight(1f).background(Color.White).border(2.dp, Wp.accent).padding(8.dp).focusRequester(req),
         )
-        BarButton(WpIcons.Back, stringResource(R.string.browser_find_prev), onPrev)
-        BarButton(WpIcons.Forward, stringResource(R.string.browser_find_next), onNext)
-        BarButton(WpIcons.Close, stringResource(R.string.cancel), onClose)
+        BarButton(WpIcons.Back, stringResource(R.string.browser_find_prev), onClick = onPrev)
+        BarButton(WpIcons.Forward, stringResource(R.string.browser_find_next), onClick = onNext)
+        BarButton(WpIcons.Close, stringResource(R.string.cancel), onClick = onClose)
     }
 }
 

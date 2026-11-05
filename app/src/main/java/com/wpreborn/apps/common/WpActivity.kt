@@ -193,6 +193,12 @@ private val NO_SPLASH = setOf(
     com.wpreborn.data.apps.BuiltInApp.Calculator,
     com.wpreborn.data.apps.BuiltInApp.Flashlight,
     com.wpreborn.data.apps.BuiltInApp.Keyboard,
+    com.wpreborn.data.apps.BuiltInApp.Photos,
+    com.wpreborn.data.apps.BuiltInApp.Calendar,
+    com.wpreborn.data.apps.BuiltInApp.Alarms,
+    com.wpreborn.data.apps.BuiltInApp.Clock,
+    com.wpreborn.data.apps.BuiltInApp.Browser,
+    com.wpreborn.data.apps.BuiltInApp.Store,
 )
 
 /**

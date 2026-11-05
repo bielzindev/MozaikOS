@@ -130,21 +130,29 @@ class MusicActivity : WpActivity() {
         // Deleted songs leave the queue too, so the player never points at a missing file.
         val songActions = rememberSongActions(onDeleted = { controller.removeSongs(it) }) { reload++ }
 
-        // Classic or new (beta) interface, re-read when coming back (e.g. after the Store update).
-        val mixUi = remember(resumes) { MusicUi.isMix(context) }
-        var mixOverride by remember { mutableStateOf<Boolean?>(null) }
-        val useMix = mixOverride ?: mixUi
         val favoriteIds by remember { com.wpreborn.data.media.Favorites.get(context) }.ids.collectAsState()
         val mixes = remember(collection, favoriteIds) {
             collection?.let { MixBuilder.build(context, it, com.wpreborn.data.media.PlayStats.get(context).counts(), favoriteIds) }.orEmpty()
         }
-        fun switchUi(on: Boolean) {
-            MusicUi.setMix(context, on)
-            mixOverride = on
-        }
         val scope = rememberCoroutineScope()
         val playMeLabel = stringResource(R.string.mix_play_me).uppercase()
         val nav = rememberNavigator<MusicPage>(if (intent?.getBooleanExtra(EXTRA_NOW_PLAYING, false) == true) MusicPage.NowPlaying else MusicPage.Collection)
+        // Back out of a page whose artist, album or playlist is gone (its songs were deleted);
+        // only the page on top acts, so one deletion never pops two pages.
+        fun gone(page: MusicPage) {
+            if (nav.current.page == page && !nav.pop()) nav.replace(MusicPage.Collection)
+        }
+        // Nothing left to play (the playing song or the whole queue was deleted): leave the
+        // player instead of showing an empty screen.
+        var hadMedia by remember { mutableStateOf(false) }
+        LaunchedEffect(ui.hasMedia) {
+            if (ui.hasMedia) {
+                hadMedia = true
+            } else if (hadMedia) {
+                hadMedia = false
+                if (nav.current.page == MusicPage.NowPlaying && !nav.pop()) nav.replace(MusicPage.Collection)
+            }
+        }
         LaunchedEffect(nowPlayingRequests) {
             if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
         }
@@ -154,7 +162,7 @@ class MusicActivity : WpActivity() {
                 WpNavHost(nav) { page ->
                     val col = collection
                     when (page) {
-                        MusicPage.Collection -> if (useMix && perm.granted) {
+                        MusicPage.Collection -> if (perm.granted) {
                             MixHome(
                                 col, mixes,
                                 onNowPlaying = { nav.navigate(MusicPage.NowPlaying) },
@@ -163,48 +171,38 @@ class MusicActivity : WpActivity() {
                                 onMixes = { nav.navigate(MusicPage.Mixes) },
                                 onFavorites = { nav.navigate(MusicPage.Favorites) },
                                 onPlayMeIntro = { nav.navigate(MusicPage.PlayMeIntro) },
-                                onClassic = { switchUi(false) },
                                 onChanged = { reload++ },
                             )
                         } else {
-                            CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, onMixUi = { switchUi(true) }) {
+                            CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }) {
                                 PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
                             }
                         }
-                        is MusicPage.Library -> CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, onMixUi = null, initialPage = page.page) {
+                        is MusicPage.Library -> CollectionPage(perm.granted, col, nav, controller, ui, songActions, onReload = { reload++ }, initialPage = page.page) {
                             PermissionGate(perm, stringResource(R.string.perm_music), Modifier.padding(start = 20.dp)) {}
                         }
                         // When the artist, album or playlist no longer exists (its last song was
                         // deleted or retagged) the page goes back instead of staying blank.
                         is MusicPage.ArtistPage -> col?.artists?.firstOrNull { it.name == page.name }?.let { a ->
-                            if (useMix) {
-                                MixArtistPage(
-                                    col!!, a,
-                                    onAlbum = { nav.navigate(MusicPage.AlbumPage(it)) },
-                                    onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
-                                    onPlay = { list, i, source -> controller.playSongs(list, i, source = source); nav.navigate(MusicPage.NowPlaying) },
-                                )
-                            } else {
-                                ArtistDetail(a, nav, controller, col!!)
-                            }
+                            MixArtistPage(
+                                col!!, a,
+                                onAlbum = { nav.navigate(MusicPage.AlbumPage(it)) },
+                                onArtist = { nav.navigate(MusicPage.ArtistPage(it)) },
+                                onPlay = { list, i, source -> controller.playSongs(list, i, source = source); nav.navigate(MusicPage.NowPlaying) },
+                            )
                         }
-                            ?: GoneBack(col != null) { nav.pop() }
+                            ?: GoneBack(col != null) { gone(page) }
                         is MusicPage.AlbumPage -> col?.albums?.firstOrNull { it.id == page.id }?.let { AlbumDetail(it, controller, songActions) }
-                            ?: GoneBack(col != null) { nav.pop() }
+                            ?: GoneBack(col != null) { gone(page) }
                         is MusicPage.PlaylistPage -> col?.playlists?.firstOrNull { it.id == page.id }?.let { p ->
                             PlaylistDetail(p, col.songsOf(p), controller, onDeleted = { reload++; nav.pop() }, onChanged = { reload++ }, allSongs = col.songs)
-                        } ?: GoneBack(col != null) { nav.pop() }
-                        MusicPage.NowPlaying -> if (useMix) MixNowPlaying(
+                        } ?: GoneBack(col != null) { gone(page) }
+                        MusicPage.NowPlaying -> MixNowPlaying(
                             onEqualizer = { nav.navigate(MusicPage.Equalizer) },
                             onChanged = { reload++ },
                             onAlbum = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.let { s -> col.albums.firstOrNull { a -> a.songs.any { it.id == s.id } }?.let { nav.navigate(MusicPage.AlbumPage(it.id)) } } },
                             onArtist = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.artist?.takeIf { it.isNotBlank() }?.let { nav.navigate(MusicPage.ArtistPage(it)) } },
                         )
-                            else NowPlayingScreen(
-                                onEqualizer = { nav.navigate(MusicPage.Equalizer) },
-                                onArtist = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.artist?.takeIf { it.isNotBlank() }?.let { nav.navigate(MusicPage.ArtistPage(it)) } },
-                                onAlbum = { id -> col?.songs?.firstOrNull { it.id.toString() == id }?.let { s -> col.albums.firstOrNull { a -> a.songs.any { it.id == s.id } }?.let { nav.navigate(MusicPage.AlbumPage(it.id)) } } },
-                            )
                         MusicPage.Equalizer -> EqualizerScreen()
                         MusicPage.NewPlaylist -> NewPlaylistPage(library) { reload++; nav.pop() }
                         MusicPage.Favorites -> FavoritesPage(
@@ -264,8 +262,6 @@ private fun CollectionPage(
     ui: PlayerUi,
     songActions: SongActions,
     onReload: () -> Unit,
-    /** Switches to the new interface; null where that makes no sense (opened from it). */
-    onMixUi: (() -> Unit)?,
     initialPage: Int = 0,
     gate: @Composable () -> Unit,
 ) {
@@ -472,14 +468,7 @@ private fun CollectionPage(
                     AppBarMenuItem(stringResource(R.string.refresh)) { onReload() },
                     AppBarMenuItem(stringResource(R.string.mix_create)) { creatingMix = true },
                     AppBarMenuItem(stringResource(R.string.mix_favorites)) { nav.navigate(MusicPage.Favorites) },
-                ) + (if (onMixUi == null) emptyList() else listOf(
-                    // The new interface arrives as an update of Music in the ZUNEX Store.
-                    AppBarMenuItem(stringResource(if (MusicUi.available(context)) R.string.mix_try_beta else R.string.mix_get_beta)) {
-                        if (MusicUi.available(context)) onMixUi() else runCatching {
-                            context.startActivity(android.content.Intent(context, com.wpreborn.apps.store.StoreActivity::class.java).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-                        }
-                    },
-                )) + listOf(
+                ) + listOf(
                     AppBarMenuItem(stringResource(if (MusicLibrary(context).hideUnknown) R.string.music_show_unknown else R.string.music_hide_unknown)) {
                         val lib = MusicLibrary(context)
                         lib.hideUnknown = !lib.hideUnknown

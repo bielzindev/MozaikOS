@@ -68,60 +68,119 @@ import java.net.URLEncoder
 data class ArtistBio(val title: String, val text: String, val image: String?, val page: String)
 
 object ArtistBios {
-    private const val AGENT = "Mozaik launcher (https://github.com/joaogabrielsilvademourap3-spec/zunex)"
+    private const val AGENT = "Mozaik launcher (https://github.com/bielzindev/MozaikOS)"
 
-    private fun get(url: String): String {
-        val c = URL(url).openConnection() as HttpURLConnection
-        c.setRequestProperty("User-Agent", AGENT)
-        c.connectTimeout = 8000
-        c.readTimeout = 10000
-        return try { c.inputStream.bufferedReader().use { it.readText() } } finally { c.disconnect() }
+    /** The network failed (offline, timeout, rate limit): not the same as "no such artist". */
+    private class Offline : Exception()
+
+    /** The page text, null when it doesn't exist (404); [Offline] on any other failure. */
+    private fun get(url: String): String? {
+        var lastError: Exception? = null
+        repeat(2) {
+            val c = URL(url).openConnection() as HttpURLConnection
+            try {
+                c.setRequestProperty("User-Agent", AGENT)
+                c.setRequestProperty("Accept", "application/json")
+                c.connectTimeout = 10000
+                c.readTimeout = 15000
+                when (val code = c.responseCode) {
+                    200 -> return c.inputStream.bufferedReader().use { it.readText() }
+                    404 -> return null
+                    else -> lastError = java.io.IOException("HTTP $code")
+                }
+            } catch (e: java.io.IOException) {
+                lastError = e
+            } finally {
+                c.disconnect()
+            }
+        }
+        throw Offline()
     }
 
-    /** Cached for a month; looks the artist up on Wikipedia in the phone's language, else English. */
+    /** "A feat. B", "A & B", "A, B": the first artist, which is the one with a page. */
+    private fun primary(name: String): String =
+        name.split(Regex("\\s+(feat\\.?|ft\\.?|featuring|with|x|&)\\s+|\\s*[,;/]\\s*", RegexOption.IGNORE_CASE)).first().trim().ifBlank { name }
+
+    /**
+     * Cached for a month when found (three days when there is no page); a failed download is
+     * never cached, so the next visit tries again. Looks the artist up on Wikipedia in the
+     * phone's language, else English.
+     */
     suspend fun load(context: Context, name: String): ArtistBio? = withContext(Dispatchers.IO) {
-        val prefs = context.getSharedPreferences("artist_bios2", Context.MODE_PRIVATE)
+        val prefs = context.getSharedPreferences("artist_bios3", Context.MODE_PRIVATE)
         val key = name.lowercase()
         prefs.getString(key, null)?.let { s ->
             runCatching {
                 val o = JSONObject(s)
-                if (System.currentTimeMillis() - o.getLong("t") < 30L * 24 * 3600 * 1000) {
-                    return@withContext if (o.optBoolean("none")) null else ArtistBio(o.getString("title"), o.getString("text"), o.optString("image").ifBlank { null }, o.getString("page"))
+                val none = o.optBoolean("none")
+                val ttl = if (none) 3L * 24 * 3600 * 1000 else 30L * 24 * 3600 * 1000
+                if (System.currentTimeMillis() - o.getLong("t") < ttl) {
+                    return@withContext if (none) null else ArtistBio(o.getString("title"), o.getString("text"), o.optString("image").ifBlank { null }, o.getString("page"))
                 }
             }
         }
         val lang = java.util.Locale.getDefault().language.takeIf { it == "pt" || it == "es" || it == "fr" || it == "de" || it == "it" } ?: "en"
-        val bio = (if (lang != "en") find(lang, name) else null) ?: find("en", name)
+        val bio = try {
+            (if (lang != "en") find(lang, name) else null) ?: find("en", name)
+        } catch (_: Offline) {
+            return@withContext null
+        }
         val o = JSONObject().put("t", System.currentTimeMillis())
         if (bio == null) o.put("none", true) else o.put("title", bio.title).put("text", bio.text).put("image", bio.image ?: "").put("page", bio.page)
         prefs.edit().putString(key, o.toString()).apply()
         bio
     }
 
-    private fun find(lang: String, name: String): ArtistBio? = runCatching {
-        // Search for the artist as a musician, then take the summary of the best page.
-        val q = URLEncoder.encode("$name " + if (lang == "pt") "música cantor banda" else "music singer band", "UTF-8")
-        val search = JSONObject(get("https://$lang.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=3&srsearch=$q"))
-        val hits = search.getJSONObject("query").getJSONArray("search")
-        val norm = name.lowercase().filter { it.isLetterOrDigit() }
-        for (i in 0 until hits.length()) {
-            val title = hits.getJSONObject(i).getString("title")
-            // The page must be about this artist: its title holds the whole name
-            // (not a list, a discography or a song of theirs).
-            val t = title.lowercase().filter { it.isLetterOrDigit() }
-            if (!t.contains(norm) || t.length > norm.length + 14) continue
-            val low = title.lowercase()
-            if (listOf("discograph", "discografia", "lista de", "list of", "song", "canção", "álbum", "album", "tour", "turnê").any { it in low }) continue
-            val s = JSONObject(get("https://$lang.wikipedia.org/api/rest_v1/page/summary/" + URLEncoder.encode(title.replace(' ', '_'), "UTF-8")))
-            if (s.optString("type") == "disambiguation") continue
-            val text = s.optString("extract")
-            if (text.isBlank()) continue
-            val image = s.optJSONObject("originalimage")?.optString("source") ?: s.optJSONObject("thumbnail")?.optString("source")
-            val page = s.optJSONObject("content_urls")?.optJSONObject("mobile")?.optString("page") ?: "https://$lang.wikipedia.org/wiki/${title.replace(' ', '_')}"
-            return@runCatching ArtistBio(title, text, image, page)
+    private val musicWords = listOf(
+        "singer", "band", "musician", "rapper", "songwriter", "composer", "producer", "vocalist", "duo", "group", "dj", "artist",
+        "cantor", "cantora", "banda", "músico", "compositor", "rapper", "grupo", "dupla", "artista", "cantautor",
+        "chanteur", "músic", "sänger", "cantante", "musiker",
+    )
+
+    private fun summary(lang: String, title: String): JSONObject? {
+        val body = get("https://$lang.wikipedia.org/api/rest_v1/page/summary/" + URLEncoder.encode(title.replace(' ', '_'), "UTF-8")) ?: return null
+        val s = JSONObject(body)
+        if (s.optString("type") == "disambiguation" || s.optString("extract").isBlank()) return null
+        return s
+    }
+
+    private fun isMusic(s: JSONObject): Boolean {
+        val d = (s.optString("description") + " " + s.optString("extract").take(240)).lowercase()
+        return musicWords.any { it in d }
+    }
+
+    private fun bioOf(lang: String, title: String, s: JSONObject): ArtistBio {
+        val image = s.optJSONObject("originalimage")?.optString("source") ?: s.optJSONObject("thumbnail")?.optString("source")
+        val page = s.optJSONObject("content_urls")?.optJSONObject("mobile")?.optString("page") ?: "https://$lang.wikipedia.org/wiki/${title.replace(' ', '_')}"
+        return ArtistBio(s.optString("title").ifBlank { title }, s.optString("extract"), image, page)
+    }
+
+    private fun find(lang: String, name: String): ArtistBio? {
+        for (n in listOf(name, primary(name)).distinct()) {
+            val norm = n.lowercase().filter { it.isLetterOrDigit() }
+            if (norm.isEmpty()) continue
+            // The page named like the artist (Wikipedia follows redirects), then with the
+            // usual qualifiers; accepted when it is about a musician.
+            for (t in listOf(n, "$n (band)", "$n (singer)", "$n (rapper)", "$n (musician)")) {
+                val s = summary(lang, t) ?: continue
+                if (isMusic(s)) return bioOf(lang, t, s)
+            }
+            // Search as a musician and take the best page about this artist.
+            val q = URLEncoder.encode("$n " + if (lang == "pt") "música cantor banda" else "music singer band", "UTF-8")
+            val search = JSONObject(get("https://$lang.wikipedia.org/w/api.php?action=query&list=search&format=json&srlimit=5&srsearch=$q") ?: continue)
+            val hits = search.getJSONObject("query").getJSONArray("search")
+            for (i in 0 until hits.length()) {
+                val title = hits.getJSONObject(i).getString("title")
+                val t = title.lowercase().filter { it.isLetterOrDigit() }
+                if (!t.contains(norm)) continue
+                val low = title.lowercase()
+                if (listOf("discograph", "discografia", "lista de", "list of", "song", "canção", "álbum", "album", "tour", "turnê").any { it in low }) continue
+                val s = summary(lang, title) ?: continue
+                if (isMusic(s) || t.length <= norm.length + 14) return bioOf(lang, title, s)
+            }
         }
-        null
-    }.getOrNull()
+        return null
+    }
 }
 
 /**

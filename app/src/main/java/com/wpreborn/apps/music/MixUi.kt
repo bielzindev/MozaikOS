@@ -78,22 +78,6 @@ import kotlinx.coroutines.launch
 /** Music app versions from this one on offer the new interface (released through the Store). */
 const val MIX_UI_VERSION = 31
 
-/** Which interface the Music app shows: the classic pivot or the new "mix" one (beta). */
-object MusicUi {
-    fun available(context: Context) = AppManager.get(context).state(BuiltInApp.Music).versionCode >= MIX_UI_VERSION
-
-    fun isMix(context: Context): Boolean {
-        if (!available(context)) return false
-        val p = context.getSharedPreferences("music", Context.MODE_PRIVATE)
-        // After the update the new interface comes on once; then it's the user's choice.
-        if (!p.contains("mixUi")) p.edit().putBoolean("mixUi", true).apply()
-        return p.getBoolean("mixUi", true)
-    }
-
-    fun setMix(context: Context, on: Boolean) =
-        context.getSharedPreferences("music", Context.MODE_PRIVATE).edit().putBoolean("mixUi", on).apply()
-}
-
 private val GREY = ColorFilter.colorMatrix(ColorMatrix().apply { setToSaturation(0f) })
 
 private fun fmt(ms: Long): String {
@@ -126,7 +110,6 @@ fun MixHome(
     mixes: List<Mix>,
     onNowPlaying: () -> Unit,
     onLibrary: (Int) -> Unit,
-    onClassic: () -> Unit,
     onChanged: () -> Unit = {},
     onSearch: () -> Unit = {},
     onMixes: () -> Unit = {},
@@ -289,7 +272,6 @@ fun MixHome(
                     stringResource(R.string.music_search) to onSearch,
                     stringResource(R.string.mix_create) to { createMix = true; Unit },
                     stringResource(R.string.music_new_playlist) to { newPlaylist = true; Unit },
-                    stringResource(R.string.mix_classic) to onClassic,
                 ),
             ) { homeMenu = false }
         }

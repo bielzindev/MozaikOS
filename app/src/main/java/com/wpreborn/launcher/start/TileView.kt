@@ -153,11 +153,20 @@ private fun FolderTile(size: TileSize, f: FolderInfo) {
         val line = 1.5.dp
         val labelH = maxHeight * (if (size == TileSize.Large) 0.18f else 0.32f)
         val cell = minOf((maxWidth - line * (cols - 1)) / cols, (maxHeight - labelH - line * rows) / rows)
-        // The tiles inside, packed like Start (their own sizes), cut to what fits.
-        val specs = remember(f.apps, f.sizes) {
-            f.apps.mapIndexed { i, a -> com.wpreborn.data.tiles.TileSpec(id = "f" + a.key, appKey = a.key, size = f.sizes.getOrNull(i)?.let { if (it == TileSize.Large) TileSize.Medium else it } ?: TileSize.Small) }
+        // The tiles inside at their own sizes when they all fit; otherwise each one small, so
+        // every app of the folder shows (two medium tiles never fit side by side here).
+        val (specs, places) = remember(f.apps, f.sizes, cols, rows) {
+            fun pack(small: Boolean): Pair<List<com.wpreborn.data.tiles.TileSpec>, List<com.wpreborn.data.tiles.Placement>> {
+                val sp = f.apps.mapIndexed { i, a ->
+                    val real = f.sizes.getOrNull(i)?.let { if (it == TileSize.Large) TileSize.Medium else it } ?: TileSize.Small
+                    com.wpreborn.data.tiles.TileSpec(id = "f" + a.key, appKey = a.key, size = if (small) TileSize.Small else real)
+                }
+                return sp to com.wpreborn.data.tiles.TileLayout.pack(sp, cols)
+            }
+            val real = pack(small = false)
+            val fitsAll = real.first.indices.all { real.second[it].y + real.first[it].size.h <= rows }
+            if (fitsAll && f.apps.size <= 2) real else pack(small = true)
         }
-        val places = remember(specs, cols) { com.wpreborn.data.tiles.TileLayout.pack(specs, cols) }
         specs.forEachIndexed { i, spec ->
             val pl = places[i]
             val w = minOf(spec.size.w, cols)

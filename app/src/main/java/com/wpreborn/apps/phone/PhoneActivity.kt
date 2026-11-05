@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -166,6 +167,7 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
     }
 
     Column(Modifier.fillMaxSize()) {
+        if (!com.wpreborn.BuildConfig.LITE) DefaultDialerBanner()
         WpPivot(
             title = stringResource(R.string.app_phone),
             headers = listOf(stringResource(R.string.phone_history), stringResource(R.string.phone_speed_dial)),
@@ -209,6 +211,32 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
                 })
             },
         )
+    }
+}
+
+/**
+ * Until Mozaik is the default Phone app, Android's own call screen shows the calls: offer to
+ * make it the default (the role asks the user once), so calls use Mozaik's call screen.
+ */
+@Composable
+private fun DefaultDialerBanner() {
+    val context = LocalContext.current
+    val rm = remember { context.getSystemService(android.app.role.RoleManager::class.java) }
+    fun held() = rm == null || !rm.isRoleAvailable(android.app.role.RoleManager.ROLE_DIALER) || rm.isRoleHeld(android.app.role.RoleManager.ROLE_DIALER)
+    var isDefault by remember { mutableStateOf(held()) }
+    val owner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    LaunchedEffect(owner) {
+        owner.lifecycle.repeatOnLifecycle(androidx.lifecycle.Lifecycle.State.RESUMED) { isDefault = held() }
+    }
+    if (isDefault) return
+    Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 8.dp)) {
+        com.wpreborn.core.ui.WpText(stringResource(R.string.phone_not_default), style = com.wpreborn.core.theme.WpType.Subtle, color = com.wpreborn.core.theme.Wp.palette.subtle)
+        Spacer(Modifier.height(8.dp))
+        com.wpreborn.core.ui.WpButton(stringResource(R.string.phone_make_default)) {
+            runCatching {
+                (context as? android.app.Activity)?.startActivityForResult(rm!!.createRequestRoleIntent(android.app.role.RoleManager.ROLE_DIALER), 8)
+            }
+        }
     }
 }
 

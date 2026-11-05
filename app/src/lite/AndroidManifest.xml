@@ -31,5 +31,10 @@
         <receiver android:name="com.wpreborn.services.sms.MmsReceiver" tools:node="remove" />
         <receiver android:name="com.wpreborn.services.sms.SmsSentReceiver" tools:node="remove" />
         <service android:name="com.wpreborn.services.sms.HeadlessSmsSendService" tools:node="remove" />
+        <!-- No default Phone app role in the lite edition. -->
+        <service android:name="com.wpreborn.services.calls.WpInCallService" tools:node="remove" />
+        <activity android:name="com.wpreborn.services.calls.CallActivity" tools:node="remove" />
+        <receiver android:name="com.wpreborn.services.calls.CallActionReceiver" tools:node="remove" />
+        <receiver android:name="com.wpreborn.services.calls.MissedCallReceiver" tools:node="remove" />
     </application>
 </manifest>

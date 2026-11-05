@@ -914,4 +914,22 @@
     <string name="folder_create">create</string>
     <string name="folder_edit">edit</string>
     <string name="folder_close">close</string>
+    <string name="call_ongoing">call in progress</string>
+    <string name="call_unknown">unknown</string>
+    <string name="call_decline">ignore</string>
+    <string name="call_answer">answer</string>
+    <string name="call_calling">calling...</string>
+    <string name="call_end">end call</string>
+    <string name="call_speaker">speaker</string>
+    <string name="call_mute">mute</string>
+    <string name="call_hold">hold</string>
+    <string name="call_keypad">keypad</string>
+    <string name="call_ended">call ended</string>
+    <string name="call_on_hold">on hold</string>
+    <string name="phone_not_default">Make Phone the default phone app so your calls also use this call screen.</string>
+    <string name="phone_make_default">make default</string>
+    <plurals name="call_missed_count">
+        <item quantity="one">%d missed call</item>
+        <item quantity="other">%d missed calls</item>
+    </plurals>
 </resources>

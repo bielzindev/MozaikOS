@@ -915,4 +915,22 @@
     <string name="folder_create">criar</string>
     <string name="folder_edit">editar</string>
     <string name="folder_close">fechar</string>
+    <string name="call_ongoing">chamada em andamento</string>
+    <string name="call_unknown">desconhecido</string>
+    <string name="call_decline">ignorar</string>
+    <string name="call_answer">atender</string>
+    <string name="call_calling">chamando...</string>
+    <string name="call_end">encerrar chamada</string>
+    <string name="call_speaker">viva-voz</string>
+    <string name="call_mute">mudo</string>
+    <string name="call_hold">espera</string>
+    <string name="call_keypad">teclado</string>
+    <string name="call_ended">chamada encerrada</string>
+    <string name="call_on_hold">em espera</string>
+    <string name="phone_not_default">Torne o Telefone o app de telefone padrão para que as ligações também usem esta tela de chamada.</string>
+    <string name="phone_make_default">tornar padrão</string>
+    <plurals name="call_missed_count">
+        <item quantity="one">%d chamada perdida</item>
+        <item quantity="other">%d chamadas perdidas</item>
+    </plurals>
 </resources>

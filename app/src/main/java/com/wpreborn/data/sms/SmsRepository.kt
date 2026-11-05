@@ -52,7 +52,15 @@ class SmsRepository(private val context: Context) {
     private val contacts = ContactsRepository(context)
     private val names = ConcurrentHashMap<String, Pair<String, Uri?>>()
 
-    fun isDefaultSmsApp(): Boolean = Telephony.Sms.getDefaultSmsPackage(context) == context.packageName
+    /**
+     * The SMS role is the truth on Android 10+; some phones (Infinix XOS among them) report
+     * a different package from getDefaultSmsPackage() even after the role was granted.
+     */
+    fun isDefaultSmsApp(): Boolean {
+        val rm = context.getSystemService(RoleManager::class.java)
+        if (rm != null && rm.isRoleAvailable(RoleManager.ROLE_SMS) && rm.isRoleHeld(RoleManager.ROLE_SMS)) return true
+        return Telephony.Sms.getDefaultSmsPackage(context) == context.packageName
+    }
 
     fun requestDefaultIntent(): Intent? {
         val rm = context.getSystemService(RoleManager::class.java) ?: return null

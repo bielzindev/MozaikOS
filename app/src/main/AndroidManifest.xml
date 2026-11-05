@@ -125,6 +125,33 @@
             </intent-filter>
         </activity>
 
+        <!-- Default Phone app: Mozaik's own call screen for every call. -->
+        <service
+            android:name=".services.calls.WpInCallService"
+            android:exported="true"
+            android:permission="android.permission.BIND_INCALL_SERVICE">
+            <meta-data android:name="android.telecom.IN_CALL_SERVICE_UI" android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
+        <activity
+            android:name=".services.calls.CallActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.wpreborn.call"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:label="@string/app_phone" />
+        <receiver android:name=".services.calls.CallActionReceiver" android:exported="false" />
+        <receiver android:name=".services.calls.MissedCallReceiver" android:exported="true">
+            <intent-filter>
+                <action android:name="android.telecom.action.SHOW_MISSED_CALLS_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+
         <activity
             android:name=".apps.messages.MessagingActivity"
             android:exported="true"

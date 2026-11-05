@@ -43,7 +43,7 @@ object CallNotifications {
             return
         }
         channels(context)
-        val name = runCatching { ContactsRepository(context).lookupNumber(call.number)?.first }.getOrNull() ?: call.number.ifBlank { context.getString(R.string.call_unknown) }
+        val name = runCatching { ContactsRepository(context).lookupNumber(call.number)?.first }.getOrNull() ?: com.wpreborn.core.PhoneFormat.br(call.number).ifBlank { context.getString(R.string.call_unknown) }
         val open = PendingIntent.getActivity(
             context, 1, Intent(context, CallActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
@@ -82,7 +82,7 @@ object CallNotifications {
             return
         }
         channels(context)
-        val who = number?.let { n -> runCatching { ContactsRepository(context).lookupNumber(n)?.first }.getOrNull() ?: n }
+        val who = number?.let { n -> runCatching { ContactsRepository(context).lookupNumber(n)?.first }.getOrNull() ?: com.wpreborn.core.PhoneFormat.br(n) }
         val open = PendingIntent.getActivity(
             context, 5, Intent(context, PhoneActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,

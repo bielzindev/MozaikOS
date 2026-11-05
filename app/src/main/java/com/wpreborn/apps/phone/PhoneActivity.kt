@@ -278,7 +278,7 @@ private fun CallRow(c: CallEntry, modifier: Modifier, onOpen: () -> Unit) {
             WpIcon(WpIcons.Phone, size = 30.dp, tint = if (missed) Wp.accent else Wp.palette.foreground)
         }
         Column(Modifier.weight(1f).wpClickable(onClick = onOpen)) {
-            WpText(c.name ?: c.number.ifBlank { stringResource(R.string.unknown_number) }, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(c.name ?: com.wpreborn.core.PhoneFormat.br(c.number).ifBlank { stringResource(R.string.unknown_number) }, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 WpIcon(
                     when (c.type) {
@@ -476,14 +476,14 @@ private fun CallDetailPage(number: String, name: String?) {
     }
     val photo = calls.firstOrNull()?.photoUri
     Column(Modifier.fillMaxSize()) {
-        WpPageHeader(stringResource(R.string.app_phone), name ?: number)
+        WpPageHeader(stringResource(R.string.app_phone), name ?: com.wpreborn.core.PhoneFormat.br(number))
         LazyColumn(Modifier.weight(1f).padding(horizontal = 20.dp)) {
             item {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(bottom = 12.dp)) {
                     ContactAvatar(photo, size = 96.dp)
                 }
-                WpListItem(stringResource(R.string.phone_call_number), subtitle = number, subtitleAccent = true) { PhoneActivity.call(context, number) }
-                WpListItem(stringResource(R.string.phone_text_number), subtitle = number, subtitleAccent = true) { PhoneActivity.text(context, number) }
+                WpListItem(stringResource(R.string.phone_call_number), subtitle = com.wpreborn.core.PhoneFormat.br(number), subtitleAccent = true) { PhoneActivity.call(context, number) }
+                WpListItem(stringResource(R.string.phone_text_number), subtitle = com.wpreborn.core.PhoneFormat.br(number), subtitleAccent = true) { PhoneActivity.text(context, number) }
                 Spacer(Modifier.height(16.dp))
                 WpText(stringResource(R.string.phone_history), style = WpType.GroupHeader, color = Wp.palette.subtle)
             }

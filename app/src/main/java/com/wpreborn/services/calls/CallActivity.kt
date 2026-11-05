@@ -170,14 +170,26 @@ private fun CallScreen(onProximity: (Boolean) -> Unit, onFinish: () -> Unit) {
                 WpText(carrier, style = WpType.Normal, color = Color.White, maxLines = 1)
             }
             Column(Modifier.padding(start = 20.dp, end = 20.dp)) {
+                val shownNumber = com.wpreborn.core.PhoneFormat.br(number)
+                val name = caller?.name?.ifBlank { null }
+                // A name wraps between words; a number stays on one line, smaller if long.
+                val title = name ?: shownNumber.ifBlank { stringResource(R.string.call_unknown) }
+                val big = when {
+                    name != null -> 54
+                    title.length <= 10 -> 54
+                    title.length <= 14 -> 44
+                    title.length <= 18 -> 36
+                    else -> 30
+                }
                 WpText(
-                    caller?.name?.ifBlank { null } ?: number.ifBlank { stringResource(R.string.call_unknown) },
-                    style = WpType.Header.copy(fontSize = 54.sp, lineHeight = 60.sp, fontWeight = FontWeight.Light),
-                    color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    title,
+                    style = WpType.Header.copy(fontSize = big.sp, lineHeight = (big + 6).sp, fontWeight = FontWeight.Light),
+                    color = Color.White, maxLines = if (name != null) 2 else 1, softWrap = name != null, overflow = TextOverflow.Ellipsis,
                 )
-                if (number.isNotBlank()) {
+                // The kind of number and the number, only when the name is shown above it.
+                if (name != null && number.isNotBlank()) {
                     WpText(
-                        if (caller != null) "${caller?.type}: $number" else number,
+                        "${caller?.type}: $shownNumber",
                         style = WpType.Normal, color = Color.White, maxLines = 1,
                     )
                 }

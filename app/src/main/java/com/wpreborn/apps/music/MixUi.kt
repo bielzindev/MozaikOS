@@ -453,7 +453,12 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
             // Previous, play and next centred on one line, the "..." at the right of the same
             // line (as on MixRadio's player), all centred vertically on the play button.
             Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Spacer(Modifier.weight(1f))
+                // The queue ("a seguir") at the left, mirroring the "..." at the right.
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterStart) {
+                    Box(Modifier.size(44.dp).wpClickable { queue = true }, contentAlignment = Alignment.Center) {
+                        WpIcon(WpIcons.Playlist, tint = Color.White, size = 24.dp)
+                    }
+                }
                 RoundButton(WpIcons.Previous, filled = false, accent = accent, size = 52.dp) { controller.previous() }
                 Spacer(Modifier.width(22.dp))
                 RoundButton(if (playback.playing) WpIcons.Pause else WpIcons.Play, filled = false, accent = accent, size = 64.dp) { controller.togglePlay() }

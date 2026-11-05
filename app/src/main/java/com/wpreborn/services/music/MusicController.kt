@@ -60,7 +60,12 @@ class MusicController private constructor(private val context: Context) {
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            mediaItem?.mediaId?.toLongOrNull()?.let { com.wpreborn.data.media.PlayStats.get(context).record(it) }
+            mediaItem?.mediaId?.toLongOrNull()?.let {
+                com.wpreborn.data.media.PlayStats.get(context).record(it)
+                recent.remove(it)
+                recent.add(it)
+                while (recent.size > 40) recent.removeAt(0)
+            }
             maybeExtend()
         }
     }
@@ -73,6 +78,8 @@ class MusicController private constructor(private val context: Context) {
             if (v) maybeExtend()
         }
     private var extending = false
+    /** The songs played lately, so the radio does not bring one back right away. */
+    private val recent = ArrayList<Long>()
 
     /**
      * The last song of the queue is playing: add a radio of similar songs from the library
@@ -98,6 +105,7 @@ class MusicController private constructor(private val context: Context) {
                         com.wpreborn.data.media.PlayStats.get(context).counts(),
                         com.wpreborn.data.media.Votes.get(context).votes.value,
                         com.wpreborn.data.media.FavoriteArtists.get(context).artists.value,
+                        recent.toList(),
                     )
                 }
                 val cc = controller

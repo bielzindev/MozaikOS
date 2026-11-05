@@ -17,19 +17,24 @@ object Radio {
         plays: Map<Long, Int>,
         votes: Map<String, Int>,
         favorites: Set<String>,
+        /** Songs played lately (newest last): not picked again. */
+        recent: List<Long> = emptyList(),
         size: Int = 12,
         random: Random = Random(System.nanoTime()),
     ): List<Song> {
         val byId = col.songs.associateBy { it.id }
         val seeds = queued.takeLast(5).mapNotNull { byId[it] }
         if (seeds.isEmpty()) return emptyList()
-        val inQueue = queued.toHashSet()
+        val inQueue = (queued + recent).toHashSet()
+        // The same song in another file (downloaded twice, another album) counts as the same.
+        fun key(s: Song) = s.title.lowercase().filter { it.isLetterOrDigit() } + "|" + s.artist.lowercase().filter { it.isLetterOrDigit() }
+        val playedKeys = (queued + recent).mapNotNull { byId[it] }.map(::key).toHashSet()
         val artists = seeds.map { it.artist.lowercase() }.toSet()
         val genres = seeds.mapNotNull { it.genre?.lowercase()?.takeIf { g -> g.isNotBlank() } }.toSet()
         val years = seeds.map { it.year }.filter { it > 0 }
         val favs = favorites.map { it.lowercase() }.toSet()
         val scored = col.songs.asSequence()
-            .filter { it.id !in inQueue && (votes[it.id.toString()] ?: 0) >= 0 }
+            .filter { it.id !in inQueue && key(it) !in playedKeys && (votes[it.id.toString()] ?: 0) >= 0 }
             .map { s ->
                 val artist = s.artist.lowercase()
                 var w = 1.0
@@ -46,8 +51,10 @@ object Radio {
             .toList()
         val out = ArrayList<Song>(size)
         val perArtist = HashMap<String, Int>()
+        val picked = HashSet<String>()
         for ((s, _) in scored) {
             if (out.size >= size) break
+            if (!picked.add(key(s))) continue
             val a = s.artist.lowercase()
             if ((perArtist[a] ?: 0) >= 4) continue
             if (out.size >= 2 && out.takeLast(2).all { it.artist.lowercase() == a }) continue

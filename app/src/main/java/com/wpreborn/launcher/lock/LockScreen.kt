@@ -321,31 +321,16 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                         }
                     }
                 }
-                // Latest notifications, each swiped away to the left or right to remove it.
-                if (settings.lockShowNotifications) {
-                    notifications.filter { it.clearable }.take(3).forEach { n ->
-                        androidx.compose.runtime.key(n.key) {
-                            com.wpreborn.launcher.actioncenter.NotificationRow(n, startPad = 24.dp, showIcon = true) {}
-                        }
-                    }
-                }
                 // Quick status: app icons with counts, and the battery while charging.
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (settings.lockShowNotifications) {
-                        val counts = notifications.groupingBy { it.packageName }.eachCount().entries.take(5)
-                        counts.forEach { (pkg, count) ->
-                            val icon = remember(pkg) {
-                                try {
-                                    context.packageManager.getApplicationIcon(pkg).toBitmap(64, 64).asImageBitmap()
-                                } catch (_: Exception) {
-                                    null
-                                }
-                            }
-                            if (icon != null) Image(icon, null, Modifier.size(24.dp))
-                            Spacer(Modifier.width(4.dp))
-                            WpText(count.toString(), style = WpType.Large, color = Color.White)
-                            Spacer(Modifier.width(18.dp))
-                        }
+                    // Only icons with counts, no notification text: square white Metro glyphs
+                    // (the app's monochrome icon).
+                    val counts = notifications.groupingBy { it.packageName }.eachCount().entries.take(5)
+                    counts.forEach { (pkg, count) ->
+                        com.wpreborn.launcher.actioncenter.SquareAppIcon(pkg, 26.dp, Wp.accent, plain = true)
+                        Spacer(Modifier.width(4.dp))
+                        WpText(count.toString(), style = WpType.Large, color = Color.White)
+                        Spacer(Modifier.width(18.dp))
                     }
                     Spacer(Modifier.weight(1f))
                     if (battery.charging) {

@@ -370,9 +370,6 @@ private fun LockScreenPage() {
         if (settings.lockEnabled && !overlay) {
             WpText(stringResource(R.string.lock_needs_overlay), style = WpType.Small, color = Wp.accent)
         }
-        WpToggle(stringResource(R.string.lock_show_notifications), settings.lockShowNotifications, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
-            repo.setLockShowNotifications(it)
-        }
         WpToggle(stringResource(R.string.lock_photos), settings.lockPhotos, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setLockPhotos(it)
         }

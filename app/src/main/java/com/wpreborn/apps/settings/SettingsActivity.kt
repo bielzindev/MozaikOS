@@ -264,6 +264,9 @@ private fun StartThemePage(onAccent: () -> Unit) {
         WpToggle(stringResource(R.string.set_more_tiles), settings.moreTiles, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setMoreTiles(it)
         }
+        WpToggle(stringResource(R.string.set_small_row), settings.smallTilesRow, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
+            repo.setSmallTilesRow(it)
+        }
         WpToggle(stringResource(R.string.set_show_duplicates), settings.showDuplicates, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setShowDuplicates(it)
         }

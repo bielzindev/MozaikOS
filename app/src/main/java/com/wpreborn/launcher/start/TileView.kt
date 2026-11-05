@@ -166,31 +166,56 @@ private fun BoxScope.CountTile(icon: androidx.compose.ui.graphics.vector.ImageVe
     }
 }
 
+/**
+ * People, after Windows Phone 8.1: a mosaic of small squares, one per contact photo; every
+ * square flips on its own, now and then, to another face, so the tile feels alive and keeps
+ * the people you talk to in sight. Without a photo a square takes the tile's colour in a
+ * lighter or darker shade, so the mosaic still shows (and moves) before any contact has a
+ * picture.
+ */
 @Composable
 private fun PeopleTile(size: TileSize, faces: List<Uri>, live: Boolean, seed: Int) {
-    if (!live || faces.size < 3) {
+    if (!live || size == TileSize.Small) {
         Box(Modifier.fillMaxSize()) { IconTile(WpIcons.People, size) }
         return
     }
     val cols = when (size) {
         TileSize.Small -> 1
-        TileSize.Medium -> 3
-        TileSize.Wide -> 6
-        TileSize.Large -> 6
+        TileSize.Medium -> 4
+        TileSize.Wide -> 8
+        TileSize.Large -> 8
     }
     val rows = when (size) {
         TileSize.Small -> 1
-        TileSize.Medium, TileSize.Wide -> 3
-        TileSize.Large -> 6
+        TileSize.Medium, TileSize.Wide -> 4
+        TileSize.Large -> 8
+    }
+    // Faces, with plain shades mixed in (a square flips between a photo and a shade).
+    val pool = remember(faces) {
+        val shades = List(maxOf(3, faces.size / 2)) { null }
+        val out = ArrayList<Uri?>()
+        val f = faces.iterator()
+        val s = shades.iterator()
+        while (f.hasNext() || s.hasNext()) {
+            if (f.hasNext()) out += f.next()
+            if (s.hasNext()) out += s.next()
+        }
+        out.mapIndexed { i, u -> u to i }
     }
     Column(Modifier.fillMaxSize()) {
         for (r in 0 until rows) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 for (c in 0 until cols) {
                     val i = r * cols + c
-                    Box(Modifier.weight(1f).fillMaxHeight()) {
-                        FlippingCell(faces, i % faces.size, seed * 31 + i, live) { uri ->
-                            Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 128)
+                    Box(Modifier.weight(1f).fillMaxHeight().padding(0.5.dp)) {
+                        FlippingCell(pool, (i * 5) % pool.size, seed * 31 + i, live) { (uri, n) ->
+                            if (uri != null) {
+                                Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 128)
+                            } else {
+                                // A shade of the tile colour: white at 8 to 32 percent.
+                                val a = 0.08f + ((n + i) % 4) * 0.08f
+                                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = a)))
+                            }
                         }
                     }
                 }
@@ -510,9 +535,11 @@ private fun FlipBack(app: AppEntry?, n: WpNotification, count: Int) {
                     Avatar(n, photo)
                     Spacer(Modifier.width(pad * 0.8f))
                 }
+                // One line, cut with "..." (never broken in the middle of a name).
                 WpText(
                     n.title, style = WpType.Normal.copy(fontSize = nameSize.tileSp(), lineHeight = (nameSize * 1.25f).tileSp(), fontWeight = FontWeight.SemiBold),
-                    color = Color.White, maxLines = if (photo > 0.dp) 2 else 1, overflow = TextOverflow.Ellipsis,
+                    color = Color.White, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
             }
             Spacer(Modifier.height(side * 0.03f))
@@ -555,7 +582,7 @@ private fun WideIconic(app: AppEntry?, n: WpNotification, count: Int) {
         Row(Modifier.fillMaxSize()) {
             if (photo) Avatar(n, h)
             Column(Modifier.weight(1f).padding(start = pad, top = pad * 0.7f, end = pad)) {
-                WpText(n.title, style = WpType.Large.copy(fontSize = nameSize.tileSp(), lineHeight = (nameSize * 1.3f).tileSp()), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                WpText(n.title, style = WpType.Large.copy(fontSize = nameSize.tileSp(), lineHeight = (nameSize * 1.3f).tileSp()), color = Color.White, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                 WpText(n.text, style = WpType.Normal.copy(fontSize = textSize.tileSp(), lineHeight = line.tileSp()), color = Color.White.copy(alpha = 0.92f), maxLines = lines, overflow = TextOverflow.Ellipsis)
             }
         }
@@ -579,7 +606,7 @@ private fun LargeIconic(app: AppEntry?, recent: List<WpNotification>, count: Int
                         Spacer(Modifier.width(pad * 1.4f))
                     }
                     Column(Modifier.weight(1f)) {
-                        WpText(n.title, style = WpType.Large.copy(fontSize = (row * 0.24f).tileSp(), lineHeight = (row * 0.3f).tileSp()), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        WpText(n.title, style = WpType.Large.copy(fontSize = (row * 0.24f).tileSp(), lineHeight = (row * 0.3f).tileSp()), color = Color.White, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis)
                         WpText(n.text, style = WpType.Normal.copy(fontSize = (row * 0.19f).tileSp(), lineHeight = (row * 0.24f).tileSp()), color = Color.White.copy(alpha = 0.85f), maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }

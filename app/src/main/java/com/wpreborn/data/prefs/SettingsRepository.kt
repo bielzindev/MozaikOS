@@ -46,6 +46,8 @@ data class WpSettings(
     /** Show system apps that duplicate a ZUNEX app (dialer, messages, music...) in the app list. */
     val showDuplicates: Boolean = false,
     val liveTiles: Boolean = true,
+    /** Small tiles fill a row across the screen instead of 2x2 groups. */
+    val smallTilesRow: Boolean = false,
     val firstRunDone: Boolean = false,
 )
 
@@ -83,6 +85,7 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setBrandColors(value: Boolean) = update { it[BRAND_COLORS] = value }
     fun setShowDuplicates(value: Boolean) = update { it[SHOW_DUPLICATES] = value }
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
+    fun setSmallTilesRow(value: Boolean) = update { it[SMALL_ROW] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
     private fun Preferences.toSettings() = WpSettings(
@@ -100,6 +103,7 @@ class SettingsRepository private constructor(private val context: Context) {
         brandColors = this[BRAND_COLORS] ?: true,
         showDuplicates = this[SHOW_DUPLICATES] ?: false,
         liveTiles = this[LIVE_TILES] ?: true,
+        smallTilesRow = this[SMALL_ROW] ?: false,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
 
@@ -118,6 +122,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val BRAND_COLORS = booleanPreferencesKey("brand_colors")
         private val SHOW_DUPLICATES = booleanPreferencesKey("show_duplicates")
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
+        private val SMALL_ROW = booleanPreferencesKey("small_tiles_row")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 
         @Volatile

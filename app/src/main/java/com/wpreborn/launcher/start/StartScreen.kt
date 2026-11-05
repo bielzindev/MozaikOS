@@ -155,12 +155,12 @@ fun StartScreen(
         val geo = startGeometry(maxWidth, settings.moreTiles)
         val viewportPx = with(density) { maxHeight.toPx() }
         val widthPx = with(density) { maxWidth.toPx() }
-        val placements = remember(tiles, geo.columns) { TileLayout.pack(tiles, geo.columns) }
+        val placements = remember(tiles, geo.columns, settings.smallTilesRow) { TileLayout.pack(tiles, geo.columns, settings.smallTilesRow) }
         val rows = TileLayout.rows(tiles, placements)
         val unitPx = with(density) { (geo.unit + geo.gap).toPx() }
         val marginPx = with(density) { geo.margin.toPx() }
-        // Windows Phone 8.1 starts the tiles just under the status bar, one margin down.
-        val topPad = geo.margin + geo.gap
+        // The tiles start right under the status bar, one gap down, like on the phone.
+        val topPad = geo.gap
         val topPadPx = with(density) { topPad.toPx() }
 
         // Drag bookkeeping, in content coordinates.
@@ -203,8 +203,8 @@ fun StartScreen(
         }
 
         // At least the screen height, so pressing and holding below the last tile is caught too.
-        // Below the last row only room for the "all apps" gesture, as on the phone.
-        val contentHeight = maxOf(geo.y(rows) + topPad + geo.unit * 0.9f, maxHeight)
+        // After the last row only one gap, so the screen ends where the tiles end.
+        val contentHeight = maxOf(geo.y(rows) + topPad + geo.margin, maxHeight)
 
         // Edit mode: every tile floats gently, each on its own path, like tiles lifted off the
         // screen. One clock for all of them, read while drawing, so no tile recomposes per frame.

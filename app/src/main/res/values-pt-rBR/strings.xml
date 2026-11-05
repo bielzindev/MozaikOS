@@ -908,4 +908,5 @@
     <string name="welcome_light">claro</string>
     <string name="welcome_setting_up">Estamos preparando tudo para você.</string>
     <string name="welcome_wont_take_long">Isso não vai demorar.</string>
+    <string name="set_small_row">Blocos pequenos em linha</string>
 </resources>

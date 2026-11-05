@@ -57,7 +57,7 @@ object TileLayout {
      * Places tiles in order, in the first free slot, scanning 2x2 blocks the way the Start
      * screen does: four small tiles fill a medium block before the next block is used.
      */
-    fun pack(tiles: List<TileSpec>, columns: Int): List<Placement> {
+    fun pack(tiles: List<TileSpec>, columns: Int, smallInRow: Boolean = false): List<Placement> {
         val occupied = HashSet<Long>()
         fun key(x: Int, y: Int) = (y.toLong() shl 16) or x.toLong()
         fun fits(x: Int, y: Int, w: Int, h: Int): Boolean {
@@ -70,6 +70,17 @@ object TileLayout {
             val w = minOf(t.size.w, columns)
             val h = t.size.h
             var placed: Placement? = null
+            if (smallInRow && t.size == TileSize.Small) {
+                // Small tiles in a row: the first free cell, scanning across each row.
+                var y = 0
+                while (placed == null) {
+                    for (x in 0 until columns) if (fits(x, y, 1, 1)) { placed = Placement(x, y); break }
+                    y++
+                }
+                val p = placed!!
+                occupied += key(p.x, p.y)
+                return@map p
+            }
             var by = 0
             while (placed == null) {
                 var bx = 0

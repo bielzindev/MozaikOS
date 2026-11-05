@@ -153,6 +153,48 @@ class MusicActivity : WpActivity() {
                 if (nav.current.page == MusicPage.NowPlaying && !nav.pop()) nav.replace(MusicPage.Collection)
             }
         }
+        // Opened by Android or another app: a song to play, or a voice "play ...".
+        LaunchedEffect(Unit) { if (incoming == null) incoming = intent?.takeIf { it.action == Intent.ACTION_VIEW || it.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH } }
+        val inc = incoming
+        LaunchedEffect(inc, collection) {
+            val i = inc ?: return@LaunchedEffect
+            val col = collection
+            when (i.action) {
+                Intent.ACTION_VIEW -> {
+                    val uri = i.data ?: run { incoming = null; return@LaunchedEffect }
+                    val id = if (uri.authority == "media") runCatching { android.content.ContentUris.parseId(uri) }.getOrNull() else null
+                    // A song of the library: wait for it to load, then play it (the radio follows).
+                    if (id != null && col == null && perm.granted) return@LaunchedEffect
+                    val song = id?.let { sid -> col?.songs?.firstOrNull { it.id == sid } }
+                    if (song != null) {
+                        controller.playSongs(listOf(song))
+                    } else {
+                        val name = runCatching {
+                            context.contentResolver.query(uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c -> if (c.moveToFirst()) c.getString(0) else null }
+                        }.getOrNull() ?: uri.lastPathSegment.orEmpty()
+                        controller.playUri(uri, name.substringBeforeLast('.'))
+                    }
+                    incoming = null
+                    if (nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
+                }
+                android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH -> {
+                    if (col == null) return@LaunchedEffect
+                    val q = i.getStringExtra(android.app.SearchManager.QUERY).orEmpty().trim().lowercase()
+                    val list = if (q.isEmpty()) {
+                        col.songs.shuffled()
+                    } else {
+                        (col.songs.filter { it.title.lowercase().contains(q) || it.album.lowercase().contains(q) } +
+                            col.songs.filter { it.artist.lowercase().contains(q) }).distinct()
+                    }
+                    incoming = null
+                    if (list.isNotEmpty()) {
+                        controller.playSongs(list)
+                        if (nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
+                    }
+                }
+                else -> incoming = null
+            }
+        }
         LaunchedEffect(nowPlayingRequests) {
             if (nowPlayingRequests > 0 && nav.current.page != MusicPage.NowPlaying) nav.navigate(MusicPage.NowPlaying)
         }
@@ -242,9 +284,13 @@ class MusicActivity : WpActivity() {
         resumes++
     }
 
+    /** A song or a "play ..." Android sent (handled once the library is there). */
+    private var incoming by mutableStateOf<Intent?>(null)
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (intent.action == Intent.ACTION_VIEW || intent.action == android.provider.MediaStore.INTENT_ACTION_MEDIA_PLAY_FROM_SEARCH) incoming = intent
         if (intent.getBooleanExtra(EXTRA_NOW_PLAYING, false)) nowPlayingRequests++
     }
 

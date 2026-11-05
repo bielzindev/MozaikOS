@@ -170,6 +170,20 @@ class MusicController private constructor(private val context: Context) {
         c.play()
     }
 
+    /** Plays a file another app asked to open (not in the library). */
+    fun playUri(uri: Uri, title: String) = withController { c ->
+        _source.value = null
+        session++
+        c.setMediaItems(
+            listOf(
+                MediaItem.Builder().setMediaId("ext:$uri").setUri(uri)
+                    .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build()).build(),
+            ),
+        )
+        c.prepare()
+        c.play()
+    }
+
     /** Jumps to the [offset]-th song after the current one in play order. */
     fun skipAhead(offset: Int) = withController { c ->
         var i = c.currentMediaItemIndex

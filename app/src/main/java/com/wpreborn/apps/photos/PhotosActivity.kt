@@ -120,8 +120,17 @@ class PhotosActivity : WpActivity() {
                 videoPerm.request()
             }
         }
+        // Another app asked for a picture (or video): a tap returns it instead of opening it.
+        val picking = remember { intent?.action == Intent.ACTION_PICK || intent?.action == Intent.ACTION_GET_CONTENT }
+        val onlyImages = remember { picking && intent?.type?.startsWith("image") == true }
+        fun pick(p: Photo) {
+            (context as? Activity)?.run {
+                setResult(Activity.RESULT_OK, Intent().setData(p.uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                finish()
+            }
+        }
         LaunchedEffect(perm.granted, videoPerm.granted, reload) {
-            if (perm.granted) photos = library.load(videos = context.hasPermissions(Perms.VIDEOS))
+            if (perm.granted) photos = library.load(videos = context.hasPermissions(Perms.VIDEOS) && !onlyImages)
         }
         val albums = remember(photos) { photos?.let { library.albums(it) }.orEmpty() }
         val trash by androidx.compose.runtime.produceState<List<Photo>>(emptyList(), perm.granted, reload) {
@@ -154,7 +163,7 @@ class PhotosActivity : WpActivity() {
                                 when {
                                     list == null -> LoadingDots(Modifier.padding(top = 24.dp))
                                     list.isEmpty() -> CenteredMessage(stringResource(R.string.photos_empty), Modifier.padding(start = 20.dp))
-                                    index == 0 -> Collection(list, selection) { nav.navigate(PhotosPage.Viewer(null, it)) }
+                                    index == 0 -> Collection(list, selection) { if (picking) pick(list[it]) else nav.navigate(PhotosPage.Viewer(null, it)) }
                                     else -> Albums(albums, trash, onTrash = { nav.navigate(PhotosPage.Trash) }) { nav.navigate(PhotosPage.AlbumPage(it.id)) }
                                 }
                             }
@@ -167,7 +176,7 @@ class PhotosActivity : WpActivity() {
                     Column(Modifier.fillMaxSize()) {
                         WpPageHeader(stringResource(R.string.app_photos), album.name)
                         Box(Modifier.weight(1f)) {
-                            PhotoGrid(album.photos, selection) { nav.navigate(PhotosPage.Viewer(album.id, it)) }
+                            PhotoGrid(album.photos, selection) { if (picking) pick(album.photos[it]) else nav.navigate(PhotosPage.Viewer(album.id, it)) }
                         }
                         SelectionAppBar(selection, album.photos) { reload++ }
                     }

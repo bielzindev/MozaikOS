@@ -376,6 +376,15 @@ private fun LockScreenPage() {
         WpToggle(stringResource(R.string.lock_photos), settings.lockPhotos, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setLockPhotos(it)
         }
+        WpToggle(stringResource(R.string.glance_title), settings.glance, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
+            repo.setGlance(it)
+            if (it && !context.canDrawOverlays()) {
+                runCatching {
+                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName)))
+                }
+            }
+        }
+        WpText(stringResource(R.string.glance_info), style = WpType.Small, color = Wp.palette.subtle)
         Spacer(Modifier.height(12.dp))
         WpText(stringResource(R.string.lock_background), style = WpType.Subtle, color = Wp.palette.subtle)
         settings.lockWallpaper?.let {

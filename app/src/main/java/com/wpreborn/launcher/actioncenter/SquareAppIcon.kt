@@ -27,13 +27,13 @@ import kotlinx.coroutines.withContext
  * monochrome (themed) icon show it in white on [accent]; others show their artwork square.
  */
 @Composable
-fun SquareAppIcon(packageName: String, size: Dp, accent: Color, modifier: Modifier = Modifier, plain: Boolean = false) {
+fun SquareAppIcon(packageName: String, size: Dp, accent: Color, modifier: Modifier = Modifier, plain: Boolean = false, tint: Color? = null) {
     val context = LocalContext.current
     val px = with(LocalDensity.current) { size.roundToPx() }
     val icon by produceState<ImageBitmap?>(null, packageName, px, accent) {
         value = withContext(Dispatchers.IO) { runCatching { render(context, packageName, px, accent.toArgb(), plain) }.getOrNull() }
     }
-    icon?.let { Image(it, null, modifier.size(size)) }
+    icon?.let { Image(it, null, modifier.size(size), colorFilter = tint?.let { t -> androidx.compose.ui.graphics.ColorFilter.tint(t) }) }
 }
 
 private fun render(context: Context, pkg: String, px: Int, accent: Int, plain: Boolean): ImageBitmap {

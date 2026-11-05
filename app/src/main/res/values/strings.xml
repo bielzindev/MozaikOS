@@ -968,4 +968,6 @@
     <string name="music_radio_source">RADIO</string>
     <string name="music_autoplay_on">autoplay radio: on</string>
     <string name="music_autoplay_off">autoplay radio: off</string>
+    <string name="glance_title">Glance screen (always on)</string>
+    <string name="glance_info">With the screen off, shows the time, weather and notification icons in dim accent-coloured type, like the Lumia. Double-tap to wake. Always on while charging, 15 minutes on battery, off in a pocket. Needs \'display over other apps\'; turn off the phone\'s own always-on display.</string>
 </resources>

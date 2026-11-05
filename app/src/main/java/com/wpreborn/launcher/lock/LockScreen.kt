@@ -167,6 +167,8 @@ class LockActivity : ComponentActivity() {
         fun register(context: Context) {
             val receiver = object : BroadcastReceiver() {
                 override fun onReceive(c: Context, intent: Intent) {
+                    // The glance screen (always on display) comes up on top of the lock screen.
+                    Glance.onScreenOff(c)
                     val settings = SettingsRepository.get(c).cached
                     if (!settings.lockEnabled || !c.canDrawOverlays()) return
                     preloadWallpaper(c, settings.lockWallpaper)
@@ -185,6 +187,14 @@ class LockActivity : ComponentActivity() {
             preloadWallpaper(context, SettingsRepository.get(context).cached.lockWallpaper)
             androidx.core.content.ContextCompat.registerReceiver(
                 context.applicationContext, receiver, IntentFilter(Intent.ACTION_SCREEN_OFF),
+                androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
+            )
+            androidx.core.content.ContextCompat.registerReceiver(
+                context.applicationContext,
+                object : BroadcastReceiver() {
+                    override fun onReceive(c: Context, intent: Intent) = Glance.onScreenOn()
+                },
+                IntentFilter(Intent.ACTION_SCREEN_ON),
                 androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,
             )
         }

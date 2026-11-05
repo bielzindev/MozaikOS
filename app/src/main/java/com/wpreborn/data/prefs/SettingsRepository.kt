@@ -48,6 +48,8 @@ data class WpSettings(
     val liveTiles: Boolean = true,
     /** Small tiles fill a row across the screen instead of 2x2 groups. */
     val smallTilesRow: Boolean = false,
+    /** Lumia glance screen (always on display) while the screen is off. */
+    val glance: Boolean = false,
     val firstRunDone: Boolean = false,
 )
 
@@ -86,6 +88,7 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setShowDuplicates(value: Boolean) = update { it[SHOW_DUPLICATES] = value }
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
     fun setSmallTilesRow(value: Boolean) = update { it[SMALL_ROW] = value }
+    fun setGlance(value: Boolean) = update { it[GLANCE] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
     private fun Preferences.toSettings() = WpSettings(
@@ -104,6 +107,7 @@ class SettingsRepository private constructor(private val context: Context) {
         showDuplicates = this[SHOW_DUPLICATES] ?: false,
         liveTiles = this[LIVE_TILES] ?: true,
         smallTilesRow = this[SMALL_ROW] ?: false,
+        glance = this[GLANCE] ?: false,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
 
@@ -123,6 +127,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val SHOW_DUPLICATES = booleanPreferencesKey("show_duplicates")
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
         private val SMALL_ROW = booleanPreferencesKey("small_tiles_row")
+        private val GLANCE = booleanPreferencesKey("glance")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 
         @Volatile

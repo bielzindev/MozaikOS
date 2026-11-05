@@ -136,6 +136,16 @@
             </intent-filter>
         </service>
         <activity
+            android:name=".launcher.lock.GlanceActivity"
+            android:exported="false"
+            android:taskAffinity="com.wpreborn.glance"
+            android:launchMode="singleInstance"
+            android:excludeFromRecents="true"
+            android:showWhenLocked="true"
+            android:turnScreenOn="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.WpReborn.Lock" />
+        <activity
             android:name=".core.diag.CrashLogActivity"
             android:exported="false"
             android:label="@string/crash_title" />

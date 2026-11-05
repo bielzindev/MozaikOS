@@ -118,6 +118,47 @@ class TranslatorActivity : WpActivity() {
         val speech = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { r ->
             r.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)?.firstOrNull()?.let { input = it }
         }
+        // Speaking is heard right here (the words appear as you speak), not in another app's window.
+        var listening by remember { mutableStateOf(false) }
+        val mic = com.wpreborn.permissions.rememberPermissionState(arrayOf(android.Manifest.permission.RECORD_AUDIO))
+        val recognizer = remember { if (android.speech.SpeechRecognizer.isRecognitionAvailable(context)) android.speech.SpeechRecognizer.createSpeechRecognizer(context) else null }
+        DisposableEffect(recognizer) { onDispose { recognizer?.destroy() } }
+        fun listen(intent: Intent) {
+            val r = recognizer
+            if (r == null) {
+                runCatching { speech.launch(intent) }
+                return
+            }
+            if (!mic.granted) {
+                mic.request()
+                return
+            }
+            if (listening) {
+                r.stopListening()
+                listening = false
+                return
+            }
+            r.setRecognitionListener(object : android.speech.RecognitionListener {
+                override fun onReadyForSpeech(params: android.os.Bundle?) = Unit
+                override fun onBeginningOfSpeech() = Unit
+                override fun onRmsChanged(rmsdB: Float) = Unit
+                override fun onBufferReceived(buffer: ByteArray?) = Unit
+                override fun onEndOfSpeech() = Unit
+                override fun onEvent(eventType: Int, params: android.os.Bundle?) = Unit
+                override fun onError(error: Int) { listening = false }
+                override fun onPartialResults(partial: android.os.Bundle?) {
+                    partial?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.takeIf { it.isNotBlank() }?.let { input = it }
+                }
+                override fun onResults(results: android.os.Bundle?) {
+                    results?.getStringArrayList(android.speech.SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()?.let { input = it }
+                    listening = false
+                }
+            })
+            runCatching {
+                r.startListening(intent.putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true))
+                listening = true
+            }
+        }
         fun recognize(img: InputImage) {
             status = context.getString(R.string.tr_reading)
             scope.launch {
@@ -223,18 +264,21 @@ class TranslatorActivity : WpActivity() {
                     }
                 }
             }
+            if (listening) {
+                Box(Modifier.fillMaxWidth().background(Wp.accent).padding(horizontal = 20.dp, vertical = 10.dp)) {
+                    WpText(stringResource(R.string.tr_listening), style = WpType.Normal, color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
             WpAppBar(
                 buttons = listOf(
                     AppBarButton(WpIcons.Camera, stringResource(R.string.tr_photo)) { runCatching { photo.launch(null) } },
                     AppBarButton(WpIcons.Photos, stringResource(R.string.tr_picture)) { runCatching { gallery.launch("image/*") } },
                     AppBarButton(com.wpreborn.core.icons.Glyphs.Microphone, stringResource(R.string.tr_speak)) {
-                        runCatching {
-                            speech.launch(
-                                Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
-                                    .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-                                    .apply { if (from != AUTO) putExtra(RecognizerIntent.EXTRA_LANGUAGE, from) },
-                            )
-                        }
+                        listen(
+                            Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH)
+                                .putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                                .apply { if (from != AUTO) putExtra(RecognizerIntent.EXTRA_LANGUAGE, from) },
+                        )
                     },
                     AppBarButton(WpIcons.Close, stringResource(R.string.tr_clear)) { input = ""; output = "" },
                 ),

@@ -82,6 +82,11 @@ private fun groupOf(name: String): String {
 /** People: the contact list with letter groups and jump list, favorites, search and profiles. */
 class PeopleActivity : WpActivity() {
 
+    companion object {
+        /** Opens straight on "new contact" with this phone number filled in. */
+        const val EXTRA_NEW_NUMBER = "new_number"
+    }
+
     @Composable
     override fun Content() {
         val context = LocalContext.current
@@ -89,7 +94,8 @@ class PeopleActivity : WpActivity() {
         var contacts by remember { mutableStateOf<List<Contact>?>(null) }
         var reload by remember { mutableStateOf(0) }
         LaunchedEffect(perm.granted, reload) { if (perm.granted) contacts = ContactsRepository(context).all() }
-        val nav = rememberNavigator<PeoplePage>(PeoplePage.Hub)
+        val newNumber = remember { intent?.getStringExtra(EXTRA_NEW_NUMBER) }
+        val nav = rememberNavigator<PeoplePage>(if (newNumber != null) PeoplePage.Edit(null) else PeoplePage.Hub)
         WpNavHost(nav) { page ->
             when (page) {
                 PeoplePage.Hub -> Column(Modifier.fillMaxSize()) {
@@ -126,8 +132,13 @@ class PeopleActivity : WpActivity() {
                 }
                 is PeoplePage.Edit -> ContactEditorPage(
                     page.contactId?.let { id -> contacts?.firstOrNull { it.id == id } },
+                    initialNumber = if (page.contactId == null) newNumber else null,
                     onDeleted = { reload++; nav.popToRoot() },
-                ) { saved -> if (saved) reload++; nav.pop() }
+                ) { saved ->
+                    if (saved) reload++
+                    // Opened only to save a number: back to where it came from.
+                    if (!nav.pop()) finish()
+                }
                 PeoplePage.Search -> SearchPage(contacts.orEmpty()) { nav.navigate(PeoplePage.Profile(it.id)) }
             }
         }

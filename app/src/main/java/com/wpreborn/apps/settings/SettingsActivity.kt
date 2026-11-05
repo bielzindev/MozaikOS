@@ -79,7 +79,7 @@ import com.wpreborn.permissions.canWriteSettings
 import com.wpreborn.permissions.overlayIntent
 import com.wpreborn.permissions.writeSettingsIntent
 
-private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher }
+private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher, Sounds, Battery }
 
 /**
  * Settings, laid out like Windows Phone 8.1 ("system" and "applications" pivots). Launcher
@@ -107,6 +107,8 @@ class SettingsActivity : WpActivity() {
                 SettingsPage.Storage -> StoragePage()
                 SettingsPage.About -> AboutPage()
                 SettingsPage.Launcher -> LauncherPage()
+                SettingsPage.Sounds -> SoundsPage()
+                SettingsPage.Battery -> BatteryPage()
             }
         }
     }
@@ -160,9 +162,9 @@ private fun SettingsHome(go: (SettingsPage) -> Unit) {
         Entry(stringResource(R.string.set_bluetooth), onOff(radios.bluetooth)) { context.open(Settings.ACTION_BLUETOOTH_SETTINGS) },
         Entry(stringResource(R.string.set_airplane), onOff(radios.airplane)) { context.open(Settings.ACTION_AIRPLANE_MODE_SETTINGS) },
         Entry(stringResource(R.string.set_cellular), net.carrier.ifBlank { null }) { context.open(Settings.ACTION_WIRELESS_SETTINGS) },
-        Entry(stringResource(R.string.set_sounds), null) { context.open(Settings.ACTION_SOUND_SETTINGS) },
+        Entry(stringResource(R.string.set_sounds), null) { go(SettingsPage.Sounds) },
         Entry(stringResource(R.string.set_display), null) { go(SettingsPage.Display) },
-        Entry(stringResource(R.string.set_battery), "${battery.level}%") { context.open(Settings.ACTION_BATTERY_SAVER_SETTINGS) },
+        Entry(stringResource(R.string.set_battery), "${battery.level}%") { go(SettingsPage.Battery) },
         Entry(stringResource(R.string.set_storage), null) { go(SettingsPage.Storage) },
         Entry(stringResource(R.string.set_location), null) { context.open(Settings.ACTION_LOCATION_SOURCE_SETTINGS) },
         Entry(stringResource(R.string.set_date_time), null) { context.open(Settings.ACTION_DATE_SETTINGS) },

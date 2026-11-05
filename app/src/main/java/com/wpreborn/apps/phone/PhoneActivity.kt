@@ -454,10 +454,10 @@ private fun KeypadPage(initial: String) {
                     modifier = Modifier
                         .fillMaxWidth()
                         .wpClickable {
+                            // A new contact with this number, in People.
                             context.startActivity(
-                                Intent(ContactsContract.Intents.Insert.ACTION)
-                                    .setType(ContactsContract.RawContacts.CONTENT_TYPE)
-                                    .putExtra(ContactsContract.Intents.Insert.PHONE, number),
+                                Intent(context, com.wpreborn.apps.people.PeopleActivity::class.java)
+                                    .putExtra(com.wpreborn.apps.people.PeopleActivity.EXTRA_NEW_NUMBER, number),
                             )
                         }
                         .padding(vertical = 8.dp),

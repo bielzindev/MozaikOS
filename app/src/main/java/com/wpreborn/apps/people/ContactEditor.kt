@@ -55,7 +55,7 @@ private val PHONE_TYPES = listOf(Phone.TYPE_MOBILE, Phone.TYPE_HOME, Phone.TYPE_
  * last name, phones with their kind, e-mails, company; save, cancel and delete.
  */
 @Composable
-fun ContactEditorPage(contact: Contact?, onDeleted: () -> Unit = {}, onDone: (saved: Boolean) -> Unit) {
+fun ContactEditorPage(contact: Contact?, initialNumber: String? = null, onDeleted: () -> Unit = {}, onDone: (saved: Boolean) -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val writer = remember { ContactWriter(context) }
@@ -75,7 +75,7 @@ fun ContactEditorPage(contact: Contact?, onDeleted: () -> Unit = {}, onDone: (sa
             phones.clear(); phones.addAll(e.phones)
             emails.clear(); emails.addAll(e.emails)
         }
-        if (phones.isEmpty()) phones += "" to Phone.TYPE_MOBILE
+        if (phones.isEmpty()) phones += (initialNumber ?: "") to Phone.TYPE_MOBILE
         loaded = true
     }
     fun save() {

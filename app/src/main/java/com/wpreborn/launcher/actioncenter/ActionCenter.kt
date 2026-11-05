@@ -380,7 +380,7 @@ private fun AppIconSmall(pkg: String) {
 }
 
 @Composable
-private fun NotificationRow(n: WpNotification, onOpen: () -> Unit) {
+fun NotificationRow(n: WpNotification, startPad: androidx.compose.ui.unit.Dp = 46.dp, onOpen: () -> Unit) {
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val density = LocalDensity.current
@@ -414,7 +414,7 @@ private fun NotificationRow(n: WpNotification, onOpen: () -> Unit) {
                 }
             }
             .wpClickable(tilt = false, onClick = onOpen)
-            .padding(start = 46.dp, end = 20.dp, top = 4.dp, bottom = 8.dp),
+            .padding(start = startPad, end = 20.dp, top = 4.dp, bottom = 8.dp),
     ) {
         WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (n.text.isNotBlank()) {

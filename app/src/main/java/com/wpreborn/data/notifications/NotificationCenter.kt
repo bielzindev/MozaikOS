@@ -110,6 +110,9 @@ object NotificationCenter {
 
     private fun StatusBarNotification.toWp(context: Context): WpNotification? {
         val n = notification
+        // Players have their own card (Action Center, lock screen, Playing Now bar), so their
+        // media notifications are never listed, playing or paused.
+        if (n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION) || n.category == Notification.CATEGORY_TRANSPORT) return null
         if (isOngoing && n.category != Notification.CATEGORY_CALL) {
             // Media and foreground service notifications are not "new" items.
             if (n.extras.containsKey(Notification.EXTRA_MEDIA_SESSION)) return null

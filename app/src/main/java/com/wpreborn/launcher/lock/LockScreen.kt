@@ -321,6 +321,14 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                         }
                     }
                 }
+                // Latest notifications, each swiped away to the left or right to remove it.
+                if (settings.lockShowNotifications) {
+                    notifications.filter { it.clearable }.take(3).forEach { n ->
+                        androidx.compose.runtime.key(n.key) {
+                            com.wpreborn.launcher.actioncenter.NotificationRow(n, startPad = 24.dp) {}
+                        }
+                    }
+                }
                 // Quick status: app icons with counts, and the battery while charging.
                 Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 18.dp), verticalAlignment = Alignment.CenterVertically) {
                     if (settings.lockShowNotifications) {

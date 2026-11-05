@@ -908,4 +908,10 @@
     <string name="welcome_setting_up">We\'re setting things up for you.</string>
     <string name="welcome_wont_take_long">This won\'t take long.</string>
     <string name="set_small_row">Small tiles in a row</string>
+    <string name="folder_default_name">Folder</string>
+    <string name="folder_add">add to folder</string>
+    <string name="folder_new">new folder</string>
+    <string name="folder_create">create</string>
+    <string name="folder_edit">edit</string>
+    <string name="folder_close">close</string>
 </resources>

@@ -42,6 +42,10 @@ import com.wpreborn.data.media.ExternalMediaWatcher
 import com.wpreborn.data.notifications.NotificationCenter
 import com.wpreborn.data.prefs.SettingsRepository
 import com.wpreborn.data.tiles.TileSpec
+import com.wpreborn.data.tiles.folderId
+import com.wpreborn.data.tiles.isFolder
+import com.wpreborn.launcher.start.FolderInfo
+import com.wpreborn.launcher.start.FolderOverlay
 import com.wpreborn.launcher.allapps.AllAppsScreen
 import com.wpreborn.launcher.start.StartScreen
 import com.wpreborn.launcher.start.StartScreenState
@@ -122,6 +126,8 @@ class MainActivity : ComponentActivity() {
         val shownTiles = remember(tiles, hidden) { tiles.filter { it.appKey !in hidden } }
         // Collected state (not vm.apps.value) so tiles recompose once the app list has loaded.
         val appsByKey = remember(apps) { apps.associateBy { it.key } }
+        val foldersMap by vm.folders.collectAsState()
+        var openFolder by remember { mutableStateOf<String?>(null) }
         val counts = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { (_, l) -> l.sumOf { it.messageCount } } }
         val latest = remember(notifications) { notifications.groupBy { it.packageName }.mapValues { it.value.take(3) } }
         val nowPlaying = when {
@@ -138,6 +144,9 @@ class MainActivity : ComponentActivity() {
             live
         }
 
+        fun folderInfo(tile: TileSpec) = if (!tile.isFolder) null else
+            foldersMap[tile.folderId]?.let { f -> FolderInfo(f.name, f.apps.mapNotNull { appsByKey[it] }) } ?: FolderInfo("", emptyList())
+
         fun inputsFor(tile: TileSpec, app: AppEntry?) = TileInputs(
             live = liveData,
             notificationCount = if (app?.builtIn == null) counts[app?.packageName] ?: 0 else 0,
@@ -145,6 +154,7 @@ class MainActivity : ComponentActivity() {
             nowPlaying = nowPlaying,
             nowPlayingArt = if (player.hasMedia) player.artUri else null,
             liveEnabled = settings.liveTiles,
+            folder = folderInfo(tile),
         )
 
         HorizontalPager(
@@ -167,6 +177,9 @@ class MainActivity : ComponentActivity() {
                         onCustomColor = { t, c -> vm.setCustomColor(t.id, c) },
                         onMove = { id, index, persist -> vm.move(id, index, persist) },
                         onPersonalize = ::openPersonalize,
+                        folders = foldersMap.values.map { it.id to it.name },
+                        onToFolder = { id, f, n -> vm.toFolder(id, f, n) },
+                        onOpenFolder = { openFolder = it.folderId },
                     )
                 } else {
                     Box(Modifier.fillMaxSize().turnstile(appsTurnstile)) {
@@ -185,6 +198,21 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
+            }
+        }
+        openFolder?.let { fid ->
+            val f = foldersMap[fid]
+            if (f == null) {
+                openFolder = null
+            } else {
+                FolderOverlay(
+                    name = f.name,
+                    apps = f.apps.mapNotNull { appsByKey[it] },
+                    onLaunch = { app -> openFolder = null; launch(app) },
+                    onRemove = { app -> vm.removeFromFolder(fid, app.key) },
+                    onRename = { vm.renameFolder(fid, it) },
+                    onClose = { openFolder = null },
+                )
             }
         }
     }

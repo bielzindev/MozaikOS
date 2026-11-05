@@ -909,4 +909,10 @@
     <string name="welcome_setting_up">Estamos preparando tudo para você.</string>
     <string name="welcome_wont_take_long">Isso não vai demorar.</string>
     <string name="set_small_row">Blocos pequenos em linha</string>
+    <string name="folder_default_name">Pasta</string>
+    <string name="folder_add">adicionar à pasta</string>
+    <string name="folder_new">nova pasta</string>
+    <string name="folder_create">criar</string>
+    <string name="folder_edit">editar</string>
+    <string name="folder_close">fechar</string>
 </resources>

@@ -79,6 +79,7 @@ import com.wpreborn.core.ui.WpIcon
 import com.wpreborn.core.ui.wpClickable
 import com.wpreborn.data.apps.AppEntry
 import com.wpreborn.data.tiles.Placement
+import com.wpreborn.data.tiles.isFolder
 import com.wpreborn.data.tiles.TileLayout
 import com.wpreborn.data.tiles.TileSize
 import com.wpreborn.data.tiles.TileSpec
@@ -112,6 +113,8 @@ class StartScreenState {
     var iconEditorFor by mutableStateOf<String?>(null)
     var dragId by mutableStateOf<String?>(null)
     var colorPickerFor by mutableStateOf<String?>(null)
+    /** Tile whose app is being put in a folder. */
+    var folderPickerFor by mutableStateOf<String?>(null)
     /** Tile being launched; it leaves last during the feather-out. */
     var launchingId by mutableStateOf<String?>(null)
     val scroll = ScrollState(0)
@@ -137,6 +140,11 @@ fun StartScreen(
     onCustomColor: (TileSpec, Int) -> Unit,
     onMove: (String, Int, Boolean) -> Unit,
     onPersonalize: () -> Unit = {},
+    /** Existing folders as (id, name), for "add to folder". */
+    folders: List<Pair<String, String>> = emptyList(),
+    /** Put the tile's app in a folder (existing id) or a new one (name). */
+    onToFolder: (tileId: String, folderId: String?, name: String?) -> Unit = { _, _, _ -> },
+    onOpenFolder: (TileSpec) -> Unit = {},
 ) {
     val settings = Wp.settings
     val density = LocalDensity.current
@@ -173,6 +181,7 @@ fun StartScreen(
         val currentOnLaunch by rememberUpdatedState(onLaunch)
         val currentOnMove by rememberUpdatedState(onMove)
         val currentOnPersonalize by rememberUpdatedState(onPersonalize)
+        val currentOnOpenFolder by rememberUpdatedState(onOpenFolder)
         val currentPlacements by rememberUpdatedState(placements)
 
         fun tileAt(p: Offset): Int {
@@ -282,7 +291,7 @@ fun StartScreen(
                                     }
                                     if (up != null) {
                                         up.consume()
-                                        currentAppFor(tile)?.let { currentOnLaunch(tile, it) }
+                                        if (tile.isFolder) currentOnOpenFolder(tile) else currentAppFor(tile)?.let { currentOnLaunch(tile, it) }
                                     } else if (!cancelled) {
                                         state.editId = tile.id
                                         dragLoop()
@@ -378,6 +387,9 @@ fun StartScreen(
                                     EditButton(WpIcons.Edit, Modifier.align(Alignment.BottomStart).offset((-12).dp, 12.dp)) {
                                         state.iconEditorFor = tile.id
                                     }
+                                    EditButton(WpIcons.Folder, Modifier.align(Alignment.TopCenter).offset(0.dp, (-12).dp)) {
+                                        state.folderPickerFor = tile.id
+                                    }
                                 }
                             }
                         }
@@ -391,6 +403,15 @@ fun StartScreen(
             tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
                 IconCustomizer(app, tileColor = tiles.first { it.id == id }.fixedColor, onDismiss = { state.iconEditorFor = null })
             } ?: run { state.iconEditorFor = null }
+        }
+
+        state.folderPickerFor?.let { id ->
+            FolderPicker(
+                folders = folders,
+                onFolder = { f -> onToFolder(id, f, null); state.folderPickerFor = null; state.editId = null },
+                onNew = { n -> onToFolder(id, null, n); state.folderPickerFor = null; state.editId = null },
+                onDismiss = { state.folderPickerFor = null },
+            )
         }
 
         state.colorPickerFor?.let { id ->

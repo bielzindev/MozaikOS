@@ -970,7 +970,7 @@
     <string name="music_autoplay_on">rádio automático: ligado</string>
     <string name="music_autoplay_off">rádio automático: desligado</string>
     <string name="glance_title">Tela de relance (sempre ligada)</string>
-    <string name="glance_info">Com a tela desligada, mostra a hora, o clima e os ícones de notificação em letras finas na cor de destaque, como no Lumia. Toque duas vezes para acordar. Sempre ligada enquanto carrega, 15 minutos na bateria e desligada no bolso. Precisa de \"sobrepor a outros apps\"; desative o always on display do próprio celular.</string>
+    <string name="glance_info">Com a tela desligada, mostra a hora, o clima e os ícones de notificação em letras finas na cor de destaque, como no Lumia. Toque nela ou aperte o botão liga/desliga para acordar. Sempre ligada enquanto carrega, 15 minutos na bateria e desligada no bolso. Precisa de \"sobrepor a outros apps\"; desative o always on display do próprio celular.</string>
     <string name="browser_open_link">Abrir no Explorer</string>
     <string name="set_splash">Tela de abertura nos apps</string>
     <string name="browser_dl_empty">Nenhum download ainda.</string>

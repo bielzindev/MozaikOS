@@ -162,7 +162,7 @@ fun GlancePage() {
             Spacer(Modifier.height(16.dp))
             WpButton(stringResource(R.string.glance_try)) {
                 runCatching {
-                    context.startActivity(Intent(context, com.wpreborn.launcher.lock.GlanceActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    context.startActivity(Intent(context, com.wpreborn.launcher.lock.GlanceActivity::class.java).putExtra(com.wpreborn.launcher.lock.GlanceActivity.EXTRA_TRY, true).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }
             }
         }

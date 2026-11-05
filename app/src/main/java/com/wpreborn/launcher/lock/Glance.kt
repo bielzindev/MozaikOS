@@ -119,10 +119,11 @@ object Glance {
     }
 
     fun onScreenOff(c: Context) {
+        // The glance screen is up: the power key (or the time-out) turned it off; it handles that.
+        if (showing) return
         val s = SettingsRepository.get(c).cached
         if (s.glance && s.glanceOptions.peek) {
             // Peek: the screen stays off until a hand waves over the sensor (or it leaves a pocket).
-            if (showing) close.value++
             armPeek(c.applicationContext)
             return
         }
@@ -176,10 +177,54 @@ object Glance {
 class GlanceActivity : ComponentActivity(), SensorEventListener {
     companion object {
         const val EXTRA_PEEK = "peek"
+        /** Opened from Settings to try it: the phone is unlocked, nothing to wake. */
+        const val EXTRA_TRY = "try"
     }
 
     private var sensors: SensorManager? = null
     private var nearSince = 0L
+    private val createdAt = System.currentTimeMillis()
+    /** When it dimmed itself to let the screen go off (0 while it is showing). */
+    private var expiredAt = 0L
+
+    /**
+     * The screen went off while the glance screen was up. Either Android's time-out after it
+     * dimmed itself (then it just goes away), or the user pressed the power key to turn on what
+     * looked like an off screen: then the phone wakes to the lock screen, at normal brightness.
+     */
+    private val screenOff = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            val timeout = runCatching { android.provider.Settings.System.getInt(contentResolver, android.provider.Settings.System.SCREEN_OFF_TIMEOUT) }.getOrDefault(30_000)
+            val timedOut = expiredAt > 0 && System.currentTimeMillis() - expiredAt >= timeout - 1500
+            finish()
+            if (!timedOut) {
+                Glance.expired = false
+                wakeScreen()
+            }
+        }
+    }
+
+    /** Unlocked (fingerprint, face...) while it showed: the glance screen must not stay on top. */
+    private val unlocked = object : android.content.BroadcastReceiver() {
+        override fun onReceive(c: Context, i: Intent) {
+            if (System.currentTimeMillis() - createdAt > 3000) wake()
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun wakeScreen() {
+        runCatching {
+            getSystemService(android.os.PowerManager::class.java)
+                ?.newWakeLock(android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP, "mozaik:glance-wake")
+                ?.acquire(1500)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        recreate()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -194,6 +239,10 @@ class GlanceActivity : ComponentActivity(), SensorEventListener {
             hide(WindowInsetsCompat.Type.systemBars())
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
+        androidx.core.content.ContextCompat.registerReceiver(this, screenOff, android.content.IntentFilter(Intent.ACTION_SCREEN_OFF), androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED)
+        if (!intent.getBooleanExtra(EXTRA_TRY, false)) {
+            androidx.core.content.ContextCompat.registerReceiver(this, unlocked, android.content.IntentFilter(Intent.ACTION_USER_PRESENT), androidx.core.content.ContextCompat.RECEIVER_EXPORTED)
+        }
         sensors = getSystemService(SensorManager::class.java)
         sensors?.getDefaultSensor(Sensor.TYPE_PROXIMITY)?.let { sensors?.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL) }
         setContent {
@@ -206,7 +255,7 @@ class GlanceActivity : ComponentActivity(), SensorEventListener {
         }
     }
 
-    /** Double tap: the phone wakes (the lock screen at normal brightness). */
+    /** A tap (or back): the phone wakes (the lock screen at normal brightness). */
     private fun wake() {
         Glance.expired = false
         Glance.disarmPeek(this)
@@ -216,6 +265,7 @@ class GlanceActivity : ComponentActivity(), SensorEventListener {
     /** Let the screen go off as usual, and stay away until the user turns it on. */
     private fun expire() {
         if (!intent.getBooleanExtra(EXTRA_PEEK, false)) Glance.expired = true
+        if (expiredAt == 0L) expiredAt = System.currentTimeMillis()
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         window.attributes = window.attributes.apply { screenBrightness = 0f }
     }
@@ -232,8 +282,13 @@ class GlanceActivity : ComponentActivity(), SensorEventListener {
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) = Unit
 
+    @Deprecated("Deprecated in Java")
+    override fun onBackPressed() = wake()
+
     override fun onDestroy() {
         Glance.showing = false
+        runCatching { unregisterReceiver(screenOff) }
+        runCatching { unregisterReceiver(unlocked) }
         sensors?.unregisterListener(this)
         super.onDestroy()
     }
@@ -287,7 +342,7 @@ private fun GlanceScreen(peek: Boolean, onWake: () -> Unit, onTimeout: () -> Uni
         Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .pointerInput(Unit) { detectTapGestures(onDoubleTap = { onWake() }) },
+            .pointerInput(Unit) { detectTapGestures(onTap = { onWake() }) },
     ) {
         picture?.let {
             // The lock screen picture, kept dark so it costs little and the type stays readable.

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -70,7 +71,7 @@ data class TileInputs(
     val folder: FolderInfo? = null,
 )
 
-class FolderInfo(val name: String, val apps: List<AppEntry>)
+class FolderInfo(val name: String, val apps: List<AppEntry>, val sizes: List<TileSize> = emptyList())
 
 /**
  * The face of a tile. Built-in apps get their real live tile templates; Android apps show
@@ -131,8 +132,8 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
 
 /**
  * A live folder (Windows Phone 8.1 Update 1): a little Start screen of the tiles inside it,
- * each a small square in its own colour, three across on a medium folder (six on wide and
- * large), over a darker shade of the folder's colour, with the folder's name below.
+ * each at its own size (a medium tile takes 2x2 small cells, with its name), in the folder's
+ * colour and separated by thin dark lines, over a strip at the bottom with the folder's name.
  */
 @Composable
 private fun FolderTile(size: TileSize, f: FolderInfo) {
@@ -140,29 +141,41 @@ private fun FolderTile(size: TileSize, f: FolderInfo) {
         Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Folder, size) }
         return
     }
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f))) {
+    val tileColor = LocalTileColor.current ?: com.wpreborn.core.theme.Wp.accent
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.35f))) {
         val cols = if (size == TileSize.Medium) 3 else 6
-        val rows = if (size == TileSize.Large) 6 else 3
-        val pad = minOf(maxWidth, maxHeight) * 0.06f
-        val gap = pad * 0.5f
-        val label = minOf(maxWidth, maxHeight) * 0.2f
-        val cell = minOf(
-            (maxWidth - pad * 2 - gap * (cols - 1)) / cols,
-            (maxHeight - pad - label - gap * (rows - 1)) / rows,
-        )
-        Column(Modifier.padding(start = pad, top = pad), verticalArrangement = Arrangement.spacedBy(gap)) {
-            for (r in 0 until rows) {
-                Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
-                    for (c in 0 until cols) {
-                        val app = f.apps.getOrNull(r * cols + c) ?: break
-                        val cellColor = rememberBrandColor(app) ?: com.wpreborn.core.theme.Wp.accent
-                        Box(Modifier.size(cell).background(cellColor), contentAlignment = Alignment.Center) {
-                            AppIcon(app, cell * 0.62f)
-                        }
-                    }
+        val rows = if (size == TileSize.Large) 5 else 2
+        val line = 1.5.dp
+        val labelH = maxHeight * (if (size == TileSize.Large) 0.18f else 0.32f)
+        val cell = minOf((maxWidth - line * (cols - 1)) / cols, (maxHeight - labelH - line * rows) / rows)
+        // The tiles inside, packed like Start (their own sizes), cut to what fits.
+        val specs = remember(f.apps, f.sizes) {
+            f.apps.mapIndexed { i, a -> com.wpreborn.data.tiles.TileSpec(id = "f" + a.key, appKey = a.key, size = f.sizes.getOrNull(i)?.let { if (it == TileSize.Large) TileSize.Medium else it } ?: TileSize.Small) }
+        }
+        val places = remember(specs, cols) { com.wpreborn.data.tiles.TileLayout.pack(specs, cols) }
+        specs.forEachIndexed { i, spec ->
+            val pl = places[i]
+            val w = minOf(spec.size.w, cols)
+            val h = spec.size.h
+            if (pl.y + h > rows) return@forEachIndexed
+            val app = f.apps[i]
+            Box(
+                Modifier
+                    .offset(x = (cell + line) * pl.x, y = (cell + line) * pl.y)
+                    .size(cell * w + line * (w - 1), cell * h + line * (h - 1))
+                    .background(tileColor),
+            ) {
+                AppIcon(app, cell * (if (h > 1) 0.9f else 0.6f), Modifier.align(Alignment.Center))
+                if (h > 1) {
+                    WpText(
+                        app.label, style = WpType.Small.copy(fontSize = (cell * 0.3f).tileSp()), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.align(Alignment.BottomStart).padding(start = 3.dp, bottom = 1.dp),
+                    )
                 }
             }
         }
+        // The strip with the folder's name (drawn by TileFace's label over it).
+        Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(labelH).background(tileColor))
     }
 }
 

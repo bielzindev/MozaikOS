@@ -143,7 +143,10 @@ class MainActivity : ComponentActivity() {
         }
 
         fun folderInfo(tile: TileSpec) = if (!tile.isFolder) null else
-            foldersMap[tile.folderId]?.let { f -> FolderInfo(f.name, f.apps.mapNotNull { appsByKey[it] }) } ?: FolderInfo("", emptyList())
+            foldersMap[tile.folderId]?.let { f ->
+                val inside = f.apps.mapNotNull { k -> appsByKey[k]?.let { it to f.sizeOf(k) } }
+                FolderInfo(f.name, inside.map { it.first }, inside.map { it.second })
+            } ?: FolderInfo("", emptyList())
 
         fun inputsFor(tile: TileSpec, app: AppEntry?) = TileInputs(
             live = liveData,

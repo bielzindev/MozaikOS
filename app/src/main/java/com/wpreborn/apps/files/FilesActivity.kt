@@ -3,6 +3,9 @@ package com.wpreborn.apps.files
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import kotlinx.coroutines.isActive
 import android.os.Build
 import android.os.Environment
 import android.os.StatFs
@@ -174,11 +177,12 @@ private fun FilesScreen() {
     var filter by remember { mutableStateOf<String?>(null) }
     var creating by remember { mutableStateOf(false) }
 
-    BackHandler(enabled = selected != null || filter != null || stack.isNotEmpty()) {
+    BackHandler(enabled = selected != null || filter != null || stack.isNotEmpty() || clipboard != null) {
         when {
             selected != null -> selected = null
             filter != null -> filter = null
-            else -> stack.removeAt(stack.lastIndex)
+            stack.isNotEmpty() -> stack.removeAt(stack.lastIndex)
+            else -> clipboard = null
         }
     }
 
@@ -254,58 +258,88 @@ private fun FilesScreen() {
         }
     }
 
+    val phoneName = stringResource(R.string.files_phone)
+    val sdName = stringResource(R.string.files_sd_card)
+    // The phone's storage and the SD cards, named like on Windows Phone (not "08C3-4D92").
+    val volumes = remember {
+        val list = ArrayList<Pair<String, File>>()
+        list += phoneName to Environment.getExternalStorageDirectory()
+        if (Build.VERSION.SDK_INT >= 30) {
+            context.getSystemService(android.os.storage.StorageManager::class.java)?.storageVolumes
+                ?.filter { it.isRemovable }?.forEach { v -> v.directory?.let { list += sdName to it } }
+        }
+        list
+    }
+    fun titleOf(f: File) = volumes.firstOrNull { it.second.absolutePath == f.absolutePath }?.first ?: f.name
+    fun volumeOf(f: File) = volumes.filter { f.absolutePath == it.second.absolutePath || f.absolutePath.startsWith(it.second.absolutePath + "/") }
+        .maxByOrNull { it.second.absolutePath.length }
+    val picking = clipboard
+    val listed = if (picking != null) shown.filter { it.isDirectory } else shown
+
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(start = 20.dp, top = 14.dp, end = 20.dp)) {
-            // The path as on Windows Phone: "\\ phone \ documents \", in the accent colour.
-            val phone = stringResource(R.string.files_phone)
-            val crumbs = remember(current) {
-                val root = Environment.getExternalStorageDirectory().absolutePath
-                current?.absolutePath?.let { p ->
-                    val rel = if (p.startsWith(root)) listOf(phone) + p.removePrefix(root).split('/').filter { it.isNotEmpty() } else p.split('/').filter { it.isNotEmpty() }
-                    rel.dropLast(1)
-                }.orEmpty()
-            }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                WpIcon(WpIcons.Phone, tint = Wp.accent, size = 18.dp)
-                Spacer(Modifier.width(6.dp))
+            picking?.let { (files, move) ->
                 WpText(
-                    "\\\\ " + crumbs.joinToString("") { "$it \\ " },
-                    style = WpType.Large.copy(fontSize = 19.sp), color = Wp.accent, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    context.resources.getQuantityString(if (move) R.plurals.files_move_to else R.plurals.files_copy_to, files.size, files.size).uppercase(),
+                    style = WpType.AppTitle,
+                    modifier = Modifier.padding(bottom = 4.dp),
                 )
             }
+            // The path: home, then each folder above this one; a tap goes back there.
+            Row(Modifier.horizontalScroll(rememberScrollState()), verticalAlignment = Alignment.CenterVertically) {
+                Box(Modifier.wpClickable { stack.clear(); filter = null }.padding(end = 4.dp, top = 2.dp, bottom = 2.dp)) {
+                    WpIcon(Glyphs.Home, tint = if (current == null) Wp.palette.foreground else Wp.accent, size = 20.dp)
+                }
+                stack.dropLast(1).forEachIndexed { i, dir ->
+                    WpText(" › ", style = WpType.Normal, color = Wp.accent)
+                    WpText(
+                        titleOf(dir).lowercase(), style = WpType.Normal, color = Wp.accent, maxLines = 1,
+                        modifier = Modifier.wpClickable { while (stack.size > i + 1) stack.removeAt(stack.lastIndex); filter = null },
+                    )
+                }
+                if (current != null) WpText(" ›", style = WpType.Normal, color = Wp.accent)
+            }
             WpText(
-                (current?.name?.let { if (current.absolutePath == Environment.getExternalStorageDirectory().absolutePath) phone else it } ?: stringResource(R.string.files_root)).lowercase(),
+                (current?.let { titleOf(it) } ?: stringResource(R.string.files_root)).lowercase(),
                 style = WpType.Header,
                 maxLines = 1,
                 softWrap = false,
             )
             filter?.let { q ->
-                WpTextBox(q, { filter = it }, Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = stringResource(R.string.files_search))
-            }
-            clipboard?.let { (files, move) ->
-                Box(Modifier.fillMaxWidth().padding(top = 8.dp).background(Wp.accent).padding(10.dp)) {
-                    WpText(
-                        context.resources.getQuantityString(if (move) R.plurals.files_to_move else R.plurals.files_to_copy, files.size, files.size),
-                        style = WpType.Normal,
-                        color = Color.White,
-                    )
-                }
+                WpText(
+                    stringResource(R.string.files_search_in, (current?.let { titleOf(it) } ?: phoneName).lowercase()),
+                    style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 4.dp),
+                )
+                WpTextBox(q, { filter = it }, Modifier.fillMaxWidth().padding(top = 4.dp), placeholder = stringResource(R.string.files_search))
             }
             busy?.let { WpText(it, style = WpType.Normal, color = Wp.accent, modifier = Modifier.padding(top = 6.dp)) }
         }
         Box(Modifier.weight(1f)) {
-            if (current == null) {
-                Places(onOpen = { stack.add(it) })
-            } else {
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 6.dp, bottom = 16.dp)) {
-                    if (shown.isEmpty()) item { WpText(stringResource(R.string.files_empty), style = WpType.Large, color = Wp.palette.subtle) }
-                    items(shown, key = { it.absolutePath }) { f ->
+            val q = filter?.trim().orEmpty()
+            when {
+                filter != null && q.isNotEmpty() -> SearchResults(current ?: volumes.first().second, q, showHidden, reload, onOpen = { open(it) }) { f ->
+                    volumeOf(f)?.let { (name, root) ->
+                        name.lowercase() + (f.parentFile?.absolutePath.orEmpty().removePrefix(root.absolutePath)).replace('/', '\\')
+                    } ?: f.parent.orEmpty()
+                }
+                current == null -> Places(volumes, onOpen = { stack.add(it) })
+                else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
+                    if (listed.isEmpty()) item { WpText(stringResource(R.string.files_empty), style = WpType.Large, color = Wp.palette.subtle) }
+                    items(listed, key = { it.absolutePath }) { f ->
+                        if (picking != null) {
+                            // Choosing where to move / copy: only the folders, as plain names.
+                            WpText(
+                                f.name, style = WpType.ExtraLarge.copy(fontSize = 26.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.fillMaxWidth().wpClickable { open(f) }.padding(vertical = 8.dp),
+                            )
+                            return@items
+                        }
                         val sel = selected
                         val checked = sel != null && f in sel
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .slideInStaggered(shown.indexOf(f).coerceAtMost(12))
+                                .slideInStaggered(listed.indexOf(f).coerceAtMost(12))
                                 .wpCombinedClickable(onLongClick = { if (sel == null) selected = setOf(f) }) {
                                     if (sel != null) {
                                         selected = if (checked) sel - f else sel + f
@@ -313,7 +347,7 @@ private fun FilesScreen() {
                                         open(f)
                                     }
                                 }
-                                .padding(vertical = 6.dp),
+                                .padding(vertical = 5.dp),
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
                             if (sel != null) {
@@ -321,24 +355,15 @@ private fun FilesScreen() {
                                     Modifier.size(26.dp).background(if (checked) Wp.accent else Color.Transparent).border(2.dp, Wp.palette.foreground),
                                     contentAlignment = Alignment.Center,
                                 ) { if (checked) WpIcon(WpIcons.Check, tint = Color.White, size = 18.dp) }
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(14.dp))
                             }
-                            // Folders: an accent square with the number of items; files: a grey
-                            // square with the kind of file, like the Files app of Windows Phone.
-                            Box(Modifier.size(84.dp).background(if (f.isDirectory) Wp.accent else Wp.palette.raised)) {
-                                if (f.isDirectory) {
-                                    val n = remember(f, reload) { f.list()?.size ?: 0 }
-                                    WpText(n.toString(), style = WpType.Large, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 4.dp))
-                                } else {
-                                    WpIcon(iconFor(f), Modifier.align(Alignment.Center), tint = Wp.palette.foreground, size = 36.dp)
-                                }
-                            }
+                            FileSquare(f, reload)
                             Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f)) {
-                                WpText(f.name, style = WpType.Large.copy(fontSize = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                WpText(f.name, style = WpType.Large.copy(fontSize = 22.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 val d = Date(f.lastModified())
-                                WpText(DateFormat.getDateFormat(context).format(d) + " " + DateFormat.getTimeFormat(context).format(d), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
-                                if (!f.isDirectory) WpText(Formatter.formatShortFileSize(context, f.length()), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
+                                WpText(DateFormat.getDateFormat(context).format(d) + " " + DateFormat.getTimeFormat(context).format(d), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+                                if (!f.isDirectory) WpText(Formatter.formatShortFileSize(context, f.length()), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
                             }
                         }
                     }
@@ -347,6 +372,13 @@ private fun FilesScreen() {
         }
         val sel = selected
         when {
+            picking != null -> Row(
+                Modifier.fillMaxWidth().background(Wp.palette.chrome).padding(horizontal = 16.dp, vertical = 10.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                WpButton(stringResource(if (picking.second) R.string.files_move_here else R.string.files_copy_here), Modifier.weight(1f), enabled = current != null) { paste() }
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f)) { clipboard = null }
+            }
             sel != null -> WpAppBar(
                 // Delete, move, copy and share, as on Windows Phone.
                 buttons = listOf(
@@ -356,7 +388,7 @@ private fun FilesScreen() {
                     AppBarButton(WpIcons.Share, stringResource(R.string.share), enabled = sel.any { it.isFile }) { share(sel.toList()); selected = null },
                 ),
                 menuItems = listOf(
-                    AppBarMenuItem(stringResource(R.string.photos_select_all)) { selected = if (sel.size == shown.size) emptySet() else shown.toSet() },
+                    AppBarMenuItem(stringResource(R.string.photos_select_all)) { selected = if (sel.size == listed.size) emptySet() else listed.toSet() },
                     AppBarMenuItem(stringResource(R.string.files_rename), enabled = sel.size == 1) {
                         val f = sel.first()
                         naming = f.name to { name -> scope.launch { withContext(Dispatchers.IO) { f.renameTo(File(f.parentFile, name)) }; reload++ } }
@@ -365,19 +397,13 @@ private fun FilesScreen() {
                     AppBarMenuItem(stringResource(R.string.files_properties), enabled = sel.size == 1) { info = sel.first(); selected = null },
                 ),
             )
-            clipboard != null -> WpAppBar(
-                buttons = listOf(
-                    AppBarButton(WpIcons.Check, stringResource(R.string.files_paste), enabled = current != null) { paste() },
-                    AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { clipboard = null },
-                ),
-            )
             current != null -> WpAppBar(
                 buttons = listOf(
-                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select), enabled = shown.isNotEmpty()) { selected = emptySet() },
                     AppBarButton(WpIcons.Add, stringResource(R.string.files_new_folder)) {
                         naming = context.getString(R.string.files_new_folder_default) to { name -> scope.launch { withContext(Dispatchers.IO) { File(current, name).mkdirs() }; reload++ } }
                         creating = true
                     },
+                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select), enabled = listed.isNotEmpty()) { selected = emptySet() },
                     AppBarButton(WpIcons.Search, stringResource(R.string.files_search)) { filter = if (filter == null) "" else null },
                 ),
                 menuItems = Sort.entries.map { s ->
@@ -390,7 +416,9 @@ private fun FilesScreen() {
                     prefs.edit().putBoolean("hidden", showHidden).apply()
                 },
             )
-            else -> {}
+            else -> WpAppBar(
+                buttons = listOf(AppBarButton(WpIcons.Search, stringResource(R.string.files_search)) { filter = if (filter == null) "" else null }),
+            )
         }
     }
 
@@ -432,57 +460,74 @@ private fun FilesScreen() {
 }
 
 /**
- * The first page, after Windows Phone's Files: the phone and the SD card as accent squares
- * with their number of items, used and free space and a bar; then the usual folders.
+ * The first page, after Windows Phone's Files: the phone and each SD card by name, used and
+ * free space at the two ends, and a bar.
  */
 @Composable
-private fun Places(onOpen: (File) -> Unit) {
+private fun Places(volumes: List<Pair<String, File>>, onOpen: (File) -> Unit) {
     val context = LocalContext.current
-    val places = remember {
-        val list = ArrayList<Place>()
-        val internal = Environment.getExternalStorageDirectory()
-        list += Place(context.getString(R.string.files_phone), internal, WpIcons.Storage, true)
-        if (Build.VERSION.SDK_INT >= 30) {
-            val sm = context.getSystemService(android.os.storage.StorageManager::class.java)
-            sm?.storageVolumes?.filter { it.isRemovable }?.forEach { v -> v.directory?.let { list += Place(v.getDescription(context), it, WpIcons.Storage, true) } }
-        }
-        fun dir(type: String, label: Int, icon: ImageVector) {
-            val d = Environment.getExternalStoragePublicDirectory(type)
-            if (d.exists()) list += Place(context.getString(label), d, icon, false)
-        }
-        dir(Environment.DIRECTORY_DOWNLOADS, R.string.files_downloads, WpIcons.Download)
-        dir(Environment.DIRECTORY_DOCUMENTS, R.string.files_documents, Glyphs.Document)
-        dir(Environment.DIRECTORY_DCIM, R.string.files_camera, WpIcons.Camera)
-        dir(Environment.DIRECTORY_PICTURES, R.string.files_pictures, WpIcons.Photos)
-        dir(Environment.DIRECTORY_MUSIC, R.string.files_music, WpIcons.MusicNote)
-        dir(Environment.DIRECTORY_MOVIES, R.string.files_videos, Glyphs.Video)
-        list
-    }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 16.dp)) {
-        items(places, key = { it.dir.absolutePath + it.name }) { p ->
-            val count = remember(p.dir) { p.dir.list()?.size ?: 0 }
-            Row(Modifier.fillMaxWidth().wpClickable { onOpen(p.dir) }.padding(vertical = 6.dp), verticalAlignment = if (p.volume) Alignment.Top else Alignment.CenterVertically) {
-                Box(Modifier.size(if (p.volume) 96.dp else 72.dp).background(Wp.accent)) {
-                    if (!p.volume) WpIcon(p.icon, Modifier.align(Alignment.Center), tint = Color.White, size = 30.dp)
-                    WpText(count.toString(), style = WpType.Large, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 4.dp))
-                }
-                Spacer(Modifier.width(16.dp))
-                Column(Modifier.weight(1f)) {
-                    WpText(p.name, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (p.volume) {
-                        val stat = remember(p.dir) { runCatching { StatFs(p.dir.path) }.getOrNull() }
-                        if (stat != null) {
-                            val total = stat.totalBytes
-                            val free = stat.availableBytes
-                            Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
-                                WpText(context.getString(R.string.files_used, Formatter.formatShortFileSize(context, total - free)), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.weight(1f), maxLines = 1)
-                                WpText(context.getString(R.string.files_free, Formatter.formatShortFileSize(context, free)), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
-                            }
-                            Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(8.dp).background(Wp.accent.copy(alpha = 0.18f))) {
-                                Box(Modifier.fillMaxWidth(((total - free).toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)).height(8.dp).background(Wp.accent))
-                            }
-                        }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp)) {
+        items(volumes, key = { it.second.absolutePath }) { (name, dir) ->
+            Column(Modifier.fillMaxWidth().wpClickable { onOpen(dir) }.padding(vertical = 10.dp)) {
+                WpText(name, style = WpType.ExtraLarge.copy(fontSize = 28.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val stat = remember(dir) { runCatching { StatFs(dir.path) }.getOrNull() }
+                if (stat != null) {
+                    val total = stat.totalBytes
+                    val free = stat.availableBytes
+                    Row(Modifier.fillMaxWidth()) {
+                        WpText(context.getString(R.string.files_used, Formatter.formatShortFileSize(context, total - free)), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.weight(1f), maxLines = 1)
+                        WpText(context.getString(R.string.files_free, Formatter.formatShortFileSize(context, free)), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
                     }
+                    Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(10.dp).background(Wp.accent.copy(alpha = 0.2f))) {
+                        Box(Modifier.fillMaxWidth(((total - free).toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)).height(10.dp).background(Wp.accent))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The square of a row: a folder in the accent colour with its number of items; a file grey with its kind, or the picture itself. */
+@Composable
+private fun FileSquare(f: File, reload: Int) {
+    Box(Modifier.size(72.dp).background(if (f.isDirectory) Wp.accent else Wp.palette.raised)) {
+        if (f.isDirectory) {
+            val n = remember(f, reload) { f.list()?.size ?: 0 }
+            WpText(n.toString(), style = WpType.Large, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 7.dp, bottom = 3.dp))
+        } else {
+            WpIcon(iconFor(f), Modifier.align(Alignment.Center), tint = Wp.palette.foreground, size = 34.dp)
+            if (f.extension.lowercase() in setOf("jpg", "jpeg", "png", "webp", "gif", "heic", "bmp")) {
+                com.wpreborn.core.ui.Thumbnail(Uri.fromFile(f), Modifier.fillMaxSize(), sizePx = 192)
+            }
+        }
+    }
+}
+
+/** Search in a folder and the folders inside it, after the phone's "search in documents". */
+@Composable
+private fun SearchResults(base: File, query: String, hidden: Boolean, reload: Int, onOpen: (File) -> Unit, where: (File) -> String) {
+    val context = LocalContext.current
+    val results by androidx.compose.runtime.produceState<List<File>?>(null, base, query, hidden, reload) {
+        kotlinx.coroutines.delay(250)
+        value = withContext(Dispatchers.IO) {
+            base.walkTopDown().maxDepth(10).onEnter { it == base || hidden || !it.name.startsWith(".") }
+                .takeWhile { isActive }
+                .filter { it != base && (hidden || !it.name.startsWith(".")) && it.name.contains(query, ignoreCase = true) }
+                .take(300).toList()
+        }
+    }
+    val list = results
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
+        if (list != null && list.isEmpty()) item { WpText(stringResource(R.string.files_no_results), style = WpType.Large, color = Wp.palette.subtle) }
+        items(list.orEmpty(), key = { it.absolutePath }) { f ->
+            Row(Modifier.fillMaxWidth().wpClickable { onOpen(f) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
+                FileSquare(f, reload)
+                Spacer(Modifier.width(14.dp))
+                Column(Modifier.weight(1f)) {
+                    WpText(f.name, style = WpType.Large.copy(fontSize = 22.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    val d = Date(f.lastModified())
+                    WpText(DateFormat.getDateFormat(context).format(d) + " " + DateFormat.getTimeFormat(context).format(d), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+                    WpText(where(f), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }

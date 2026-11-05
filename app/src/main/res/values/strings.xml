@@ -942,4 +942,17 @@
     <string name="files_create_folder_title">create a new folder</string>
     <string name="files_folder_name">Folder name</string>
     <string name="files_new_folder_default">New folder</string>
+    <string name="files_sd_card">SD Card</string>
+    <string name="files_move_here">move here</string>
+    <string name="files_copy_here">copy here</string>
+    <string name="files_search_in">Search in %1$s</string>
+    <string name="files_no_results">No results.</string>
+    <plurals name="files_move_to">
+        <item quantity="one">move %d item to</item>
+        <item quantity="other">move %d items to</item>
+    </plurals>
+    <plurals name="files_copy_to">
+        <item quantity="one">copy %d item to</item>
+        <item quantity="other">copy %d items to</item>
+    </plurals>
 </resources>

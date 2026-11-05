@@ -943,4 +943,17 @@
     <string name="files_create_folder_title">criar uma nova pasta</string>
     <string name="files_folder_name">Nome da pasta</string>
     <string name="files_new_folder_default">Nova pasta</string>
+    <string name="files_sd_card">Cartão SD</string>
+    <string name="files_move_here">mover aqui</string>
+    <string name="files_copy_here">copiar aqui</string>
+    <string name="files_search_in">Pesquisar em %1$s</string>
+    <string name="files_no_results">Nenhum resultado.</string>
+    <plurals name="files_move_to">
+        <item quantity="one">mover %d item para</item>
+        <item quantity="other">mover %d itens para</item>
+    </plurals>
+    <plurals name="files_copy_to">
+        <item quantity="one">copiar %d item para</item>
+        <item quantity="other">copiar %d itens para</item>
+    </plurals>
 </resources>

@@ -97,6 +97,8 @@ private sealed interface PhotosPage {
     data class Viewer(val albumId: Long?, val index: Int) : PhotosPage
     data class Edit(val photoId: Long) : PhotosPage
     data object Trash : PhotosPage
+    /** A picture or video another app (or Android) asked to show. */
+    data class External(val uri: String, val video: Boolean) : PhotosPage
 }
 
 /** Photos hub: "collection" by month, "albums", an album page and the full-screen viewer. */
@@ -125,7 +127,18 @@ class PhotosActivity : WpActivity() {
         val trash by androidx.compose.runtime.produceState<List<Photo>>(emptyList(), perm.granted, reload) {
             if (perm.granted) value = library.trash(videos = context.hasPermissions(Perms.VIDEOS))
         }
-        val nav = rememberNavigator<PhotosPage>(PhotosPage.Hub)
+        // Opened to show a picture or video (Mozaik Photos as the phone's gallery).
+        val start = remember {
+            val i = intent
+            val data = i?.data
+            if (data != null && (i.action == Intent.ACTION_VIEW || i.action == "com.android.camera.action.REVIEW")) {
+                val type = i.type ?: runCatching { context.contentResolver.getType(data) }.getOrNull().orEmpty()
+                PhotosPage.External(data.toString(), type.startsWith("video") || data.toString().contains("/video/"))
+            } else {
+                PhotosPage.Hub
+            }
+        }
+        val nav = rememberNavigator<PhotosPage>(start)
         WpNavHost(nav) { page ->
             when (page) {
                 PhotosPage.Hub -> {
@@ -165,6 +178,21 @@ class PhotosActivity : WpActivity() {
                     else Viewer(list, page.index, onDeleted = { reload++; nav.pop() }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
                 }
                 PhotosPage.Trash -> TrashPage(trash) { reload++ }
+                is PhotosPage.External -> {
+                    val uri = remember(page.uri) { android.net.Uri.parse(page.uri) }
+                    // A picture of the library: shown among the others, so you can swipe on.
+                    val mediaId = remember(page.uri) { if (uri.authority == "media") runCatching { android.content.ContentUris.parseId(uri) }.getOrNull() else null }
+                    val list = photos
+                    val at = if (mediaId != null) list?.indexOfFirst { it.id == mediaId } ?: -1 else -1
+                    when {
+                        at >= 0 && list != null -> Viewer(list, at, onDeleted = { reload++ }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
+                        mediaId != null && perm.granted && list == null -> LoadingDots(Modifier.padding(top = 24.dp))
+                        else -> Viewer(
+                            listOf(Photo(-1, System.currentTimeMillis(), 0, "", isVideo = page.video, source = uri)),
+                            0, onDeleted = { (context as? android.app.Activity)?.finish() }, onEdit = {},
+                        )
+                    }
+                }
                 is PhotosPage.Edit -> photos?.firstOrNull { it.id == page.photoId }?.let { photo ->
                     PhotoEditorPage(photo, onSaved = { reload++ })
                 } ?: GoneBack(photos != null) { nav.pop() }
@@ -366,14 +394,14 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
                             )
                             }
                         })
-                        if (Build.VERSION.SDK_INT >= 30) {
+                        if (Build.VERSION.SDK_INT >= 30 && p.source == null) {
                             add(AppBarButton(WpIcons.Delete, stringResource(R.string.delete)) {
                                 // To the trash (30 days), not deleted for good.
                                 val pi = MediaStore.createTrashRequest(context.contentResolver, listOf(p.uri), true)
                                 deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                             })
                         }
-                        if (!p.isVideo) add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) { onEdit(p) })
+                        if (!p.isVideo && p.source == null) add(AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) { onEdit(p) })
                     },
                     background = Color.Black.copy(alpha = 0.6f),
                 )

@@ -16,9 +16,11 @@ data class Photo(
     val durationMs: Long = 0,
     /** In the trash: when Android deletes it for good (ms; 0 = not in the trash). */
     val expiresAt: Long = 0,
+    /** A picture or video opened from another app (not in the library). */
+    val source: Uri? = null,
 ) {
     val uri: Uri
-        get() = ContentUris.withAppendedId(
+        get() = source ?: ContentUris.withAppendedId(
             if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
             id,
         )

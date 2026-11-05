@@ -129,18 +129,22 @@ fun TileFace(tile: TileSpec, app: AppEntry?, inputs: TileInputs, tileSize: Dp, s
     }
 }
 
-/** A folder: small squares with the first apps in it, like a little Start screen. */
+/**
+ * A live folder (Windows Phone 8.1 Update 1): a little Start screen of the tiles inside it,
+ * each a small square in its own colour, three across on a medium folder (six on wide and
+ * large), over a darker shade of the folder's colour, with the folder's name below.
+ */
 @Composable
 private fun FolderTile(size: TileSize, f: FolderInfo) {
     if (size == TileSize.Small || f.apps.isEmpty()) {
         Box(Modifier.fillMaxSize()) { IconTile(WpIcons.Folder, size) }
         return
     }
-    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
-        val cols = when (size) { TileSize.Large -> 3; TileSize.Wide -> 4; else -> 2 }
-        val rows = if (size == TileSize.Large) 3 else 2
-        val pad = minOf(maxWidth, maxHeight) * 0.07f
-        val gap = pad * 0.45f
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.28f))) {
+        val cols = if (size == TileSize.Medium) 3 else 6
+        val rows = if (size == TileSize.Large) 6 else 3
+        val pad = minOf(maxWidth, maxHeight) * 0.06f
+        val gap = pad * 0.5f
         val label = minOf(maxWidth, maxHeight) * 0.2f
         val cell = minOf(
             (maxWidth - pad * 2 - gap * (cols - 1)) / cols,
@@ -150,11 +154,10 @@ private fun FolderTile(size: TileSize, f: FolderInfo) {
             for (r in 0 until rows) {
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     for (c in 0 until cols) {
-                        val app = f.apps.getOrNull(r * cols + c)
-                        // Each app as a little tile in its own colour.
-                        val cellColor = if (app != null) rememberBrandColor(app) ?: Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f)
+                        val app = f.apps.getOrNull(r * cols + c) ?: break
+                        val cellColor = rememberBrandColor(app) ?: com.wpreborn.core.theme.Wp.accent
                         Box(Modifier.size(cell).background(cellColor), contentAlignment = Alignment.Center) {
-                            if (app != null) AppIcon(app, cell * 0.66f)
+                            AppIcon(app, cell * 0.62f)
                         }
                     }
                 }

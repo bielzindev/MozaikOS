@@ -550,8 +550,10 @@ fun StartScreen(
                       }
                     }
                     if (openTile != null && openIndex != null && bandRow != null) {
-                        val folderColor = openTile.fixedColor ?: Wp.accent
-                        val bandColor = androidx.compose.ui.graphics.lerp(folderColor, Color.Black, 0.6f)
+                        // The open folder's area: a lighter band across the screen (like the
+                        // phone's), the folder's tiles on it at their own sizes.
+                        val bandColor = androidx.compose.ui.graphics.lerp(Wp.palette.background, Color.White, if (Wp.palette.isDark) 0.12f else 0f)
+                            .let { if (Wp.palette.isDark) it else androidx.compose.ui.graphics.lerp(it, Color.Black, 0.08f) }
                         Box(Modifier.offset(0.dp, bandTop).fillMaxWidth().height(bandHeight).background(bandColor))
                         // The notch pointing up at the folder's tile.
                         val fpl = placements[openIndex]
@@ -581,7 +583,7 @@ fun StartScreen(
                                 )
                             } else {
                                 com.wpreborn.core.ui.WpText(
-                                    folderName(openTile), style = com.wpreborn.core.theme.WpType.Large, color = Color.White, maxLines = 1,
+                                    folderName(openTile), style = com.wpreborn.core.theme.WpType.Large, color = Wp.palette.foreground, maxLines = 1,
                                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
                                     modifier = Modifier.wpClickable { state.renamingFolder = true },
                                 )

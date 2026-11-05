@@ -68,6 +68,8 @@ private sealed interface PeoplePage {
     data object Hub : PeoplePage
     data class Profile(val contactId: Long) : PeoplePage
     data object Search : PeoplePage
+    /** New contact (null) or editing one. */
+    data class Edit(val contactId: Long?) : PeoplePage
 }
 
 private val LETTERS = listOf("#") + ('a'..'z').map { it.toString() }
@@ -112,14 +114,20 @@ class PeopleActivity : WpActivity() {
                     WpAppBar(
                         buttons = listOf(
                             AppBarButton(WpIcons.Add, stringResource(R.string.people_new)) {
-                                context.startActivity(Intent(ContactsContract.Intents.Insert.ACTION).setType(ContactsContract.RawContacts.CONTENT_TYPE))
+                                nav.navigate(PeoplePage.Edit(null))
                             },
                             AppBarButton(WpIcons.Search, stringResource(R.string.search), enabled = perm.granted) { nav.navigate(PeoplePage.Search) },
                             AppBarButton(WpIcons.Sync, stringResource(R.string.refresh), enabled = perm.granted) { reload++ },
                         ),
                     )
                 }
-                is PeoplePage.Profile -> contacts?.firstOrNull { it.id == page.contactId }?.let { ProfilePage(it) { reload++ } }
+                is PeoplePage.Profile -> contacts?.firstOrNull { it.id == page.contactId }?.let { c ->
+                    ProfilePage(c, onEdit = { nav.navigate(PeoplePage.Edit(c.id)) }) { reload++ }
+                }
+                is PeoplePage.Edit -> ContactEditorPage(
+                    page.contactId?.let { id -> contacts?.firstOrNull { it.id == id } },
+                    onDeleted = { reload++; nav.popToRoot() },
+                ) { saved -> if (saved) reload++; nav.pop() }
                 PeoplePage.Search -> SearchPage(contacts.orEmpty()) { nav.navigate(PeoplePage.Profile(it.id)) }
             }
         }
@@ -191,7 +199,7 @@ private fun SearchPage(contacts: List<Contact>, onOpen: (Contact) -> Unit) {
 }
 
 @Composable
-private fun ProfilePage(contact: Contact, onChanged: () -> Unit) {
+private fun ProfilePage(contact: Contact, onEdit: () -> Unit, onChanged: () -> Unit) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val repo = remember { ContactsRepository(context) }
@@ -269,9 +277,7 @@ private fun ProfilePage(contact: Contact, onChanged: () -> Unit) {
                         }
                     }
                 },
-                AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) {
-                    context.startActivity(Intent(Intent.ACTION_EDIT, repo.contactUri(contact)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                },
+                AppBarButton(WpIcons.Edit, stringResource(R.string.edit), onClick = onEdit),
             ),
         )
     }

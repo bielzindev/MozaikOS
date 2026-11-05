@@ -69,6 +69,8 @@ import java.util.Calendar
 private sealed interface CalPage {
     data object Main : CalPage
     data class Event(val event: CalendarEvent) : CalPage
+    /** New appointment (eventId null) or editing one. */
+    data class Edit(val eventId: Long?, val start: Long) : CalPage
 }
 
 private const val DAY = 24L * 60 * 60 * 1000
@@ -81,8 +83,12 @@ class CalendarActivity : WpActivity() {
         val nav = rememberNavigator<CalPage>(CalPage.Main)
         WpNavHost(nav) { page ->
             when (page) {
-                CalPage.Main -> CalendarMain { nav.navigate(CalPage.Event(it)) }
-                is CalPage.Event -> EventPage(page.event)
+                CalPage.Main -> CalendarMain(onNew = { nav.navigate(CalPage.Edit(null, it)) }) { nav.navigate(CalPage.Event(it)) }
+                is CalPage.Event -> EventPage(page.event) { nav.navigate(CalPage.Edit(page.event.eventId, page.event.begin)) }
+                is CalPage.Edit -> EventEditorPage(page.eventId, page.start) { saved ->
+                    // After saving or deleting an appointment its details page is out of date.
+                    if (saved && page.eventId != null) nav.popToRoot() else nav.pop()
+                }
             }
         }
     }
@@ -94,7 +100,7 @@ private fun startOfDay(t: Long): Long = Calendar.getInstance().apply {
 }.timeInMillis
 
 @Composable
-private fun CalendarMain(onOpen: (CalendarEvent) -> Unit) {
+private fun CalendarMain(onNew: (Long) -> Unit, onOpen: (CalendarEvent) -> Unit) {
     val context = LocalContext.current
     val perm = rememberPermissionState(Perms.CALENDAR)
     val repo = remember { CalendarRepository(context) }
@@ -152,11 +158,7 @@ private fun CalendarMain(onOpen: (CalendarEvent) -> Unit) {
         WpAppBar(
             buttons = listOf(
                 AppBarButton(WpIcons.Add, stringResource(R.string.calendar_new)) {
-                    context.startActivity(
-                        Intent(Intent.ACTION_INSERT, CalendarContract.Events.CONTENT_URI)
-                            .putExtra(CalendarContract.EXTRA_EVENT_BEGIN_TIME, selected + 9 * 60 * 60 * 1000)
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
+                    onNew(selected + 9 * 60 * 60 * 1000)
                 },
                 AppBarButton(WpIcons.Calendar, stringResource(R.string.today)) {
                     month = System.currentTimeMillis()
@@ -291,7 +293,7 @@ private fun MonthView(
 }
 
 @Composable
-private fun EventPage(e: CalendarEvent) {
+private fun EventPage(e: CalendarEvent, onEdit: () -> Unit) {
     val context = LocalContext.current
     Column(Modifier.fillMaxSize()) {
         WpPageHeader(stringResource(R.string.app_calendar), null)
@@ -310,12 +312,7 @@ private fun EventPage(e: CalendarEvent) {
         }
         WpAppBar(
             buttons = listOf(
-                AppBarButton(WpIcons.Edit, stringResource(R.string.edit)) {
-                    context.startActivity(
-                        Intent(Intent.ACTION_EDIT, ContentUris.withAppendedId(CalendarContract.Events.CONTENT_URI, e.eventId))
-                            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-                    )
-                },
+                AppBarButton(WpIcons.Edit, stringResource(R.string.edit), onClick = onEdit),
             ),
         )
     }

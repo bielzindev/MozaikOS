@@ -75,7 +75,13 @@ abstract class WpActivity : ComponentActivity() {
             override fun handleOnBackPressed() = closeWithTurnstile()
         })
         // A Mozaik app opened fresh shows its splash screen first, as Windows Phone apps did.
-        val splashApp = if (savedInstanceState == null) com.wpreborn.data.apps.BuiltInApp.entries.firstOrNull { it.activity == this::class.java } else null
+        // Not for the apps built into Windows Phone itself (Phone, Messaging, People, Settings,
+        // Camera...), which opened at once without one; only for the apps that had it.
+        val splashApp = if (savedInstanceState == null) {
+            com.wpreborn.data.apps.BuiltInApp.entries.firstOrNull { it.activity == this::class.java }?.takeIf { it !in NO_SPLASH }
+        } else {
+            null
+        }
         setContent {
             WpTheme {
                 LaunchedEffect(trigger) {
@@ -177,6 +183,17 @@ abstract class WpActivity : ComponentActivity() {
     }
 }
 
+
+private val NO_SPLASH = setOf(
+    com.wpreborn.data.apps.BuiltInApp.Phone,
+    com.wpreborn.data.apps.BuiltInApp.Messaging,
+    com.wpreborn.data.apps.BuiltInApp.People,
+    com.wpreborn.data.apps.BuiltInApp.Settings,
+    com.wpreborn.data.apps.BuiltInApp.Camera,
+    com.wpreborn.data.apps.BuiltInApp.Calculator,
+    com.wpreborn.data.apps.BuiltInApp.Flashlight,
+    com.wpreborn.data.apps.BuiltInApp.Keyboard,
+)
 
 /**
  * The Windows Phone splash screen: the app's colour (the accent) filling the screen and its

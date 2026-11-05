@@ -58,6 +58,51 @@ class MusicController private constructor(private val context: Context) {
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem?.mediaId?.toLongOrNull()?.let { com.wpreborn.data.media.PlayStats.get(context).record(it) }
+            maybeExtend()
+        }
+    }
+
+    /** Autoplay radio when the queue ends (on unless turned off in PulseRadio's menu). */
+    var autoplay: Boolean
+        get() = context.getSharedPreferences("music", Context.MODE_PRIVATE).getBoolean("autoplay", true)
+        set(v) {
+            context.getSharedPreferences("music", Context.MODE_PRIVATE).edit().putBoolean("autoplay", v).apply()
+            if (v) maybeExtend()
+        }
+    private var extending = false
+
+    /**
+     * The last song of the queue is playing: add a radio of similar songs from the library
+     * ([com.wpreborn.data.media.Radio]) so the music goes on instead of stopping.
+     */
+    private fun maybeExtend() {
+        val c = controller ?: return
+        if (extending || !autoplay || c.repeatMode != Player.REPEAT_MODE_OFF || c.mediaItemCount == 0) return
+        val next = c.currentTimeline.getNextWindowIndex(c.currentMediaItemIndex, Player.REPEAT_MODE_OFF, c.shuffleModeEnabled)
+        if (next != androidx.media3.common.C.INDEX_UNSET) return
+        extending = true
+        val queued = (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).mediaId.toLongOrNull() }
+        scope.launch {
+            try {
+                val col = com.wpreborn.data.media.MusicLibrary(context).load()
+                val picks = kotlinx.coroutines.withContext(Dispatchers.Default) {
+                    com.wpreborn.data.media.Radio.pick(
+                        col, queued,
+                        com.wpreborn.data.media.PlayStats.get(context).counts(),
+                        com.wpreborn.data.media.Votes.get(context).votes.value,
+                        com.wpreborn.data.media.FavoriteArtists.get(context).artists.value,
+                    )
+                }
+                val cc = controller
+                if (cc != null && picks.isNotEmpty()) {
+                    cc.addMediaItems(picks.map { it.toMediaItem() })
+                    if (_source.value == null) _source.value = context.getString(com.wpreborn.R.string.music_radio_source)
+                    publish()
+                }
+            } catch (_: Exception) {
+            } finally {
+                extending = false
+            }
         }
     }
 

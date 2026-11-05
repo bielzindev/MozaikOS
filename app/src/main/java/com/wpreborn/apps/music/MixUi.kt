@@ -266,12 +266,19 @@ fun MixHome(
                 )
             }
         }
+        var autoplay by remember { mutableStateOf(controller.autoplay) }
         if (homeMenu) {
             MenuOverlay(
                 listOf(
                     stringResource(R.string.music_search) to onSearch,
                     stringResource(R.string.mix_create) to { createMix = true; Unit },
                     stringResource(R.string.music_new_playlist) to { newPlaylist = true; Unit },
+                    // Autoplay radio when what you play ends (like Spotify).
+                    stringResource(if (autoplay) R.string.music_autoplay_on else R.string.music_autoplay_off) to {
+                        autoplay = !autoplay
+                        controller.autoplay = autoplay
+                        Unit
+                    },
                 ),
             ) { homeMenu = false }
         }

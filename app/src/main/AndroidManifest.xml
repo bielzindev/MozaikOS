@@ -136,6 +136,10 @@
             </intent-filter>
         </service>
         <activity
+            android:name=".core.diag.CrashLogActivity"
+            android:exported="false"
+            android:label="@string/crash_title" />
+        <activity
             android:name=".services.calls.CallActivity"
             android:exported="false"
             android:launchMode="singleTask"

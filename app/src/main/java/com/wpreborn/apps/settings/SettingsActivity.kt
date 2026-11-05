@@ -495,6 +495,10 @@ private fun AboutPage() {
                 WpText(v, style = WpType.Large)
             }
         }
+        Spacer(Modifier.height(12.dp))
+        com.wpreborn.core.ui.WpButton(stringResource(R.string.crash_title)) {
+            runCatching { context.startActivity(android.content.Intent(context, com.wpreborn.core.diag.CrashLogActivity::class.java)) }
+        }
         Spacer(Modifier.height(16.dp))
         WpText(stringResource(R.string.about_disclaimer), style = WpType.Small, color = Wp.palette.subtle)
         Spacer(Modifier.height(12.dp))

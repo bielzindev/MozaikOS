@@ -38,6 +38,10 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
     private var swipedWord: String? = null
     private var swipeAlternatives: List<String> = emptyList()
     private var correctionShown: String? = null
+    /** The word [correctionShown] was found for (suggestions are worked out off the main thread). */
+    private var correctionFor: String? = null
+    private val worker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private var suggestGen = 0
     /** Word replaced by autocorrect, so backspace can undo it. */
     private var undoCorrection: Pair<String, String>? = null
 
@@ -60,6 +64,8 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
     override fun onDestroy() {
         runCatching { getSystemService(android.content.ClipboardManager::class.java)?.removePrimaryClipChangedListener(clipListener) }
         recognizer?.destroy()
+        mainHandler.removeCallbacksAndMessages(null)
+        worker.shutdownNow()
         super.onDestroy()
     }
 
@@ -330,13 +336,31 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
             v.highlighted = -1
             return
         }
-        val s = predictor.suggest(language, word.toString())
+        // The word typed shows at once; the guesses are worked out on a background thread
+        // (comparing with thousands of words) and replace it when ready, if still current.
         val typed = word.toString()
-        correctionShown = if (prefs.autoCorrect) s.correction else null
-        // WP showed what you typed plus the best guesses; the autocorrect word is highlighted.
-        val list = (listOf(typed) + s.words).distinct().take(3)
-        v.suggestions = list
-        v.highlighted = correctionShown?.let { list.indexOf(it) } ?: -1
+        val lang = language
+        val gen = ++suggestGen
+        if (v.suggestions.firstOrNull() != typed) {
+            v.suggestions = listOf(typed)
+            v.highlighted = -1
+        }
+        if (correctionFor != typed) correctionShown = null
+        runCatching {
+            worker.execute {
+                val s = runCatching { predictor.suggest(lang, typed) }.getOrNull() ?: return@execute
+                mainHandler.post {
+                    if (gen != suggestGen || word.toString() != typed) return@post
+                    val vv = view ?: return@post
+                    correctionShown = if (prefs.autoCorrect) s.correction else null
+                    correctionFor = typed
+                    // WP showed what you typed plus the best guesses; the autocorrect word is highlighted.
+                    val list = (listOf(typed) + s.words).distinct().take(3)
+                    vv.suggestions = list
+                    vv.highlighted = correctionShown?.let { list.indexOf(it) } ?: -1
+                }
+            }
+        }
     }
 
     // --- Text helpers -----------------------------------------------------------------------
@@ -382,7 +406,10 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
     /** Commits the word, replacing it with the autocorrection when there is one. */
     private fun commitWithCorrection() {
         val typed = word.toString()
-        val corr = correctionShown
+        // Typed faster than the background guesses: work the correction out now.
+        val corr = if (correctionFor == typed) correctionShown
+            else if (prefs.autoCorrect && !noSuggestions && typed.length >= 2 && language.composer == Composer.None) runCatching { predictor.suggest(language, typed).correction }.getOrNull()
+            else null
         if (!noSuggestions && corr != null && corr != typed && typed.isNotEmpty() && language.composer == Composer.None) {
             ic()?.commitText(corr, 1)
             undoCorrection = typed to corr

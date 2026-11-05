@@ -16,31 +16,55 @@ import kotlin.math.min
  */
 class WordPredictor(private val context: Context) {
 
+    /**
+     * A dictionary with everything a keystroke needs worked out once, when it loads: ranks,
+     * the sorted list for completions, and each word with its accents folded, grouped by
+     * first letter (folding with Normalizer on every keystroke froze the keyboard).
+     */
     private class Dict(val words: List<String>) {
-        val rank: Map<String, Int> = words.withIndex().associate { it.value to it.index }
+        val rank: Map<String, Int> = HashMap<String, Int>(words.size * 2).also { m -> words.forEachIndexed { i, w -> m.putIfAbsent(w, i) } }
         val sorted: List<String> = words.sorted()
-        val byFirst: Map<Char, List<String>> = words.filter { it.isNotEmpty() }.groupBy { fold(it[0]) }
+        /** First letter (folded) -> words and their folded spelling, most common first. */
+        val byFirst: Map<Char, List<Pair<String, String>>> = words.asSequence().filter { it.isNotEmpty() }
+            .map { it to fold(it) }.filter { it.second.isNotEmpty() }.groupBy { it.second[0] }
     }
+
+    private val empty = Dict(emptyList())
+    private val loading = ConcurrentHashMap.newKeySet<String>()
 
     private val dicts = ConcurrentHashMap<String, Dict>()
     private val learned = ConcurrentHashMap<String, MutableMap<String, Int>>()
     private val bigrams = ConcurrentHashMap<String, MutableMap<String, MutableMap<String, Int>>>()
 
+    /**
+     * The language's dictionary. It is never built on the caller's thread: until the
+     * background load is done, typing works with an empty dictionary instead of freezing.
+     */
     private fun dict(lang: KbLanguage): Dict {
-        val name = lang.dictionary ?: return Dict(emptyList())
-        return dicts.getOrPut(name) {
-            val words = try {
-                context.assets.open("dict/$name.txt").bufferedReader().readLines()
-            } catch (_: Exception) {
-                emptyList()
-            }
-            Dict(words)
-        }
+        val name = lang.dictionary ?: return empty
+        dicts[name]?.let { return it }
+        preload(lang)
+        return empty
     }
 
-    /** Loads the dictionary in the background so the first keystroke is not slowed down. */
+    /** Loads the dictionary in the background (once), so keystrokes are never slowed down. */
     fun preload(lang: KbLanguage) {
-        Thread { dict(lang); learnedFor(lang.code) }.start()
+        val name = lang.dictionary ?: return
+        if (dicts.containsKey(name) || !loading.add(name)) return
+        Thread {
+            try {
+                val words = try {
+                    context.assets.open("dict/$name.txt").bufferedReader().readLines()
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                dicts[name] = Dict(words)
+                learnedFor(lang.code)
+            } catch (_: Throwable) {
+            } finally {
+                loading.remove(name)
+            }
+        }.apply { priority = Thread.MIN_PRIORITY + 1 }.start()
     }
 
     private fun learnedFile(code: String) = File(context.filesDir, "kb_learned_$code.txt")
@@ -116,12 +140,14 @@ class WordPredictor(private val context: Context) {
         // Corrections: edit distance with keyboard-neighbour weighting, same first letter.
         var correction: String? = null
         if (lower.length >= 2 && !isKnown(lang, lower)) {
-            val pool = d.byFirst[fold(lower[0])].orEmpty().asSequence().take(12_000) +
-                learnedFor(lang.code).keys.asSequence().filter { fold(it[0]) == fold(lower[0]) }
+            val fl = fold(lower)
+            val first = fl.firstOrNull() ?: return Suggestions(emptyList(), null)
+            val pool = d.byFirst[first].orEmpty().asSequence().take(12_000) +
+                learnedFor(lang.code).keys.asSequence().filter { it.isNotEmpty() }.map { it to fold(it) }.filter { it.second.firstOrNull() == first }
             var best = Int.MAX_VALUE
-            for (w in pool) {
-                if (abs(w.length - lower.length) > 2) continue
-                val dist = distance(fold(lower), fold(w), lang)
+            for ((w, fw) in pool) {
+                if (abs(fw.length - fl.length) > 2) continue
+                val dist = distance(fl, fw, lang)
                 if (dist > if (lower.length <= 4) 1.0 else 2.0) continue
                 val s = score(lang, w) + (dist * 4_000).toInt()
                 candidates[w] = minOf(candidates[w] ?: Int.MAX_VALUE, s)
@@ -148,11 +174,10 @@ class WordPredictor(private val context: Context) {
         val last = path.last()
         val d = dict(lang)
         val pool = d.byFirst[first].orEmpty().asSequence().take(20_000) +
-            learnedFor(lang.code).keys.asSequence().filter { it.isNotEmpty() && fold(it[0]) == first }
+            learnedFor(lang.code).keys.asSequence().filter { it.isNotEmpty() }.map { it to fold(it) }.filter { it.second.firstOrNull() == first }
         val scored = ArrayList<Pair<String, Int>>()
-        for (w in pool) {
-            if (w.length < 2) continue
-            val fw = fold(w)
+        for ((w, fw) in pool) {
+            if (w.length < 2 || fw.isEmpty()) continue
             if (fw.last() != last && !neighbours(fw.last(), last, lang)) continue
             if (!isSubsequence(fw, path)) continue
             // Prefer words that use most of the path, then frequency.
@@ -204,7 +229,10 @@ class WordPredictor(private val context: Context) {
 
     companion object {
         /** Folds accents so "voce" finds "você" and swipes ignore diacritics. */
-        fun fold(s: String): String = Normalizer.normalize(s, Normalizer.Form.NFD).filter { Character.getType(it) != Character.NON_SPACING_MARK.toInt() }
+        /** Plain ASCII needs no folding (most words): skips the slow Normalizer. */
+        fun fold(s: String): String =
+            if (s.all { it.code < 128 }) s
+            else Normalizer.normalize(s, Normalizer.Form.NFD).filter { Character.getType(it) != Character.NON_SPACING_MARK.toInt() }
         fun fold(c: Char): Char = fold(c.toString()).firstOrNull() ?: c
 
         private fun matchCase(word: String, typed: String): String = when {

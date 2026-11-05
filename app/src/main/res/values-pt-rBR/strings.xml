@@ -964,4 +964,9 @@
     <string name="photos_restore_all">restaurar tudo</string>
     <string name="photos_delete_forever">apagar de vez</string>
     <string name="photos_empty_trash">esvaziar lixeira</string>
+    <string name="crash_title">relatório de erros</string>
+    <string name="crash_none">Nenhum erro ou travamento registrado.</string>
+    <string name="music_radio_source">RÁDIO</string>
+    <string name="music_autoplay_on">rádio automático: ligado</string>
+    <string name="music_autoplay_off">rádio automático: desligado</string>
 </resources>

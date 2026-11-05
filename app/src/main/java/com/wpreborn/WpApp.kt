@@ -7,6 +7,8 @@ import com.wpreborn.launcher.lock.LockActivity
 class WpApp : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Crashes and freezes are written down, to be shared from Settings > About.
+        com.wpreborn.core.diag.CrashLog.install(this)
         // Read the theme synchronously so the very first frame already has the right colors.
         SettingsRepository.get(this).warmUp()
         LockActivity.register(this)

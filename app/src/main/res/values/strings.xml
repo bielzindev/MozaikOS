@@ -963,4 +963,9 @@
     <string name="photos_restore_all">restore all</string>
     <string name="photos_delete_forever">delete for good</string>
     <string name="photos_empty_trash">empty trash</string>
+    <string name="crash_title">error report</string>
+    <string name="crash_none">No crashes or freezes recorded.</string>
+    <string name="music_radio_source">RADIO</string>
+    <string name="music_autoplay_on">autoplay radio: on</string>
+    <string name="music_autoplay_off">autoplay radio: off</string>
 </resources>

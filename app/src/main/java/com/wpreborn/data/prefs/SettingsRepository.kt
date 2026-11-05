@@ -50,6 +50,8 @@ data class WpSettings(
     val smallTilesRow: Boolean = false,
     /** Lumia glance screen (always on display) while the screen is off. */
     val glance: Boolean = false,
+    /** Mozaik apps open with their splash screen (colour and glyph), as on Windows Phone. */
+    val splash: Boolean = true,
     val firstRunDone: Boolean = false,
 )
 
@@ -89,6 +91,7 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
     fun setSmallTilesRow(value: Boolean) = update { it[SMALL_ROW] = value }
     fun setGlance(value: Boolean) = update { it[GLANCE] = value }
+    fun setSplash(value: Boolean) = update { it[SPLASH] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
     private fun Preferences.toSettings() = WpSettings(
@@ -108,6 +111,7 @@ class SettingsRepository private constructor(private val context: Context) {
         liveTiles = this[LIVE_TILES] ?: true,
         smallTilesRow = this[SMALL_ROW] ?: false,
         glance = this[GLANCE] ?: false,
+        splash = this[SPLASH] ?: true,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
 
@@ -128,6 +132,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
         private val SMALL_ROW = booleanPreferencesKey("small_tiles_row")
         private val GLANCE = booleanPreferencesKey("glance")
+        private val SPLASH = booleanPreferencesKey("splash")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 
         @Volatile

@@ -971,4 +971,5 @@
     <string name="glance_title">Glance screen (always on)</string>
     <string name="glance_info">With the screen off, shows the time, weather and notification icons in dim accent-coloured type, like the Lumia. Double-tap to wake. Always on while charging, 15 minutes on battery, off in a pocket. Needs \'display over other apps\'; turn off the phone\'s own always-on display.</string>
     <string name="browser_open_link">Open in Explorer</string>
+    <string name="set_splash">Splash screen when apps open</string>
 </resources>

@@ -121,6 +121,7 @@ fun PersonalizeScreen(turnstile: TurnstileState, onClose: () -> Unit) {
         WpToggle(stringResource(R.string.set_more_tiles), settings.moreTiles, onText = on, offText = off) { repo.setMoreTiles(it) }
         WpToggle(stringResource(R.string.set_small_row), settings.smallTilesRow, onText = on, offText = off) { repo.setSmallTilesRow(it) }
         WpToggle(stringResource(R.string.set_live_tiles), settings.liveTiles, onText = on, offText = off) { repo.setLiveTiles(it) }
+        WpToggle(stringResource(R.string.set_splash), settings.splash, onText = on, offText = off) { repo.setSplash(it) }
         if (!settings.metroIcons) {
             WpToggle(stringResource(R.string.set_icons_accent), settings.iconsOnAccent, onText = on, offText = off) { repo.setIconsOnAccent(it) }
         }

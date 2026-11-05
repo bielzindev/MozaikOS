@@ -9,6 +9,10 @@ import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
@@ -70,6 +74,8 @@ abstract class WpActivity : ComponentActivity() {
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() = closeWithTurnstile()
         })
+        // A Mozaik app opened fresh shows its splash screen first, as Windows Phone apps did.
+        val splashApp = if (savedInstanceState == null) com.wpreborn.data.apps.BuiltInApp.entries.firstOrNull { it.activity == this::class.java } else null
         setContent {
             WpTheme {
                 LaunchedEffect(trigger) {
@@ -80,6 +86,7 @@ abstract class WpActivity : ComponentActivity() {
                         Box(Modifier.fillMaxSize().turnstile(turnstile)) { Content() }
                     }
                 }
+                if (splashApp != null && com.wpreborn.core.theme.Wp.settings.splash) SplashScreen(splashApp)
             }
         }
     }
@@ -167,5 +174,32 @@ abstract class WpActivity : ComponentActivity() {
                 controller.show(WindowInsetsCompat.Type.statusBars())
             }
         }
+    }
+}
+
+
+/**
+ * The Windows Phone splash screen: the app's colour (the accent) filling the screen and its
+ * glyph in the middle, for a moment while the app opens, then it fades away.
+ */
+@androidx.compose.runtime.Composable
+private fun SplashScreen(app: com.wpreborn.data.apps.BuiltInApp) {
+    var shown by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
+    val alpha = androidx.compose.runtime.remember { androidx.compose.animation.core.Animatable(1f) }
+    LaunchedEffect(Unit) {
+        kotlinx.coroutines.delay(650)
+        alpha.animateTo(0f, androidx.compose.animation.core.tween(220))
+        shown = false
+    }
+    if (!shown) return
+    Box(
+        Modifier
+            .fillMaxSize()
+            .graphicsLayer { this.alpha = alpha.value }
+            .background(com.wpreborn.core.theme.Wp.accent)
+            .clickable(androidx.compose.runtime.remember { androidx.compose.foundation.interaction.MutableInteractionSource() }, null) {},
+        contentAlignment = androidx.compose.ui.Alignment.Center,
+    ) {
+        com.wpreborn.core.ui.WpIcon(app.icon, tint = androidx.compose.ui.graphics.Color.White, size = 96.dp)
     }
 }

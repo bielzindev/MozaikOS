@@ -380,7 +380,7 @@ private fun AppIconSmall(pkg: String) {
 }
 
 @Composable
-fun NotificationRow(n: WpNotification, startPad: androidx.compose.ui.unit.Dp = 46.dp, onOpen: () -> Unit) {
+fun NotificationRow(n: WpNotification, startPad: androidx.compose.ui.unit.Dp = 46.dp, showIcon: Boolean = false, onOpen: () -> Unit) {
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val density = LocalDensity.current
@@ -416,9 +416,18 @@ fun NotificationRow(n: WpNotification, startPad: androidx.compose.ui.unit.Dp = 4
             .wpClickable(tilt = false, onClick = onOpen)
             .padding(start = startPad, end = 20.dp, top = 4.dp, bottom = 8.dp),
     ) {
-        WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        if (n.text.isNotBlank()) {
-            WpText(n.text, style = WpType.Subtle, color = Color(0xB3FFFFFF), maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(verticalAlignment = Alignment.Top) {
+            // On the lock screen there is no app header above, so each one carries its icon.
+            if (showIcon) {
+                SquareAppIcon(n.packageName, 40.dp, Wp.accent)
+                Spacer(Modifier.width(12.dp))
+            }
+            Column(Modifier.weight(1f)) {
+                WpText(n.title, style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (n.text.isNotBlank()) {
+                    WpText(n.text, style = WpType.Subtle, color = Color(0xB3FFFFFF), maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
+            }
         }
     }
 }

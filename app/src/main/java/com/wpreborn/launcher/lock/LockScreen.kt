@@ -325,7 +325,7 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                 if (settings.lockShowNotifications) {
                     notifications.filter { it.clearable }.take(3).forEach { n ->
                         androidx.compose.runtime.key(n.key) {
-                            com.wpreborn.launcher.actioncenter.NotificationRow(n, startPad = 24.dp) {}
+                            com.wpreborn.launcher.actioncenter.NotificationRow(n, startPad = 24.dp, showIcon = true) {}
                         }
                     }
                 }

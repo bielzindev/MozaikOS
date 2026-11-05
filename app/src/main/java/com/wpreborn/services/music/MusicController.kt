@@ -54,7 +54,10 @@ class MusicController private constructor(private val context: Context) {
     val ui: StateFlow<PlayerUi> = _ui.asStateFlow()
 
     private val listener = object : Player.Listener {
-        override fun onEvents(player: Player, events: Player.Events) = publish()
+        override fun onEvents(player: Player, events: Player.Events) {
+            publish()
+            if (events.contains(Player.EVENT_PLAYBACK_STATE_CHANGED) && player.playbackState == Player.STATE_ENDED) maybeExtend()
+        }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
             mediaItem?.mediaId?.toLongOrNull()?.let { com.wpreborn.data.media.PlayStats.get(context).record(it) }
@@ -78,8 +81,12 @@ class MusicController private constructor(private val context: Context) {
     private fun maybeExtend() {
         val c = controller ?: return
         if (extending || !autoplay || c.repeatMode != Player.REPEAT_MODE_OFF || c.mediaItemCount == 0) return
-        val next = c.currentTimeline.getNextWindowIndex(c.currentMediaItemIndex, Player.REPEAT_MODE_OFF, c.shuffleModeEnabled)
-        if (next != androidx.media3.common.C.INDEX_UNSET) return
+        val tl = c.currentTimeline
+        if (tl.isEmpty) return
+        // Last song playing, or the queue already ended: add the radio (and play on if it ended).
+        val ended = c.playbackState == Player.STATE_ENDED
+        val next = runCatching { tl.getNextWindowIndex(c.currentMediaItemIndex, Player.REPEAT_MODE_OFF, c.shuffleModeEnabled) }.getOrDefault(0)
+        if (next != androidx.media3.common.C.INDEX_UNSET && !ended) return
         extending = true
         val queued = (0 until c.mediaItemCount).mapNotNull { c.getMediaItemAt(it).mediaId.toLongOrNull() }
         scope.launch {
@@ -95,7 +102,12 @@ class MusicController private constructor(private val context: Context) {
                 }
                 val cc = controller
                 if (cc != null && picks.isNotEmpty()) {
+                    val wasEnded = cc.playbackState == Player.STATE_ENDED
                     cc.addMediaItems(picks.map { it.toMediaItem() })
+                    if (wasEnded) {
+                        cc.seekToNextMediaItem()
+                        cc.play()
+                    }
                     if (_source.value == null) _source.value = context.getString(com.wpreborn.R.string.music_radio_source)
                     publish()
                 }
@@ -124,6 +136,7 @@ class MusicController private constructor(private val context: Context) {
             pending.forEach { it(c) }
             pending.clear()
             publish()
+            maybeExtend()
             startTicker()
         }, ContextCompat.getMainExecutor(context))
     }

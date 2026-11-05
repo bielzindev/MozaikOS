@@ -413,7 +413,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                     WpText(playback.title, style = WpType.Large.copy(fontSize = 24.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     WpText(playback.artist, style = WpType.Normal, color = Color.White.copy(alpha = 0.85f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Spacer(Modifier.weight(1f))
-                    Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                         val fav = playback.mediaId != null && playback.mediaId in favorites
                         // MixRadio's three: thumbs up, thumbs down (skips, and never again in
                         // "play me"), and the star (favourites).
@@ -434,7 +434,7 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
             }
             Spacer(Modifier.height(14.dp))
             // Progress: accent over a dim line, the times under it.
-            Box(Modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
+            Box(Modifier.fillMaxWidth().padding(horizontal = 20.dp)) {
                 WpSlider(
                     seeking ?: playback.progress,
                     { seeking = it },
@@ -450,19 +450,22 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
                 WpText(fmt(playback.durationMs), style = WpType.Small, color = Color.White)
             }
             Spacer(Modifier.height(12.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center) {
+            // Previous, play and next centred on one line, the "..." at the right of the same
+            // line (as on MixRadio's player), all centred vertically on the play button.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Spacer(Modifier.weight(1f))
                 RoundButton(WpIcons.Previous, filled = false, accent = accent, size = 52.dp) { controller.previous() }
                 Spacer(Modifier.width(22.dp))
                 RoundButton(if (playback.playing) WpIcons.Pause else WpIcons.Play, filled = false, accent = accent, size = 64.dp) { controller.togglePlay() }
                 Spacer(Modifier.width(22.dp))
                 RoundButton(WpIcons.Next, filled = false, accent = accent, size = 52.dp) { controller.next() }
+                Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                    Box(Modifier.size(44.dp).wpClickable { menu = true }, contentAlignment = Alignment.Center) {
+                        WpIcon(WpIcons.More, tint = Color.White, size = 22.dp)
+                    }
+                }
             }
         }
-        // "..." at the bottom right, as on MixRadio's player.
-        Box(
-            Modifier.align(Alignment.BottomEnd).padding(end = 12.dp, bottom = 8.dp).size(40.dp).wpClickable { menu = true },
-            contentAlignment = Alignment.Center,
-        ) { WpIcon(WpIcons.More, tint = Color.White, size = 22.dp) }
 
         if (queue) QueueEditor(playback, accent) { queue = false }
         if (sleepMenu) SleepMenu { sleepMenu = false }
@@ -472,6 +475,10 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
             MenuOverlay(
                 listOf(
                     stringResource(R.string.music_up_next) to { queue = true; Unit },
+                    stringResource(if (controller.autoplay) R.string.music_autoplay_on else R.string.music_autoplay_off) to {
+                        controller.autoplay = !controller.autoplay
+                        Unit
+                    },
                     stringResource(R.string.music_add_to_playlist) to { playback.mediaId?.toLongOrNull()?.let { playlistFor = listOf(it) }; Unit },
                     stringResource(R.string.music_save_queue) to { playlistFor = controller.queueIds(); Unit },
                     (if (fade == 0) stringResource(R.string.music_crossfade_off) else stringResource(R.string.music_crossfade_on, fade)) to {

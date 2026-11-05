@@ -1095,4 +1095,8 @@
     <string name="mail_attach">attach</string>
     <string name="mail_send_failed">Couldn\'t send: %1$s</string>
     <string name="mail_oauth_only">%1$s no longer accepts a password from other mail apps, only its own sign-in page (OAuth). Mozaik can\'t sign in to it yet. Gmail, Yahoo, iCloud, UOL, BOL and Terra work with a password or an app password.</string>
+    <string name="people_photo">add / change photo</string>
+    <string name="people_photo_choose">choose from Photos</string>
+    <string name="people_photo_take">take a photo</string>
+    <string name="people_photo_remove">remove photo</string>
 </resources>

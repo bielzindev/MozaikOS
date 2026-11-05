@@ -59,8 +59,11 @@ class ContactWriter(private val context: Context) {
         EditableContact(first, last, phones.distinctBy { it.first }, emails.distinct(), company)
     }
 
-    /** Saves [data] as a new contact (contactId null) or over an existing one. True when done. */
-    suspend fun save(contactId: Long?, data: EditableContact): Boolean = withContext(Dispatchers.IO) {
+    /**
+     * Saves [data] as a new contact (contactId null) or over an existing one. [photo] (a JPEG)
+     * becomes its picture; [removePhoto] takes the picture away. True when done.
+     */
+    suspend fun save(contactId: Long?, data: EditableContact, photo: ByteArray? = null, removePhoto: Boolean = false): Boolean = withContext(Dispatchers.IO) {
         val ops = ArrayList<ContentProviderOperation>()
         val existing = contactId?.let(::rawContactId)
         fun data(mime: String) = if (existing != null) {
@@ -95,7 +98,26 @@ class ContactWriter(private val context: Context) {
         if (data.company.isNotBlank()) {
             ops += data(CommonDataKinds.Organization.CONTENT_ITEM_TYPE).withValue(CommonDataKinds.Organization.COMPANY, data.company.trim()).build()
         }
-        runCatching { resolver.applyBatch(ContactsContract.AUTHORITY, ops); true }.getOrDefault(false)
+        if (removePhoto && existing != null) {
+            ops += ContentProviderOperation.newDelete(ContactsContract.Data.CONTENT_URI)
+                .withSelection("${ContactsContract.Data.RAW_CONTACT_ID} = ? AND ${ContactsContract.Data.MIMETYPE} = ?", arrayOf(existing.toString(), CommonDataKinds.Photo.CONTENT_ITEM_TYPE))
+                .build()
+        }
+        val results = runCatching { resolver.applyBatch(ContactsContract.AUTHORITY, ops) }.getOrNull() ?: return@withContext false
+        val raw = existing ?: results.firstOrNull()?.uri?.let { android.content.ContentUris.parseId(it) }
+        if (photo != null && raw != null) setPhoto(raw, photo)
+        true
+    }
+
+    /** The contact's picture, at full size (Android keeps a small copy for lists itself). */
+    private fun setPhoto(rawContactId: Long, jpeg: ByteArray) {
+        runCatching {
+            val uri = android.net.Uri.withAppendedPath(
+                android.content.ContentUris.withAppendedId(ContactsContract.RawContacts.CONTENT_URI, rawContactId),
+                ContactsContract.RawContacts.DisplayPhoto.CONTENT_DIRECTORY,
+            )
+            resolver.openAssetFileDescriptor(uri, "rw")?.use { fd -> fd.createOutputStream().use { it.write(jpeg) } }
+        }
     }
 
     suspend fun delete(contact: Contact): Boolean = withContext(Dispatchers.IO) {

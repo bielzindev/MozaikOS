@@ -1096,4 +1096,8 @@
     <string name="mail_attach">anexar</string>
     <string name="mail_send_failed">Não foi possível enviar: %1$s</string>
     <string name="mail_oauth_only">%1$s não aceita mais senha em outros apps de e-mail, só o login pela página dela (OAuth). O Mozaik ainda não consegue entrar nessa conta. Gmail, Yahoo, iCloud, UOL, BOL e Terra funcionam com senha ou senha de app.</string>
+    <string name="people_photo">adicionar / trocar foto</string>
+    <string name="people_photo_choose">escolher das fotos</string>
+    <string name="people_photo_take">tirar uma foto</string>
+    <string name="people_photo_remove">remover foto</string>
 </resources>

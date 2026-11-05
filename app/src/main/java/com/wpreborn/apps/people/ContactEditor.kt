@@ -2,6 +2,7 @@ package com.wpreborn.apps.people
 
 import android.Manifest
 import android.provider.ContactsContract.CommonDataKinds.Phone
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -68,6 +70,22 @@ fun ContactEditorPage(contact: Contact?, initialNumber: String? = null, onDelete
     var loaded by remember { mutableStateOf(contact == null) }
     var failed by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
+    // The picture: a new one chosen here, or the contact's own (unless taken away).
+    var newPhoto by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var removePhoto by remember { mutableStateOf(false) }
+    var photoMenu by remember { mutableStateOf(false) }
+    fun usePicture(b: android.graphics.Bitmap?) {
+        b ?: return
+        // A square from the middle, like the phone's contact pictures.
+        val side = minOf(b.width, b.height)
+        val square = android.graphics.Bitmap.createBitmap(b, (b.width - side) / 2, (b.height - side) / 2, side, side)
+        newPhoto = if (side > 720) android.graphics.Bitmap.createScaledBitmap(square, 720, 720, true) else square
+        removePhoto = false
+    }
+    val pickPhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) scope.launch { usePicture(com.wpreborn.core.ui.ImageLoader.full(context, uri, 1440)) }
+    }
+    val takePhoto = androidx.activity.compose.rememberLauncherForActivityResult(androidx.activity.result.contract.ActivityResultContracts.TakePicturePreview()) { b -> usePicture(b) }
     LaunchedEffect(contact?.id) {
         if (contact != null) {
             val e = writer.load(contact.id)
@@ -81,7 +99,8 @@ fun ContactEditorPage(contact: Contact?, initialNumber: String? = null, onDelete
     fun save() {
         if (!perm.granted) { perm.request(); return }
         scope.launch {
-            val ok = writer.save(contact?.id, EditableContact(first, last, phones.toList(), emails.toList(), company))
+            val jpeg = newPhoto?.let { b -> java.io.ByteArrayOutputStream().also { b.compress(android.graphics.Bitmap.CompressFormat.JPEG, 90, it) }.toByteArray() }
+            val ok = writer.save(contact?.id, EditableContact(first, last, phones.toList(), emails.toList(), company), jpeg, removePhoto)
             if (ok) onDone(true) else failed = true
         }
     }
@@ -91,6 +110,19 @@ fun ContactEditorPage(contact: Contact?, initialNumber: String? = null, onDelete
             WpText(stringResource(if (contact == null) R.string.people_new_contact else R.string.people_edit_contact), style = WpType.Header)
             Spacer(Modifier.height(12.dp))
             if (!loaded) return@Column
+            // The picture: tap to choose one from Photos, take one, or take it away.
+            Box(
+                Modifier.size(120.dp).background(Wp.accent).wpClickable { photoMenu = true },
+                contentAlignment = Alignment.Center,
+            ) {
+                val chosen = newPhoto
+                when {
+                    chosen != null -> androidx.compose.foundation.Image(chosen.asImageBitmap(), null, Modifier.fillMaxSize(), contentScale = androidx.compose.ui.layout.ContentScale.Crop)
+                    !removePhoto && contact?.photoUri != null -> com.wpreborn.core.ui.Thumbnail(contact.photoUri, Modifier.fillMaxSize(), sizePx = 360)
+                    else -> WpIcon(WpIcons.Person, tint = androidx.compose.ui.graphics.Color.White, size = 56.dp)
+                }
+            }
+            WpText(stringResource(R.string.people_photo), style = WpType.Small, color = Wp.accent, modifier = Modifier.padding(top = 4.dp).wpClickable { photoMenu = true })
             Label(R.string.people_first_name)
             WpTextBox(first, { first = it }, Modifier.fillMaxWidth())
             Label(R.string.people_last_name)
@@ -127,6 +159,20 @@ fun ContactEditorPage(contact: Contact?, initialNumber: String? = null, onDelete
                 AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { onDone(false) },
             ),
             menuItems = if (contact != null) listOf(AppBarMenuItem(stringResource(R.string.delete)) { confirmDelete = true }) else emptyList(),
+        )
+    }
+    if (photoMenu) {
+        val hasPhoto = newPhoto != null || (!removePhoto && contact?.photoUri != null)
+        com.wpreborn.core.ui.WpContextMenu(
+            items = listOfNotNull(
+                com.wpreborn.core.ui.ContextMenuItem(stringResource(R.string.people_photo_choose)) {
+                    runCatching { pickPhoto.launch(androidx.activity.result.PickVisualMediaRequest(androidx.activity.result.contract.ActivityResultContracts.PickVisualMedia.ImageOnly)) }
+                },
+                com.wpreborn.core.ui.ContextMenuItem(stringResource(R.string.people_photo_take)) { runCatching { takePhoto.launch(null) } },
+                if (hasPhoto) com.wpreborn.core.ui.ContextMenuItem(stringResource(R.string.people_photo_remove)) { newPhoto = null; removePhoto = true } else null,
+            ),
+            anchorY = 300f,
+            onDismiss = { photoMenu = false },
         )
     }
     if (failed) {

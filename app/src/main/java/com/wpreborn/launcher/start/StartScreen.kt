@@ -370,7 +370,9 @@ fun StartScreen(
                                     )
                                     .clipToBounds(),
                             ) {
-                                TileFace(tile, app, inputsFor(tile, app), w, seed = tile.id.hashCode())
+                                androidx.compose.runtime.CompositionLocalProvider(LocalTileColor provides tileColor) {
+                                    TileFace(tile, app, inputsFor(tile, app), w, seed = tile.id.hashCode())
+                                }
                             }
                             if (selected && state.dragId == null) {
                                 EditButton(WpIcons.Unpin, Modifier.align(Alignment.TopEnd).offset(12.dp, (-12).dp)) {

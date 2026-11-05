@@ -35,6 +35,9 @@ import kotlinx.coroutines.withContext
 /** Icon tint chosen for the app whose tile is being drawn (used by built-in live tiles). */
 val LocalTileIconTint = staticCompositionLocalOf<Color?> { null }
 
+/** The colour of the tile being drawn, for faces that paint shades of it (People). */
+val LocalTileColor = staticCompositionLocalOf<Color?> { null }
+
 /** The app's icon settings (per app, by its permanent key). */
 @Composable
 fun rememberIconCustom(app: AppEntry?): IconCustom {

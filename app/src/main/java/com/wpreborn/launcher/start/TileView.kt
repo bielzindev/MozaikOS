@@ -207,11 +207,10 @@ private fun BoxScope.CountTile(icon: androidx.compose.ui.graphics.vector.ImageVe
 }
 
 /**
- * People, after Windows Phone 8.1: a mosaic of small squares, one per contact photo; every
- * square flips on its own, now and then, to another face, so the tile feels alive and keeps
- * the people you talk to in sight. Without a photo a square takes the tile's colour in a
- * lighter or darker shade, so the mosaic still shows (and moves) before any contact has a
- * picture.
+ * People, after Windows Phone 8.1: a mosaic of flat squares, no gaps, in lighter and darker
+ * shades of the tile colour, with some of them showing a contact's picture. One square at a
+ * time flips to something else - a shade, or another contact - so the tile keeps changing.
+ * A contact is never in two squares at once.
  */
 @Composable
 private fun PeopleTile(size: TileSize, faces: List<Uri>, live: Boolean, seed: Int) {
@@ -219,43 +218,73 @@ private fun PeopleTile(size: TileSize, faces: List<Uri>, live: Boolean, seed: In
         Box(Modifier.fillMaxSize()) { IconTile(WpIcons.People, size) }
         return
     }
-    val cols = when (size) {
-        TileSize.Small -> 1
-        TileSize.Medium -> 4
-        TileSize.Wide -> 8
-        TileSize.Large -> 8
+    val cols = when (size) { TileSize.Medium -> 3; else -> 6 }
+    val rows = when (size) { TileSize.Large -> 6; else -> 3 }
+    val n = cols * rows
+    val base = LocalTileColor.current ?: com.wpreborn.core.theme.Wp.accent
+    val shades = remember(base) {
+        listOf(
+            androidx.compose.ui.graphics.lerp(base, Color.White, 0.14f),
+            androidx.compose.ui.graphics.lerp(base, Color.White, 0.28f),
+            androidx.compose.ui.graphics.lerp(base, Color.White, 0.40f),
+            androidx.compose.ui.graphics.lerp(base, Color.Black, 0.10f),
+            androidx.compose.ui.graphics.lerp(base, Color.Black, 0.20f),
+            base,
+        )
     }
-    val rows = when (size) {
-        TileSize.Small -> 1
-        TileSize.Medium, TileSize.Wide -> 4
-        TileSize.Large -> 8
-    }
-    // Faces, with plain shades mixed in (a square flips between a photo and a shade).
-    val pool = remember(faces) {
-        val shades = List(maxOf(3, faces.size / 2)) { null }
-        val out = ArrayList<Uri?>()
-        val f = faces.iterator()
-        val s = shades.iterator()
-        while (f.hasNext() || s.hasNext()) {
-            if (f.hasNext()) out += f.next()
-            if (s.hasNext()) out += s.next()
+    val people = remember(faces) { faces.distinct() }
+    // A cell holds a person (index >= 0) or a shade (-1 - shade index).
+    val cells = remember(n, people, seed) {
+        androidx.compose.runtime.mutableStateListOf<Int>().also { l ->
+            val rnd = kotlin.random.Random(seed)
+            val photoCells = (0 until n).shuffled(rnd).take(minOf(people.size, n / 2)).toSet()
+            val order = people.indices.shuffled(rnd)
+            var next = 0
+            for (i in 0 until n) l += if (i in photoCells) order[next++] else -1 - rnd.nextInt(shades.size)
         }
-        out.mapIndexed { i, u -> u to i }
+    }
+    val angles = remember(n) { List(n) { androidx.compose.animation.core.Animatable(0f) } }
+    androidx.compose.runtime.LaunchedEffect(n, people, seed) {
+        val rnd = kotlin.random.Random(seed * 17 + 3)
+        kotlinx.coroutines.delay(500L + rnd.nextLong(1500))
+        while (true) {
+            val i = rnd.nextInt(n)
+            angles[i].animateTo(90f, androidx.compose.animation.core.tween(260))
+            val shown = cells.filter { it >= 0 }.toSet()
+            val free = people.indices.filter { it !in shown }
+            val photos = shown.size
+            val cur = cells[i]
+            cells[i] = when {
+                // A person goes back to a shade, or makes room for someone else.
+                cur >= 0 -> if (free.isEmpty() || rnd.nextInt(5) < 3) -1 - rnd.nextInt(shades.size) else free.random(rnd)
+                free.isNotEmpty() && photos < n / 2 && rnd.nextInt(100) < 55 -> free.random(rnd)
+                else -> {
+                    var s = -1 - rnd.nextInt(shades.size)
+                    if (s == cur) s = -1 - ((-1 - cur + 1) % shades.size)
+                    s
+                }
+            }
+            angles[i].snapTo(-90f)
+            angles[i].animateTo(0f, androidx.compose.animation.core.tween(320))
+            kotlinx.coroutines.delay(600L + rnd.nextLong(1400))
+        }
     }
     Column(Modifier.fillMaxSize()) {
         for (r in 0 until rows) {
             Row(Modifier.weight(1f).fillMaxWidth()) {
                 for (c in 0 until cols) {
                     val i = r * cols + c
-                    Box(Modifier.weight(1f).fillMaxHeight().padding(0.5.dp)) {
-                        FlippingCell(pool, (i * 5) % pool.size, seed * 31 + i, live) { (uri, n) ->
-                            if (uri != null) {
-                                Thumbnail(uri, Modifier.fillMaxSize(), sizePx = 128)
-                            } else {
-                                // A shade of the tile colour: white at 8 to 32 percent.
-                                val a = 0.08f + ((n + i) % 4) * 0.08f
-                                Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = a)))
-                            }
+                    Box(
+                        Modifier.weight(1f).fillMaxHeight().graphicsLayer {
+                            rotationX = angles[i].value
+                            cameraDistance = 12f * density
+                        },
+                    ) {
+                        val v = cells[i]
+                        if (v >= 0 && v < people.size) {
+                            Thumbnail(people[v], Modifier.fillMaxSize(), sizePx = 256)
+                        } else {
+                            Box(Modifier.fillMaxSize().background(shades[(-1 - v).coerceIn(0, shades.lastIndex)]))
                         }
                     }
                 }

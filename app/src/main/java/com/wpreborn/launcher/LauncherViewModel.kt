@@ -183,7 +183,8 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
             val events = if (ctx.hasPermissions(Perms.CALENDAR)) CalendarRepository(ctx).upcoming(days = 14, max = 3) else emptyList()
             val photos = if (ctx.hasPermissions(Perms.IMAGES)) PhotoLibrary(ctx).load(limit = 24).map { it.uri } else emptyList()
             val faces = if (ctx.hasPermissions(Perms.CONTACTS)) {
-                ContactsRepository(ctx).all().mapNotNull { it.thumbUri }.shuffled().take(18)
+                // The full photo (the thumbnail is only 96 px and looks soft on a tile), one per person.
+                ContactsRepository(ctx).all().mapNotNull { it.photoUri ?: it.thumbUri }.distinct().shuffled().take(24)
             } else {
                 emptyList()
             }

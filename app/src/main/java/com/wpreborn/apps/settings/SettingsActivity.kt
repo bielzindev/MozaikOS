@@ -79,7 +79,7 @@ import com.wpreborn.permissions.canWriteSettings
 import com.wpreborn.permissions.overlayIntent
 import com.wpreborn.permissions.writeSettingsIntent
 
-private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher, Sounds, Battery, Wifi }
+private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher, Sounds, Battery, Wifi, Glance }
 
 /**
  * Settings, laid out like Windows Phone 8.1 ("system" and "applications" pivots). Launcher
@@ -101,7 +101,7 @@ class SettingsActivity : WpActivity() {
                 SettingsPage.Home -> SettingsHome { nav.navigate(it) }
                 SettingsPage.StartTheme -> StartThemePage { nav.navigate(SettingsPage.Accent) }
                 SettingsPage.Accent -> AccentPage { nav.pop() }
-                SettingsPage.LockScreen -> LockScreenPage()
+                SettingsPage.LockScreen -> LockScreenPage { nav.navigate(SettingsPage.Glance) }
                 SettingsPage.Notifications -> NotificationsPage()
                 SettingsPage.Display -> DisplayPage()
                 SettingsPage.Storage -> StoragePage()
@@ -110,6 +110,7 @@ class SettingsActivity : WpActivity() {
                 SettingsPage.Sounds -> SoundsPage()
                 SettingsPage.Battery -> BatteryPage()
                 SettingsPage.Wifi -> WifiPage()
+                SettingsPage.Glance -> GlancePage()
             }
         }
     }
@@ -351,7 +352,7 @@ private fun AccentPage(onPicked: () -> Unit) {
 }
 
 @Composable
-private fun LockScreenPage() {
+private fun LockScreenPage(onGlance: () -> Unit) {
     val context = LocalContext.current
     val repo = remember { SettingsRepository.get(context) }
     val settings = Wp.settings
@@ -379,15 +380,18 @@ private fun LockScreenPage() {
         WpToggle(stringResource(R.string.lock_photos), settings.lockPhotos, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setLockPhotos(it)
         }
-        WpToggle(stringResource(R.string.glance_title), settings.glance, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
-            repo.setGlance(it)
-            if (it && !context.canDrawOverlays()) {
-                runCatching {
-                    context.startActivity(android.content.Intent(android.provider.Settings.ACTION_MANAGE_OVERLAY_PERMISSION, android.net.Uri.parse("package:" + context.packageName)))
-                }
-            }
-        }
-        WpText(stringResource(R.string.glance_info), style = WpType.Small, color = Wp.palette.subtle)
+        WpListItem(
+            stringResource(R.string.glance_title),
+            subtitle = stringResource(
+                when {
+                    !settings.glance -> R.string.glance_mode_off
+                    settings.glanceOptions.peek -> R.string.glance_mode_peek
+                    else -> R.string.glance_mode_always
+                },
+            ),
+            titleStyle = WpType.Large,
+            onClick = onGlance,
+        )
         Spacer(Modifier.height(12.dp))
         WpText(stringResource(R.string.lock_background), style = WpType.Subtle, color = Wp.palette.subtle)
         settings.lockWallpaper?.let {

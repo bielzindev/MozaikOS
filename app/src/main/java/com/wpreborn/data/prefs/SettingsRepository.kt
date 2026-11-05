@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.wpreborn.core.theme.AccentColor
@@ -50,9 +51,33 @@ data class WpSettings(
     val smallTilesRow: Boolean = false,
     /** Lumia glance screen (always on display) while the screen is off. */
     val glance: Boolean = false,
+    /** Lumia glance options (Settings > lock screen > glance screen). */
+    val glanceOptions: GlanceOptions = GlanceOptions(),
     /** Mozaik apps open with their splash screen (colour and glyph), as on Windows Phone. */
     val splash: Boolean = true,
     val firstRunDone: Boolean = false,
+)
+
+/**
+ * The Lumia glance screen settings. [peek]: shown for a moment when a hand waves over the
+ * sensor or the phone comes out of a pocket, instead of always on. [timeout]: on battery it goes
+ * off after 15 minutes. [color]: accent, white, red, green or blue. Night mode from [nightFrom]
+ * to [nightTo] (minutes of the day) shows it in [nightColor] (red, green, blue) or "hidden".
+ * [background]: the lock screen picture, dimmed. [detail]: the detailed status at the top
+ * (weather, calendar, music or none). [icons]: notification icons; [battery]: battery level.
+ */
+data class GlanceOptions(
+    val peek: Boolean = false,
+    val timeout: Boolean = true,
+    val color: String = "accent",
+    val night: Boolean = false,
+    val nightFrom: Int = 23 * 60,
+    val nightTo: Int = 7 * 60,
+    val nightColor: String = "red",
+    val background: Boolean = false,
+    val detail: String = "weather",
+    val icons: Boolean = true,
+    val battery: Boolean = false,
 )
 
 class SettingsRepository private constructor(private val context: Context) {
@@ -91,6 +116,19 @@ class SettingsRepository private constructor(private val context: Context) {
     fun setLiveTiles(value: Boolean) = update { it[LIVE_TILES] = value }
     fun setSmallTilesRow(value: Boolean) = update { it[SMALL_ROW] = value }
     fun setGlance(value: Boolean) = update { it[GLANCE] = value }
+    fun setGlanceOptions(o: GlanceOptions) = update {
+        it[G_PEEK] = o.peek
+        it[G_TIMEOUT] = o.timeout
+        it[G_COLOR] = o.color
+        it[G_NIGHT] = o.night
+        it[G_NIGHT_FROM] = o.nightFrom
+        it[G_NIGHT_TO] = o.nightTo
+        it[G_NIGHT_COLOR] = o.nightColor
+        it[G_BG] = o.background
+        it[G_DETAIL] = o.detail
+        it[G_ICONS] = o.icons
+        it[G_BATTERY] = o.battery
+    }
     fun setSplash(value: Boolean) = update { it[SPLASH] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
@@ -111,6 +149,19 @@ class SettingsRepository private constructor(private val context: Context) {
         liveTiles = this[LIVE_TILES] ?: true,
         smallTilesRow = this[SMALL_ROW] ?: false,
         glance = this[GLANCE] ?: false,
+        glanceOptions = GlanceOptions(
+            peek = this[G_PEEK] ?: false,
+            timeout = this[G_TIMEOUT] ?: true,
+            color = this[G_COLOR] ?: "accent",
+            night = this[G_NIGHT] ?: false,
+            nightFrom = this[G_NIGHT_FROM] ?: 23 * 60,
+            nightTo = this[G_NIGHT_TO] ?: 7 * 60,
+            nightColor = this[G_NIGHT_COLOR] ?: "red",
+            background = this[G_BG] ?: false,
+            detail = this[G_DETAIL] ?: "weather",
+            icons = this[G_ICONS] ?: true,
+            battery = this[G_BATTERY] ?: false,
+        ),
         splash = this[SPLASH] ?: true,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
@@ -132,6 +183,17 @@ class SettingsRepository private constructor(private val context: Context) {
         private val LIVE_TILES = booleanPreferencesKey("live_tiles")
         private val SMALL_ROW = booleanPreferencesKey("small_tiles_row")
         private val GLANCE = booleanPreferencesKey("glance")
+        private val G_PEEK = booleanPreferencesKey("glance_peek")
+        private val G_TIMEOUT = booleanPreferencesKey("glance_timeout")
+        private val G_COLOR = stringPreferencesKey("glance_color")
+        private val G_NIGHT = booleanPreferencesKey("glance_night")
+        private val G_NIGHT_FROM = intPreferencesKey("glance_night_from")
+        private val G_NIGHT_TO = intPreferencesKey("glance_night_to")
+        private val G_NIGHT_COLOR = stringPreferencesKey("glance_night_color")
+        private val G_BG = booleanPreferencesKey("glance_background")
+        private val G_DETAIL = stringPreferencesKey("glance_detail")
+        private val G_ICONS = booleanPreferencesKey("glance_icons")
+        private val G_BATTERY = booleanPreferencesKey("glance_battery")
         private val SPLASH = booleanPreferencesKey("splash")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 

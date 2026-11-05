@@ -192,7 +192,7 @@ class LockActivity : ComponentActivity() {
             androidx.core.content.ContextCompat.registerReceiver(
                 context.applicationContext,
                 object : BroadcastReceiver() {
-                    override fun onReceive(c: Context, intent: Intent) = Glance.onScreenOn()
+                    override fun onReceive(c: Context, intent: Intent) = Glance.onScreenOn(c)
                 },
                 IntentFilter(Intent.ACTION_SCREEN_ON),
                 androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED,

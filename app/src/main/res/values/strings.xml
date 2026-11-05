@@ -932,4 +932,14 @@
         <item quantity="one">%d missed call</item>
         <item quantity="other">%d missed calls</item>
     </plurals>
+    <string name="call_add">add call</string>
+    <string name="call_message">message</string>
+    <string name="call_text_reply">text reply</string>
+    <string name="files_phone">Phone</string>
+    <string name="files_root">files</string>
+    <string name="files_used">%1$s used</string>
+    <string name="files_free">%1$s free</string>
+    <string name="files_create_folder_title">create a new folder</string>
+    <string name="files_folder_name">Folder name</string>
+    <string name="files_new_folder_default">New folder</string>
 </resources>

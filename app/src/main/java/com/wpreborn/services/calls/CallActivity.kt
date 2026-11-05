@@ -88,13 +88,42 @@ class CallActivity : ComponentActivity() {
     }
 }
 
+/** Who is calling: name, picture and the kind of number ("Mobile"), from the contacts. */
+private data class Caller(val name: String, val photo: android.net.Uri?, val type: String)
+
+private fun lookup(context: android.content.Context, number: String): Caller? {
+    if (number.isBlank()) return null
+    return runCatching {
+        val uri = android.net.Uri.withAppendedPath(android.provider.ContactsContract.PhoneLookup.CONTENT_FILTER_URI, android.net.Uri.encode(number))
+        context.contentResolver.query(
+            uri,
+            arrayOf(
+                android.provider.ContactsContract.PhoneLookup.DISPLAY_NAME,
+                android.provider.ContactsContract.PhoneLookup.PHOTO_URI,
+                android.provider.ContactsContract.PhoneLookup.TYPE,
+                android.provider.ContactsContract.PhoneLookup.LABEL,
+            ),
+            null, null, null,
+        )?.use { c ->
+            if (!c.moveToFirst()) return@use null
+            val type = android.provider.ContactsContract.CommonDataKinds.Phone.getTypeLabel(context.resources, c.getInt(2), c.getString(3)).toString()
+            Caller(c.getString(0).orEmpty(), c.getString(1)?.let(android.net.Uri::parse), type)
+        }
+    }.getOrNull()
+}
+
+/**
+ * The Windows Phone 8.1 call screen: time (in the accent colour) and network at the top, the
+ * name in very large light type and "Mobile: number" under it, over the caller's picture
+ * when there is one; at the bottom a grid of dark squares (speaker, mute, Bluetooth / hold,
+ * add call, message) and a row with "end call" in the accent colour and the keypad.
+ */
 @Composable
 private fun CallScreen(onProximity: (Boolean) -> Unit, onFinish: () -> Unit) {
     val context = LocalContext.current
     val calls by CallManager.state.collectAsState()
     val audio by CallManager.audio.collectAsState()
     val call = calls.firstOrNull { it.ringing } ?: calls.firstOrNull { !it.holding && !it.ended } ?: calls.firstOrNull()
-    // Gone: a moment of "call ended", then close.
     var lastNumber by remember { mutableStateOf("") }
     if (call != null) lastNumber = call.number
     LaunchedEffect(call == null || call.ended) {
@@ -104,37 +133,31 @@ private fun CallScreen(onProximity: (Boolean) -> Unit, onFinish: () -> Unit) {
         }
     }
     val number = call?.number ?: lastNumber
-    val contact by produceState<Pair<String, android.net.Uri?>?>(null, number) {
-        value = withContext(Dispatchers.IO) { runCatching { ContactsRepository(context).lookupNumber(number) }.getOrNull() }
-    }
+    val caller by produceState<Caller?>(null, number) { value = withContext(Dispatchers.IO) { lookup(context, number) } }
+    val carrier = remember { runCatching { context.getSystemService(android.telephony.TelephonyManager::class.java)?.networkOperatorName }.getOrNull().orEmpty() }
     val speaker = audio?.route == android.telecom.CallAudioState.ROUTE_SPEAKER
+    val bluetooth = audio?.route == android.telecom.CallAudioState.ROUTE_BLUETOOTH
+    val btAvailable = ((audio?.supportedRouteMask ?: 0) and android.telecom.CallAudioState.ROUTE_BLUETOOTH) != 0
     val muted = audio?.isMuted == true
-    LaunchedEffect(call?.active == true, speaker) { onProximity(call?.active == true && !speaker) }
+    LaunchedEffect(call?.active == true, speaker, bluetooth) { onProximity(call?.active == true && !speaker && !bluetooth) }
     var keypad by remember { mutableStateOf(false) }
     var typed by remember { mutableStateOf("") }
     var now by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(call?.connectedAt) {
+    LaunchedEffect(Unit) {
         while (true) {
             now = System.currentTimeMillis()
             delay(500)
         }
     }
+    val dark = Color(0xFF333333)
 
-    val bg = lerp(Wp.accent, Color.Black, 0.35f)
-    Box(Modifier.fillMaxSize().background(bg)) {
-        // The caller's picture fills the top, fading into the colour below.
-        contact?.second?.let { photo ->
-            Box(Modifier.fillMaxWidth().aspectRatio(1f)) {
-                Thumbnail(photo, Modifier.fillMaxSize(), sizePx = 720, contentScale = ContentScale.Crop)
-                Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0.45f to Color.Transparent, 1f to bg)))
-            }
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        caller?.photo?.let { photo ->
+            Thumbnail(photo, Modifier.fillMaxSize(), sizePx = 1080, contentScale = ContentScale.Crop)
+            Box(Modifier.fillMaxSize().background(Brush.verticalGradient(0f to Color.Black.copy(alpha = 0.55f), 0.35f to Color.Transparent)))
         }
         Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
-            Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp)) {
-                WpText(stringResource(R.string.app_phone).uppercase(), style = WpType.AppTitle, color = Color.White)
-            }
-            Spacer(Modifier.weight(1f))
-            Column(Modifier.padding(horizontal = 20.dp)) {
+            Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                 val status = when {
                     call == null || call.ended -> stringResource(R.string.call_ended)
                     call.ringing -> stringResource(R.string.call_incoming)
@@ -143,43 +166,73 @@ private fun CallScreen(onProximity: (Boolean) -> Unit, onFinish: () -> Unit) {
                     call.connectedAt > 0 -> duration(now - call.connectedAt)
                     else -> ""
                 }
-                WpText(status, style = WpType.Large, color = Color.White.copy(alpha = 0.85f))
+                WpText(status, style = WpType.Normal, color = Wp.accent, modifier = Modifier.weight(1f))
+                WpText(carrier, style = WpType.Normal, color = Color.White, maxLines = 1)
+            }
+            Column(Modifier.padding(start = 20.dp, end = 20.dp)) {
                 WpText(
-                    contact?.first ?: number.ifBlank { stringResource(R.string.call_unknown) },
-                    style = WpType.Header.copy(fontSize = 46.sp, lineHeight = 52.sp, fontWeight = FontWeight.Light),
+                    caller?.name?.ifBlank { null } ?: number.ifBlank { stringResource(R.string.call_unknown) },
+                    style = WpType.Header.copy(fontSize = 54.sp, lineHeight = 60.sp, fontWeight = FontWeight.Light),
                     color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
-                if (contact != null && number.isNotBlank()) {
-                    WpText(number, style = WpType.Large, color = Color.White.copy(alpha = 0.8f), maxLines = 1)
+                if (number.isNotBlank()) {
+                    WpText(
+                        if (caller != null) "${caller?.type}: $number" else number,
+                        style = WpType.Normal, color = Color.White, maxLines = 1,
+                    )
                 }
                 if (keypad && typed.isNotEmpty()) {
                     WpText(typed, style = WpType.Large, color = Color.White, maxLines = 1, modifier = Modifier.padding(top = 6.dp))
                 }
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.weight(1f))
+            val gap = 3.dp
             if (call != null && call.ringing) {
-                Bar(stringResource(R.string.call_answer), Color(0xFF60A917)) { CallManager.answer(call.call) }
-                Bar(stringResource(R.string.call_decline), Color(0xFFE51400)) { CallManager.reject(call.call) }
-            } else {
-                if (keypad && call != null) {
-                    Keypad { d -> typed += d; CallManager.tone(call.call, d) }
-                } else {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Square(WpIcons.Speaker, stringResource(R.string.call_speaker), speaker, Modifier.weight(1f)) { CallManager.toggleSpeaker() }
-                        Square(WpIcons.Mute, stringResource(R.string.call_mute), muted, Modifier.weight(1f)) { CallManager.toggleMute() }
-                        Square(WpIcons.Pause, stringResource(R.string.call_hold), call?.holding == true, Modifier.weight(1f), enabled = call?.canHold == true || call?.holding == true) {
-                            call?.let { CallManager.toggleHold(it) }
-                        }
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    Bar(stringResource(R.string.call_text_reply), dark) {
+                        com.wpreborn.apps.phone.PhoneActivity.text(context, call.number)
+                        CallManager.reject(call.call)
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                        Bar(stringResource(R.string.call_answer), Wp.accent, Modifier.weight(1f)) { CallManager.answer(call.call) }
+                        Bar(stringResource(R.string.call_decline), dark, Modifier.weight(1f)) { CallManager.reject(call.call) }
                     }
                 }
-                Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Square(WpIcons.Keypad, stringResource(R.string.call_keypad), keypad, Modifier.weight(1f)) { keypad = !keypad }
-                    Box(
-                        Modifier.weight(2f).height(72.dp).background(Color(0xFFE51400)).wpClickable { call?.let { CallManager.hangUp(it.call) } ?: onFinish() },
-                        contentAlignment = Alignment.Center,
-                    ) { WpText(stringResource(R.string.call_end), style = WpType.Large, color = Color.White) }
+            } else {
+                Column(verticalArrangement = Arrangement.spacedBy(gap)) {
+                    if (keypad && call != null) {
+                        Keypad(dark) { d -> typed += d; CallManager.tone(call.call, d) }
+                    } else {
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                            Square(WpIcons.Speaker, stringResource(R.string.call_speaker), speaker, dark, Modifier.weight(1f)) { CallManager.toggleSpeaker() }
+                            Square(WpIcons.Mute, stringResource(R.string.call_mute), muted, dark, Modifier.weight(1f)) { CallManager.toggleMute() }
+                            Square(WpIcons.Bluetooth, "Bluetooth", bluetooth, dark, Modifier.weight(1f), enabled = btAvailable) { CallManager.toggleBluetooth() }
+                        }
+                        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                            Square(WpIcons.Pause, stringResource(R.string.call_hold), call?.holding == true, dark, Modifier.weight(1f), enabled = call?.canHold == true || call?.holding == true) {
+                                call?.let { CallManager.toggleHold(it) }
+                            }
+                            Square(WpIcons.Add, stringResource(R.string.call_add), false, dark, Modifier.weight(1f), enabled = call?.active == true) {
+                                runCatching {
+                                    context.startActivity(
+                                        android.content.Intent(android.content.Intent.ACTION_DIAL).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+                                            .setClass(context, com.wpreborn.apps.phone.PhoneActivity::class.java),
+                                    )
+                                }
+                            }
+                            Square(WpIcons.Messaging, stringResource(R.string.call_message), false, dark, Modifier.weight(1f), enabled = number.isNotBlank()) {
+                                com.wpreborn.apps.phone.PhoneActivity.text(context, number)
+                            }
+                        }
+                    }
+                    Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+                        Bar(stringResource(R.string.call_end), Wp.accent, Modifier.weight(2f)) { call?.let { CallManager.hangUp(it.call) } ?: onFinish() }
+                        Box(
+                            Modifier.weight(1f).height(72.dp).background(if (keypad) Wp.accent else dark).wpClickable { keypad = !keypad },
+                            contentAlignment = Alignment.Center,
+                        ) { WpIcon(WpIcons.Keypad, tint = Color.White, size = 26.dp) }
+                    }
                 }
-                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -187,51 +240,54 @@ private fun CallScreen(onProximity: (Boolean) -> Unit, onFinish: () -> Unit) {
 
 private fun duration(ms: Long): String {
     val s = (ms / 1000).coerceAtLeast(0)
-    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
+    return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s / 60 % 60, s % 60) else "%02d:%02d".format(s / 60, s % 60)
 }
 
 @Composable
-private fun Bar(label: String, color: Color, onClick: () -> Unit) {
+private fun Bar(label: String, color: Color, modifier: Modifier = Modifier.fillMaxWidth(), onClick: () -> Unit) {
     Box(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 8.dp).height(64.dp).background(color).wpClickable(onClick = onClick),
+        modifier.height(72.dp).background(color).wpClickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) { WpText(label, style = WpType.Large, color = Color.White) }
 }
 
-/** A square call button: glyph and label, filled with the accent while on. */
+/** A call button: the glyph with its name under it, centred; filled with the accent while on. */
 @Composable
 private fun Square(
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     label: String,
     on: Boolean,
+    color: Color,
     modifier: Modifier,
     enabled: Boolean = true,
     onClick: () -> Unit,
 ) {
+    val fg = if (enabled) Color.White else Color.White.copy(alpha = 0.35f)
     Column(
         modifier
-            .height(72.dp)
-            .background(if (on) Wp.accent else Color.White.copy(alpha = 0.12f))
-            .wpClickable(enabled = enabled, onClick = onClick)
-            .padding(8.dp),
-        verticalArrangement = Arrangement.SpaceBetween,
+            .height(76.dp)
+            .background(if (on) Wp.accent else color)
+            .wpClickable(enabled = enabled, onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
     ) {
-        WpIcon(icon, tint = if (enabled) Color.White else Color.White.copy(alpha = 0.4f), size = 24.dp)
-        WpText(label, style = WpType.Small, color = if (enabled) Color.White else Color.White.copy(alpha = 0.4f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        WpIcon(icon, tint = fg, size = 22.dp)
+        Spacer(Modifier.height(6.dp))
+        WpText(label, style = WpType.Small, color = fg, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
-/** Keypad tones during a call (menus, codes). */
+/** Keypad tones during a call (menus, codes), in the same dark squares. */
 @Composable
-private fun Keypad(onDigit: (Char) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+private fun Keypad(color: Color, onDigit: (Char) -> Unit) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(3.dp)) {
         listOf("123", "456", "789", "*0#").forEach { row ->
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(3.dp)) {
                 row.forEach { d ->
                     Box(
-                        Modifier.weight(1f).height(52.dp).background(Color.White.copy(alpha = 0.12f)).wpClickable { onDigit(d) },
+                        Modifier.weight(1f).height(58.dp).background(color).wpClickable { onDigit(d) },
                         contentAlignment = Alignment.Center,
-                    ) { WpText(d.toString(), style = WpType.Large.copy(fontSize = 26.sp), color = Color.White) }
+                    ) { WpText(d.toString(), style = WpType.Large.copy(fontSize = 28.sp, fontWeight = FontWeight.Light), color = Color.White) }
                 }
             }
         }

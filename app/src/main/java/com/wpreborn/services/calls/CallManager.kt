@@ -100,6 +100,13 @@ object CallManager {
         service?.setAudioRoute(if (speaker) CallAudioState.ROUTE_WIRED_OR_EARPIECE else CallAudioState.ROUTE_SPEAKER)
     }
 
+    val supportsBluetooth get() = (_audio.value?.supportedRouteMask ?: 0) and CallAudioState.ROUTE_BLUETOOTH != 0
+
+    @Suppress("DEPRECATION")
+    fun toggleBluetooth() {
+        service?.setAudioRoute(if (bluetooth) CallAudioState.ROUTE_WIRED_OR_EARPIECE else CallAudioState.ROUTE_BLUETOOTH)
+    }
+
     fun tone(c: Call, digit: Char) {
         c.playDtmfTone(digit)
         c.stopDtmfTone()

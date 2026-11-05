@@ -933,4 +933,14 @@
         <item quantity="one">%d chamada perdida</item>
         <item quantity="other">%d chamadas perdidas</item>
     </plurals>
+    <string name="call_add">adicionar</string>
+    <string name="call_message">mensagem</string>
+    <string name="call_text_reply">responder por SMS</string>
+    <string name="files_phone">Telefone</string>
+    <string name="files_root">arquivos</string>
+    <string name="files_used">%1$s usados</string>
+    <string name="files_free">%1$s livres</string>
+    <string name="files_create_folder_title">criar uma nova pasta</string>
+    <string name="files_folder_name">Nome da pasta</string>
+    <string name="files_new_folder_default">Nova pasta</string>
 </resources>

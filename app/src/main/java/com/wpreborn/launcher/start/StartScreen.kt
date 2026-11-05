@@ -341,13 +341,27 @@ fun StartScreen(
                                 suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.dragLoop() {
                                     var dragging = false
                                     var total = Offset.Zero
-                                    // Held still over the middle of another tile: a folder.
+                                    // The tile under the finger and how long it has been there. Held
+                                    // over its middle: a folder; resting near its edges: the tiles move.
                                     var hoverId: String? = null
                                     var hoverSince = 0L
+                                    var inCenter = false
+                                    var edgeSince = 0L
+                                    var movedHere = false
+                                    fun settle(now: Long) {
+                                        val id = hoverId ?: return
+                                        if (inCenter) {
+                                            if (now - hoverSince > 600) state.mergeTargetId = id
+                                        } else if (!movedHere && edgeSince > 0 && now - edgeSince > 180) {
+                                            val over = currentTiles.indexOfFirst { it.id == id }
+                                            if (over >= 0) currentOnMove(tile.id, over, false)
+                                            movedHere = true
+                                        }
+                                    }
                                     while (true) {
-                                        val ev = withTimeoutOrNull(80) { awaitPointerEvent() }
+                                        val ev = withTimeoutOrNull(60) { awaitPointerEvent() }
                                         if (ev == null) {
-                                            if (dragging && hoverId != null && System.currentTimeMillis() - hoverSince > 650) state.mergeTargetId = hoverId
+                                            if (dragging) settle(System.currentTimeMillis())
                                             continue
                                         }
                                         val ch: PointerInputChange = ev.changes.firstOrNull { it.id == down.id } ?: break
@@ -364,28 +378,36 @@ fun StartScreen(
                                         if (dragging) {
                                             ch.consume()
                                             dragPointerViewport = Offset(ch.position.x, ch.position.y - state.scroll.value)
+                                            val now = System.currentTimeMillis()
                                             val over = tileAt(ch.position)
                                             val r = if (over >= 0 && currentTiles[over].id != tile.id) rectOf(over) else null
-                                            if (r != null) {
-                                                // The middle of a tile: hold to make a folder; its edges: move there.
-                                                val inner = Rect(r.left + r.width * 0.22f, r.top + r.height * 0.22f, r.right - r.width * 0.22f, r.bottom - r.height * 0.22f)
-                                                if (!tile.isFolder && inner.contains(ch.position)) {
-                                                    val id = currentTiles[over].id
-                                                    if (hoverId != id) {
-                                                        hoverId = id
-                                                        hoverSince = System.currentTimeMillis()
-                                                        state.mergeTargetId = null
-                                                    } else if (System.currentTimeMillis() - hoverSince > 650) {
-                                                        state.mergeTargetId = id
-                                                    }
-                                                } else {
-                                                    hoverId = null
-                                                    state.mergeTargetId = null
-                                                    currentOnMove(tile.id, over, false)
-                                                }
-                                            } else {
+                                            if (r == null) {
                                                 hoverId = null
+                                                inCenter = false
                                                 state.mergeTargetId = null
+                                            } else {
+                                                val id = currentTiles[over].id
+                                                if (hoverId != id) {
+                                                    hoverId = id
+                                                    hoverSince = now
+                                                    edgeSince = 0L
+                                                    movedHere = false
+                                                    state.mergeTargetId = null
+                                                }
+                                                val mx = r.width * 0.2f
+                                                val my = r.height * 0.2f
+                                                val center = !tile.isFolder && Rect(r.left + mx, r.top + my, r.right - mx, r.bottom - my).contains(ch.position)
+                                                if (center != inCenter) {
+                                                    inCenter = center
+                                                    if (center) {
+                                                        hoverSince = now
+                                                    } else {
+                                                        edgeSince = now
+                                                        state.mergeTargetId = null
+                                                    }
+                                                }
+                                                if (!center && edgeSince == 0L) edgeSince = now
+                                                settle(now)
                                             }
                                         }
                                     }
@@ -400,6 +422,8 @@ fun StartScreen(
                                             state.openFolderId = fid
                                             state.renamingFolder = true
                                         } else {
+                                            // Let go over a tile without holding: take its place.
+                                            hoverId?.let { id -> currentTiles.indexOfFirst { it.id == id }.takeIf { it >= 0 } }?.let { currentOnMove(tile.id, it, false) }
                                             currentOnMove(tile.id, currentTiles.indexOfFirst { it.id == tile.id }, true)
                                         }
                                     }

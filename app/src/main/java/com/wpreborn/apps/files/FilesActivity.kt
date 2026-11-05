@@ -13,6 +13,8 @@ import android.webkit.MimeTypeMap
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -170,6 +172,7 @@ private fun FilesScreen() {
     var confirmDelete by remember { mutableStateOf<List<File>?>(null) }
     var info by remember { mutableStateOf<File?>(null) }
     var filter by remember { mutableStateOf<String?>(null) }
+    var creating by remember { mutableStateOf(false) }
 
     BackHandler(enabled = selected != null || filter != null || stack.isNotEmpty()) {
         when {
@@ -253,16 +256,29 @@ private fun FilesScreen() {
 
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.padding(start = 20.dp, top = 14.dp, end = 20.dp)) {
-            WpText(stringResource(R.string.app_files).uppercase(), style = WpType.AppTitle)
+            // The path as on Windows Phone: "\\ phone \ documents \", in the accent colour.
+            val phone = stringResource(R.string.files_phone)
+            val crumbs = remember(current) {
+                val root = Environment.getExternalStorageDirectory().absolutePath
+                current?.absolutePath?.let { p ->
+                    val rel = if (p.startsWith(root)) listOf(phone) + p.removePrefix(root).split('/').filter { it.isNotEmpty() } else p.split('/').filter { it.isNotEmpty() }
+                    rel.dropLast(1)
+                }.orEmpty()
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WpIcon(WpIcons.Phone, tint = Wp.accent, size = 18.dp)
+                Spacer(Modifier.width(6.dp))
+                WpText(
+                    "\\\\ " + crumbs.joinToString("") { "$it \\ " },
+                    style = WpType.Large.copy(fontSize = 19.sp), color = Wp.accent, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
             WpText(
-                (current?.name ?: stringResource(R.string.files_this_phone)).lowercase(),
+                (current?.name?.let { if (current.absolutePath == Environment.getExternalStorageDirectory().absolutePath) phone else it } ?: stringResource(R.string.files_root)).lowercase(),
                 style = WpType.Header,
                 maxLines = 1,
                 softWrap = false,
             )
-            if (current != null) {
-                WpText(current.absolutePath, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
             filter?.let { q ->
                 WpTextBox(q, { filter = it }, Modifier.fillMaxWidth().padding(top = 6.dp), placeholder = stringResource(R.string.files_search))
             }
@@ -307,20 +323,22 @@ private fun FilesScreen() {
                                 ) { if (checked) WpIcon(WpIcons.Check, tint = Color.White, size = 18.dp) }
                                 Spacer(Modifier.width(12.dp))
                             }
-                            Box(Modifier.size(48.dp).background(if (f.isDirectory) Wp.accent else Wp.palette.raised), contentAlignment = Alignment.Center) {
-                                WpIcon(iconFor(f), tint = if (f.isDirectory) Color.White else Wp.palette.foreground, size = 26.dp)
-                            }
-                            Spacer(Modifier.width(12.dp))
-                            Column(Modifier.weight(1f)) {
-                                WpText(f.name, style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                val date = DateFormat.getDateFormat(context).format(Date(f.lastModified()))
-                                val sub = if (f.isDirectory) {
-                                    val n = f.list()?.size ?: 0
-                                    context.resources.getQuantityString(R.plurals.files_items, n, n) + " · " + date
+                            // Folders: an accent square with the number of items; files: a grey
+                            // square with the kind of file, like the Files app of Windows Phone.
+                            Box(Modifier.size(84.dp).background(if (f.isDirectory) Wp.accent else Wp.palette.raised)) {
+                                if (f.isDirectory) {
+                                    val n = remember(f, reload) { f.list()?.size ?: 0 }
+                                    WpText(n.toString(), style = WpType.Large, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 4.dp))
                                 } else {
-                                    Formatter.formatShortFileSize(context, f.length()) + " · " + date
+                                    WpIcon(iconFor(f), Modifier.align(Alignment.Center), tint = Wp.palette.foreground, size = 36.dp)
                                 }
-                                WpText(sub, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+                            }
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                WpText(f.name, style = WpType.Large.copy(fontSize = 24.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                val d = Date(f.lastModified())
+                                WpText(DateFormat.getDateFormat(context).format(d) + " " + DateFormat.getTimeFormat(context).format(d), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
+                                if (!f.isDirectory) WpText(Formatter.formatShortFileSize(context, f.length()), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
                             }
                         }
                     }
@@ -330,15 +348,15 @@ private fun FilesScreen() {
         val sel = selected
         when {
             sel != null -> WpAppBar(
+                // Delete, move, copy and share, as on Windows Phone.
                 buttons = listOf(
-                    AppBarButton(WpIcons.Share, stringResource(R.string.share), enabled = sel.any { it.isFile }) { share(sel.toList()); selected = null },
                     AppBarButton(WpIcons.Delete, stringResource(R.string.delete), enabled = sel.isNotEmpty()) { confirmDelete = sel.toList() },
-                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select_all)) { selected = if (sel.size == shown.size) emptySet() else shown.toSet() },
-                    AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { selected = null },
+                    AppBarButton(WpIcons.Folder, stringResource(R.string.files_move), enabled = sel.isNotEmpty()) { clipboard = sel.toList() to true; selected = null },
+                    AppBarButton(Glyphs.Document, stringResource(R.string.files_copy), enabled = sel.isNotEmpty()) { clipboard = sel.toList() to false; selected = null },
+                    AppBarButton(WpIcons.Share, stringResource(R.string.share), enabled = sel.any { it.isFile }) { share(sel.toList()); selected = null },
                 ),
                 menuItems = listOf(
-                    AppBarMenuItem(stringResource(R.string.files_copy), enabled = sel.isNotEmpty()) { clipboard = sel.toList() to false; selected = null },
-                    AppBarMenuItem(stringResource(R.string.files_move), enabled = sel.isNotEmpty()) { clipboard = sel.toList() to true; selected = null },
+                    AppBarMenuItem(stringResource(R.string.photos_select_all)) { selected = if (sel.size == shown.size) emptySet() else shown.toSet() },
                     AppBarMenuItem(stringResource(R.string.files_rename), enabled = sel.size == 1) {
                         val f = sel.first()
                         naming = f.name to { name -> scope.launch { withContext(Dispatchers.IO) { f.renameTo(File(f.parentFile, name)) }; reload++ } }
@@ -357,7 +375,8 @@ private fun FilesScreen() {
                 buttons = listOf(
                     AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select), enabled = shown.isNotEmpty()) { selected = emptySet() },
                     AppBarButton(WpIcons.Add, stringResource(R.string.files_new_folder)) {
-                        naming = "" to { name -> scope.launch { withContext(Dispatchers.IO) { File(current, name).mkdirs() }; reload++ } }
+                        naming = context.getString(R.string.files_new_folder_default) to { name -> scope.launch { withContext(Dispatchers.IO) { File(current, name).mkdirs() }; reload++ } }
+                        creating = true
                     },
                     AppBarButton(WpIcons.Search, stringResource(R.string.files_search)) { filter = if (filter == null) "" else null },
                 ),
@@ -376,7 +395,7 @@ private fun FilesScreen() {
     }
 
     naming?.let { (initial, onDone) ->
-        NameBox(initial, onDismiss = { naming = null }) { name -> naming = null; onDone(name) }
+        NameBox(initial, creating, onDismiss = { naming = null; creating = false }) { name -> naming = null; creating = false; onDone(name) }
     }
     confirmDelete?.let { list ->
         WpMessageBox(
@@ -412,14 +431,17 @@ private fun FilesScreen() {
     }
 }
 
-/** The first page: storage volumes with free space, then the usual folders. */
+/**
+ * The first page, after Windows Phone's Files: the phone and the SD card as accent squares
+ * with their number of items, used and free space and a bar; then the usual folders.
+ */
 @Composable
 private fun Places(onOpen: (File) -> Unit) {
     val context = LocalContext.current
     val places = remember {
         val list = ArrayList<Place>()
         val internal = Environment.getExternalStorageDirectory()
-        list += Place(context.getString(R.string.files_this_phone), internal, WpIcons.Storage, true)
+        list += Place(context.getString(R.string.files_phone), internal, WpIcons.Storage, true)
         if (Build.VERSION.SDK_INT >= 30) {
             val sm = context.getSystemService(android.os.storage.StorageManager::class.java)
             sm?.storageVolumes?.filter { it.isRemovable }?.forEach { v -> v.directory?.let { list += Place(v.getDescription(context), it, WpIcons.Storage, true) } }
@@ -436,27 +458,29 @@ private fun Places(onOpen: (File) -> Unit) {
         dir(Environment.DIRECTORY_MOVIES, R.string.files_videos, Glyphs.Video)
         list
     }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, top = 6.dp, bottom = 16.dp)) {
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 6.dp, bottom = 16.dp)) {
         items(places, key = { it.dir.absolutePath + it.name }) { p ->
-            Row(Modifier.fillMaxWidth().wpClickable { onOpen(p.dir) }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-                Box(Modifier.size(56.dp).background(Wp.accent), contentAlignment = Alignment.Center) { WpIcon(p.icon, tint = Color.White, size = 30.dp) }
-                Spacer(Modifier.width(14.dp))
+            val count = remember(p.dir) { p.dir.list()?.size ?: 0 }
+            Row(Modifier.fillMaxWidth().wpClickable { onOpen(p.dir) }.padding(vertical = 6.dp), verticalAlignment = if (p.volume) Alignment.Top else Alignment.CenterVertically) {
+                Box(Modifier.size(if (p.volume) 96.dp else 72.dp).background(Wp.accent)) {
+                    if (!p.volume) WpIcon(p.icon, Modifier.align(Alignment.Center), tint = Color.White, size = 30.dp)
+                    WpText(count.toString(), style = WpType.Large, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd).padding(end = 8.dp, bottom = 4.dp))
+                }
+                Spacer(Modifier.width(16.dp))
                 Column(Modifier.weight(1f)) {
-                    WpText(p.name.lowercase(), style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    WpText(p.name, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (p.volume) {
                         val stat = remember(p.dir) { runCatching { StatFs(p.dir.path) }.getOrNull() }
                         if (stat != null) {
                             val total = stat.totalBytes
                             val free = stat.availableBytes
-                            // Used space as a bar, like Storage Sense on Windows Phone.
-                            Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(6.dp).background(Wp.palette.raised)) {
-                                Box(Modifier.fillMaxWidth(((total - free).toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)).height(6.dp).background(Wp.accent))
+                            Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+                                WpText(context.getString(R.string.files_used, Formatter.formatShortFileSize(context, total - free)), style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.weight(1f), maxLines = 1)
+                                WpText(context.getString(R.string.files_free, Formatter.formatShortFileSize(context, free)), style = WpType.Normal, color = Wp.palette.subtle, maxLines = 1)
                             }
-                            WpText(
-                                context.getString(R.string.files_free_of, Formatter.formatShortFileSize(context, free), Formatter.formatShortFileSize(context, total)),
-                                style = WpType.Small,
-                                color = Wp.palette.subtle,
-                            )
+                            Box(Modifier.fillMaxWidth().padding(top = 6.dp).height(8.dp).background(Wp.accent.copy(alpha = 0.18f))) {
+                                Box(Modifier.fillMaxWidth(((total - free).toFloat() / total.coerceAtLeast(1)).coerceIn(0f, 1f)).height(8.dp).background(Wp.accent))
+                            }
                         }
                     }
                 }
@@ -465,18 +489,34 @@ private fun Places(onOpen: (File) -> Unit) {
     }
 }
 
+/** "Create a new folder" / "rename": a page with the name box and check / cancel, as on the phone. */
 @Composable
-private fun NameBox(initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
-    var name by remember { mutableStateOf(initial) }
+private fun NameBox(initial: String, creating: Boolean, onDismiss: () -> Unit, onSave: (String) -> Unit) {
+    var name by remember { mutableStateOf(androidx.compose.ui.text.input.TextFieldValue(initial, androidx.compose.ui.text.TextRange(0, initial.length))) }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     BackHandler(onBack = onDismiss)
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).wpClickable(onClick = onDismiss)) {
-        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome).wpClickable { }.padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp)) {
-            WpText(stringResource(if (initial.isEmpty()) R.string.files_new_folder else R.string.files_rename), style = WpType.Large)
-            WpTextBox(name, { name = it.replace("/", "") }, Modifier.fillMaxWidth().padding(top = 12.dp))
-            Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                WpButton(stringResource(R.string.save), Modifier.weight(1f)) { if (name.isNotBlank()) onSave(name.trim()) }
-                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
-            }
+    Column(Modifier.fillMaxSize().background(Wp.palette.background).wpClickable(tilt = false) { }) {
+        Column(Modifier.weight(1f).padding(start = 20.dp, end = 20.dp, top = 20.dp)) {
+            WpText(stringResource(if (creating) R.string.files_create_folder_title else R.string.files_rename).uppercase(), style = WpType.AppTitle)
+            Spacer(Modifier.height(24.dp))
+            WpText(stringResource(R.string.files_folder_name), style = WpType.Subtle, color = Wp.palette.subtle)
+            androidx.compose.foundation.text.BasicTextField(
+                value = name,
+                onValueChange = { name = it.copy(text = it.text.replace("/", "")) },
+                singleLine = true,
+                textStyle = WpType.Normal.copy(color = Color.Black, fontSize = 18.sp),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(Wp.accent),
+                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(imeAction = androidx.compose.ui.text.input.ImeAction.Done),
+                keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (name.text.isNotBlank()) onSave(name.text.trim()) }),
+                modifier = Modifier.fillMaxWidth().padding(top = 6.dp).background(Color.White).border(2.dp, Wp.accent).padding(10.dp).focusRequester(focus),
+            )
         }
+        WpAppBar(
+            buttons = listOf(
+                AppBarButton(WpIcons.Check, stringResource(R.string.save), enabled = name.text.isNotBlank()) { onSave(name.text.trim()) },
+                AppBarButton(WpIcons.Close, stringResource(R.string.cancel), onClick = onDismiss),
+            ),
+        )
     }
 }

@@ -62,6 +62,12 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         // Pins asked for elsewhere (the Store's "pin to Start"), once the layout is loaded.
         viewModelScope.launch {
             _tiles.first { it.isNotEmpty() }
+            // The Store's live tile comes on Start by default, also on phones set up before it was live.
+            val prefs = app.getSharedPreferences("launcher_migrations", android.content.Context.MODE_PRIVATE)
+            if (!prefs.getBoolean("store_tile", false)) {
+                prefs.edit().putBoolean("store_tile", true).apply()
+                com.wpreborn.data.tiles.PinRequests.pin("builtin:${com.wpreborn.data.apps.BuiltInApp.Store.id}")
+            }
             com.wpreborn.data.tiles.PinRequests.pending.collect { keys ->
                 if (keys.isEmpty()) return@collect
                 com.wpreborn.data.tiles.PinRequests.pending.value = emptyList()

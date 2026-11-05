@@ -391,7 +391,13 @@ private fun SetupPage(onDone: (MailAccount) -> Unit) {
                         MailSyncWorker.schedule(context)
                         onDone(account)
                     } else {
-                        error = context.getString(if (e.auth) R.string.mail_login_failed else R.string.mail_connect_failed, e.message.orEmpty())
+                        val msg = e.message.orEmpty()
+                        error = when {
+                            // The server takes only OAuth sign-in (Outlook / Hotmail since 2024), no password.
+                            msg.contains("No login methods", true) || msg.contains("XOAUTH2", true) -> context.getString(R.string.mail_oauth_only, account.email.substringAfter('@'))
+                            e.auth -> context.getString(R.string.mail_login_failed, msg)
+                            else -> context.getString(R.string.mail_connect_failed, msg)
+                        }
                     }
                 }
             }

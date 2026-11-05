@@ -113,35 +113,41 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
         val list = _tiles.value.toMutableList()
         val i = list.indexOf(t)
         list.removeAt(i)
-        list.addAll(i, f?.apps.orEmpty().map { TileSpec(appKey = it, size = TileSize.Medium) })
+        list.addAll(i, f?.apps.orEmpty().map { TileSpec(appKey = it, size = f?.sizeOf(it) ?: TileSize.Medium) })
         folderStore.delete(t.folderId)
         update(list)
     }
 
     /**
-     * Puts the app of a tile in a folder: [folderId], or a new folder called [newName] that
-     * takes the tile's place.
+     * A tile dropped and held on another one: both go in a folder that takes the place of the
+     * tile below (or the tile joins the folder it was dropped on). Returns the folder's id.
      */
-    fun toFolder(tileId: String, folderId: String?, newName: String?) {
+    fun merge(dragId: String, targetId: String): String? {
         val list = _tiles.value.toMutableList()
-        val i = list.indexOfFirst { it.id == tileId }
-        if (i < 0 || list[i].isFolder) return
-        val tile = list[i]
-        if (folderId != null) {
-            folderStore.add(folderId, tile.appKey)
-            list.removeAt(i)
+        val d = list.firstOrNull { it.id == dragId } ?: return null
+        val t = list.firstOrNull { it.id == targetId } ?: return null
+        if (d.isFolder || d.id == t.id) return null
+        val fid = if (t.isFolder) {
+            folderStore.add(t.folderId, d.appKey, d.size)
+            t.folderId
         } else {
-            val f = folderStore.create(newName.orEmpty().ifBlank { "Folder" }, listOf(tile.appKey))
-            list[i] = TileSpec(appKey = FolderStore.PREFIX + f.id, size = TileSize.Medium, color = tile.color, customColor = tile.customColor)
+            val f = folderStore.create(context.getString(com.wpreborn.R.string.folder_default_name), listOf(t.appKey to t.size, d.appKey to d.size))
+            list[list.indexOf(t)] = TileSpec(appKey = FolderStore.PREFIX + f.id, size = TileSize.Medium, color = t.color, customColor = t.customColor)
+            f.id
         }
+        list.remove(d)
         update(list)
+        return fid
     }
 
     /** Takes an app out of a folder; it returns to Start, and an empty folder disappears. */
     fun removeFromFolder(folderId: String, appKey: String) {
+        val size = folderStore.folders.value[folderId]?.sizeOf(appKey) ?: TileSize.Medium
         val f = folderStore.remove(folderId, appKey)
         val list = _tiles.value.toMutableList()
-        list += TileSpec(appKey = appKey, size = TileSize.Medium)
+        val at = list.indexOfFirst { it.appKey == FolderStore.PREFIX + folderId }
+        // Right after the folder, where you took it out.
+        list.add(if (at >= 0) at + 1 else list.size, TileSpec(appKey = appKey, size = size))
         if (f == null || f.apps.isEmpty()) {
             list.removeAll { it.appKey == FolderStore.PREFIX + folderId }
             folderStore.delete(folderId)

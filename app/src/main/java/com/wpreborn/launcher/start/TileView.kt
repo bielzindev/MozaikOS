@@ -151,7 +151,9 @@ private fun FolderTile(size: TileSize, f: FolderInfo) {
                 Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
                     for (c in 0 until cols) {
                         val app = f.apps.getOrNull(r * cols + c)
-                        Box(Modifier.size(cell).background(Color.White.copy(alpha = if (app != null) 0.18f else 0.08f)), contentAlignment = Alignment.Center) {
+                        // Each app as a little tile in its own colour.
+                        val cellColor = if (app != null) rememberBrandColor(app) ?: Color.White.copy(alpha = 0.22f) else Color.White.copy(alpha = 0.08f)
+                        Box(Modifier.size(cell).background(cellColor), contentAlignment = Alignment.Center) {
                             if (app != null) AppIcon(app, cell * 0.66f)
                         }
                     }

@@ -53,6 +53,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -79,6 +80,7 @@ import com.wpreborn.core.ui.WpIcon
 import com.wpreborn.core.ui.wpClickable
 import com.wpreborn.data.apps.AppEntry
 import com.wpreborn.data.tiles.Placement
+import com.wpreborn.data.tiles.folderId
 import com.wpreborn.data.tiles.isFolder
 import com.wpreborn.data.tiles.TileLayout
 import com.wpreborn.data.tiles.TileSize
@@ -113,8 +115,12 @@ class StartScreenState {
     var iconEditorFor by mutableStateOf<String?>(null)
     var dragId by mutableStateOf<String?>(null)
     var colorPickerFor by mutableStateOf<String?>(null)
-    /** Tile whose app is being put in a folder. */
-    var folderPickerFor by mutableStateOf<String?>(null)
+    /** The folder open in place (its contents shown under it, the tiles below pushed down). */
+    var openFolderId by mutableStateOf<String?>(null)
+    /** The open folder's name is being edited (right after creating it, or after a tap on it). */
+    var renamingFolder by mutableStateOf(false)
+    /** While dragging: the tile held over long enough to become a folder on release. */
+    var mergeTargetId by mutableStateOf<String?>(null)
     /** Tile being launched; it leaves last during the feather-out. */
     var launchingId by mutableStateOf<String?>(null)
     val scroll = ScrollState(0)
@@ -140,17 +146,23 @@ fun StartScreen(
     onCustomColor: (TileSpec, Int) -> Unit,
     onMove: (String, Int, Boolean) -> Unit,
     onPersonalize: () -> Unit = {},
-    /** Existing folders as (id, name), for "add to folder". */
-    folders: List<Pair<String, String>> = emptyList(),
-    /** Put the tile's app in a folder (existing id) or a new one (name). */
-    onToFolder: (tileId: String, folderId: String?, name: String?) -> Unit = { _, _, _ -> },
-    onOpenFolder: (TileSpec) -> Unit = {},
+    /** The apps of a folder tile, with the size of their tiles. */
+    folderContents: (TileSpec) -> List<Pair<AppEntry, TileSize>> = { emptyList() },
+    folderName: (TileSpec) -> String = { "" },
+    /** A tile dropped and held on another one: make (or fill) a folder; returns its id. */
+    onMerge: (dragId: String, targetId: String) -> String? = { _, _ -> null },
+    onFolderLaunch: (AppEntry) -> Unit = {},
+    onFolderRemove: (folderId: String, appKey: String) -> Unit = { _, _ -> },
+    onFolderRename: (folderId: String, name: String) -> Unit = { _, _ -> },
 ) {
     val settings = Wp.settings
     val density = LocalDensity.current
     val context = LocalContext.current
 
     BackHandler(enabled = state.editId != null) { state.editId = null }
+    BackHandler(enabled = state.editId == null && state.openFolderId != null) { state.openFolderId = null; state.renamingFolder = false }
+    // Editing Start closes the open folder (tiles move around while editing).
+    LaunchedEffect(state.editId) { if (state.editId != null) { state.openFolderId = null; state.renamingFolder = false } }
 
     // Start background (8.1): an image seen through the tiles.
     val background by produceState<ImageBitmap?>(null, settings.startBackground) {
@@ -171,6 +183,42 @@ fun StartScreen(
         val topPad = geo.gap
         val topPadPx = with(density) { topPad.toPx() }
 
+        // An open folder, Windows Phone 8.1 style: its tiles appear in a band right under the
+        // folder's row, with its name on top, and every tile below moves down to make room.
+        val openIndex = state.openFolderId?.let { fid -> tiles.indexOfFirst { it.isFolder && it.folderId == fid } }?.takeIf { it >= 0 }
+        val openTile = openIndex?.let { tiles[it] }
+        val items = openTile?.let(folderContents).orEmpty()
+        val itemSpecs = remember(items) { items.map { (app, size) -> TileSpec(id = "in:" + app.key, appKey = app.key, size = size) } }
+        val itemPlacements = remember(itemSpecs, geo.columns, settings.smallTilesRow) { TileLayout.pack(itemSpecs, geo.columns, settings.smallTilesRow) }
+        val itemRows = TileLayout.rows(itemSpecs, itemPlacements)
+        val bandRow = openIndex?.let { placements[it].y + tiles[it].size.h }
+        val bandHeader = 46.dp
+        val bandTop = if (bandRow != null) topPad + geo.y(bandRow) else 0.dp
+        val bandHeight = if (bandRow != null) bandHeader + geo.y(itemRows) + geo.gap else 0.dp
+        val shift = if (bandRow != null) bandHeight + geo.gap else 0.dp
+        val shiftPx = with(density) { shift.toPx() }
+        fun rowTop(row: Int): Dp = topPad + geo.y(row) + (if (bandRow != null && row >= bandRow) shift else 0.dp)
+        val itemRects = with(density) {
+            items.indices.map { i ->
+                val pl = itemPlacements[i]
+                val s = itemSpecs[i].size
+                Rect(
+                    Offset(geo.x(pl.x).toPx(), (bandTop + bandHeader + geo.y(pl.y)).toPx()),
+                    androidx.compose.ui.geometry.Size(geo.w(s, geo.columns).toPx(), geo.h(s).toPx()),
+                )
+            }
+        }
+        val currentBandRow by rememberUpdatedState(bandRow)
+        val currentShiftPx by rememberUpdatedState(shiftPx)
+        val currentItems by rememberUpdatedState(items)
+        val currentItemRects by rememberUpdatedState(itemRects)
+        val currentOpenFolder by rememberUpdatedState(openTile)
+        val currentOnMerge by rememberUpdatedState(onMerge)
+        val currentOnFolderLaunch by rememberUpdatedState(onFolderLaunch)
+        val currentOnFolderRemove by rememberUpdatedState(onFolderRemove)
+        val bandRect = if (bandRow != null) with(density) { Rect(Offset(0f, bandTop.toPx()), androidx.compose.ui.geometry.Size(widthPx, bandHeight.toPx())) } else null
+        val currentBandRect by rememberUpdatedState(bandRect)
+
         // Drag bookkeeping, in content coordinates.
         var dragStartTopLeft by remember { mutableStateOf(Offset.Zero) }
         var dragDown by remember { mutableStateOf(Offset.Zero) }
@@ -181,19 +229,27 @@ fun StartScreen(
         val currentOnLaunch by rememberUpdatedState(onLaunch)
         val currentOnMove by rememberUpdatedState(onMove)
         val currentOnPersonalize by rememberUpdatedState(onPersonalize)
-        val currentOnOpenFolder by rememberUpdatedState(onOpenFolder)
         val currentPlacements by rememberUpdatedState(placements)
 
+        val gapPx = with(density) { geo.gap.toPx() }
+
+        /** Where tile [i] is drawn, in content pixels (below an open folder: pushed down). */
+        fun rectOf(i: Int): Rect? {
+            val t = currentTiles.getOrNull(i) ?: return null
+            val pl = currentPlacements.getOrNull(i) ?: return null
+            val w = minOf(t.size.w, geo.columns)
+            val band = currentBandRow
+            val top = topPadPx + pl.y * unitPx + (if (band != null && pl.y >= band) currentShiftPx else 0f)
+            return Rect(Offset(marginPx + pl.x * unitPx, top), androidx.compose.ui.geometry.Size(w * unitPx - gapPx, t.size.h * unitPx - gapPx))
+        }
+
         fun tileAt(p: Offset): Int {
-            val col = ((p.x - marginPx) / unitPx).toInt()
-            val row = ((p.y - topPadPx) / unitPx).toInt()
-            if (p.x < marginPx || p.y < topPadPx) return -1
-            currentTiles.forEachIndexed { i, t ->
-                val pl = currentPlacements.getOrNull(i) ?: return@forEachIndexed
-                if (col >= pl.x && col < pl.x + minOf(t.size.w, geo.columns) && row >= pl.y && row < pl.y + t.size.h) return i
-            }
+            for (i in currentTiles.indices) if (rectOf(i)?.contains(p) == true) return i
             return -1
         }
+
+        /** A tile inside the open folder. */
+        fun itemAt(p: Offset): Int = currentItemRects.indexOfFirst { it.contains(p) }
 
         // Auto-scroll while dragging near the edges.
         LaunchedEffect(state.dragId) {
@@ -213,7 +269,7 @@ fun StartScreen(
 
         // At least the screen height, so pressing and holding below the last tile is caught too.
         // After the last row only one gap, so the screen ends where the tiles end.
-        val contentHeight = maxOf(geo.y(rows) + topPad + geo.margin, maxHeight)
+        val contentHeight = maxOf(geo.y(rows) + topPad + geo.margin + shift, maxHeight)
 
         // Edit mode: every tile floats gently, each on its own path, like tiles lifted off the
         // screen. One clock for all of them, read while drawing, so no tile recomposes per frame.
@@ -237,8 +293,36 @@ fun StartScreen(
                         .pointerInput(geo) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
+                                // Inside the open folder: tap opens the app, press and hold
+                                // takes it out of the folder (back to Start, after the folder).
+                                val item = if (state.editId == null) itemAt(down.position) else -1
+                                if (item >= 0) {
+                                    var cancelled = false
+                                    val up = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
+                                        waitForUpOrCancellation().also { if (it == null) cancelled = true }
+                                    }
+                                    val entry = currentItems.getOrNull(item)
+                                    val folder = currentOpenFolder
+                                    if (entry != null && folder != null) {
+                                        if (up != null) {
+                                            up.consume()
+                                            currentOnFolderLaunch(entry.first)
+                                        } else if (!cancelled) {
+                                            currentOnFolderRemove(folder.folderId, entry.first.key)
+                                        }
+                                    }
+                                    return@awaitEachGesture
+                                }
+                                // The folder's name bar handles its own taps (rename).
+                                if (currentBandRect?.contains(down.position) == true && itemAt(down.position) < 0) return@awaitEachGesture
                                 val hit = tileAt(down.position)
                                 if (hit < 0) {
+                                    // A tap outside closes the open folder.
+                                    if (state.openFolderId != null && state.editId == null) {
+                                        val up = waitForUpOrCancellation()
+                                        if (up != null && itemAt(up.position) < 0) { state.openFolderId = null; state.renamingFolder = false }
+                                        return@awaitEachGesture
+                                    }
                                     if (state.editId != null) {
                                         val up = waitForUpOrCancellation()
                                         if (up != null) state.editId = null
@@ -256,8 +340,15 @@ fun StartScreen(
                                 suspend fun androidx.compose.ui.input.pointer.AwaitPointerEventScope.dragLoop() {
                                     var dragging = false
                                     var total = Offset.Zero
+                                    // Held still over the middle of another tile: a folder.
+                                    var hoverId: String? = null
+                                    var hoverSince = 0L
                                     while (true) {
-                                        val ev = awaitPointerEvent()
+                                        val ev = withTimeoutOrNull(80) { awaitPointerEvent() }
+                                        if (ev == null) {
+                                            if (dragging && hoverId != null && System.currentTimeMillis() - hoverSince > 650) state.mergeTargetId = hoverId
+                                            continue
+                                        }
                                         val ch: PointerInputChange = ev.changes.firstOrNull { it.id == down.id } ?: break
                                         if (!ch.pressed) break
                                         total += ch.positionChange()
@@ -273,12 +364,43 @@ fun StartScreen(
                                             ch.consume()
                                             dragPointerViewport = Offset(ch.position.x, ch.position.y - state.scroll.value)
                                             val over = tileAt(ch.position)
-                                            if (over >= 0 && currentTiles[over].id != tile.id) currentOnMove(tile.id, over, false)
+                                            val r = if (over >= 0 && currentTiles[over].id != tile.id) rectOf(over) else null
+                                            if (r != null) {
+                                                // The middle of a tile: hold to make a folder; its edges: move there.
+                                                val inner = Rect(r.left + r.width * 0.22f, r.top + r.height * 0.22f, r.right - r.width * 0.22f, r.bottom - r.height * 0.22f)
+                                                if (!tile.isFolder && inner.contains(ch.position)) {
+                                                    val id = currentTiles[over].id
+                                                    if (hoverId != id) {
+                                                        hoverId = id
+                                                        hoverSince = System.currentTimeMillis()
+                                                        state.mergeTargetId = null
+                                                    } else if (System.currentTimeMillis() - hoverSince > 650) {
+                                                        state.mergeTargetId = id
+                                                    }
+                                                } else {
+                                                    hoverId = null
+                                                    state.mergeTargetId = null
+                                                    currentOnMove(tile.id, over, false)
+                                                }
+                                            } else {
+                                                hoverId = null
+                                                state.mergeTargetId = null
+                                            }
                                         }
                                     }
                                     if (dragging) {
                                         state.dragId = null
-                                        currentOnMove(tile.id, currentTiles.indexOfFirst { it.id == tile.id }, true)
+                                        val target = state.mergeTargetId
+                                        state.mergeTargetId = null
+                                        val fid = target?.let { currentOnMerge(tile.id, it) }
+                                        if (fid != null) {
+                                            // The new folder opens with its name ready to type.
+                                            state.editId = null
+                                            state.openFolderId = fid
+                                            state.renamingFolder = true
+                                        } else {
+                                            currentOnMove(tile.id, currentTiles.indexOfFirst { it.id == tile.id }, true)
+                                        }
                                     }
                                 }
                                 if (state.editId != null) {
@@ -291,7 +413,13 @@ fun StartScreen(
                                     }
                                     if (up != null) {
                                         up.consume()
-                                        if (tile.isFolder) currentOnOpenFolder(tile) else currentAppFor(tile)?.let { currentOnLaunch(tile, it) }
+                                        if (tile.isFolder) {
+                                            // A tap opens the folder in place, another closes it.
+                                            state.renamingFolder = false
+                                            state.openFolderId = if (state.openFolderId == tile.folderId) null else tile.folderId
+                                        } else {
+                                            currentAppFor(tile)?.let { currentOnLaunch(tile, it) }
+                                        }
                                     } else if (!cancelled) {
                                         state.editId = tile.id
                                         dragLoop()
@@ -308,7 +436,7 @@ fun StartScreen(
                         val app = appFor(tile)
                         val dragging = state.dragId == tile.id
                         val target = with(density) {
-                            IntOffset(geo.x(pl.x).roundToPx(), (geo.y(pl.y) + topPad).roundToPx())
+                            IntOffset(geo.x(pl.x).roundToPx(), rowTop(pl.y).roundToPx())
                         }
                         val animated by animateIntOffsetAsState(target, tween(250), label = "tilePos")
                         val pos = if (dragging) {
@@ -320,8 +448,10 @@ fun StartScreen(
                         }
                         val editing = state.editId != null
                         val selected = state.editId == tile.id
+                        val mergeTarget = state.mergeTargetId == tile.id
                         val scale by animateFloatAsState(
                             when {
+                                mergeTarget -> 1.12f
                                 !editing -> 1f
                                 selected -> 1.04f
                                 else -> 0.88f
@@ -389,13 +519,70 @@ fun StartScreen(
                                     EditButton(WpIcons.Edit, Modifier.align(Alignment.BottomStart).offset((-12).dp, 12.dp)) {
                                         state.iconEditorFor = tile.id
                                     }
-                                    EditButton(WpIcons.Folder, Modifier.align(Alignment.TopCenter).offset(0.dp, (-12).dp)) {
-                                        state.folderPickerFor = tile.id
-                                    }
                                 }
                             }
                         }
                       }
+                    }
+                    if (openTile != null && openIndex != null && bandRow != null) {
+                        val folderColor = openTile.fixedColor ?: Wp.accent
+                        val bandColor = androidx.compose.ui.graphics.lerp(folderColor, Color.Black, 0.6f)
+                        Box(Modifier.offset(0.dp, bandTop).fillMaxWidth().height(bandHeight).background(bandColor))
+                        // The notch pointing up at the folder's tile.
+                        val fpl = placements[openIndex]
+                        val notchX = geo.x(fpl.x) + geo.w(openTile.size, geo.columns) / 2
+                        androidx.compose.foundation.Canvas(Modifier.offset(notchX - 9.dp, bandTop - geo.gap).size(18.dp, geo.gap)) {
+                            val p = androidx.compose.ui.graphics.Path().apply {
+                                moveTo(0f, size.height); lineTo(size.width / 2f, 0f); lineTo(size.width, size.height); close()
+                            }
+                            drawPath(p, bandColor)
+                        }
+                        Box(
+                            Modifier.offset(geo.margin, bandTop).width(maxWidth - geo.margin * 2).height(bandHeader),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            if (state.renamingFolder) {
+                                val fid = openTile.folderId
+                                var draft by remember(fid) { mutableStateOf(folderName(openTile)) }
+                                val fr = remember { androidx.compose.ui.focus.FocusRequester() }
+                                LaunchedEffect(fid) { runCatching { fr.requestFocus() } }
+                                // Saved when done, and also when the folder closes.
+                                androidx.compose.runtime.DisposableEffect(fid) { onDispose { if (draft.isNotBlank()) onFolderRename(fid, draft) } }
+                                com.wpreborn.core.ui.WpTextBox(
+                                    draft, { draft = it }, Modifier.fillMaxWidth(),
+                                    imeAction = androidx.compose.ui.text.input.ImeAction.Done,
+                                    focusRequester = fr,
+                                    onImeAction = { state.renamingFolder = false },
+                                )
+                            } else {
+                                com.wpreborn.core.ui.WpText(
+                                    folderName(openTile), style = com.wpreborn.core.theme.WpType.Large, color = Color.White, maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                                    modifier = Modifier.wpClickable { state.renamingFolder = true },
+                                )
+                            }
+                        }
+                        items.forEachIndexed { i, (itemApp, itemSize) ->
+                            key("in:" + itemApp.key) {
+                                val ipl = itemPlacements.getOrNull(i) ?: Placement(0, 0)
+                                val spec = itemSpecs[i]
+                                val iw = geo.w(itemSize, geo.columns)
+                                val ih = geo.h(itemSize)
+                                val color = rememberBrandColor(itemApp) ?: Wp.accent
+                                Box(
+                                    Modifier
+                                        .offset(geo.x(ipl.x), bandTop + bandHeader + geo.y(ipl.y))
+                                        .size(iw, ih)
+                                        .tilt()
+                                        .background(color)
+                                        .clipToBounds(),
+                                ) {
+                                    androidx.compose.runtime.CompositionLocalProvider(LocalTileColor provides color) {
+                                        TileFace(spec, itemApp, inputsFor(spec, itemApp), iw, seed = spec.id.hashCode())
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -405,15 +592,6 @@ fun StartScreen(
             tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
                 IconCustomizer(app, tileColor = tiles.first { it.id == id }.fixedColor, onDismiss = { state.iconEditorFor = null })
             } ?: run { state.iconEditorFor = null }
-        }
-
-        state.folderPickerFor?.let { id ->
-            FolderPicker(
-                folders = folders,
-                onFolder = { f -> onToFolder(id, f, null); state.folderPickerFor = null; state.editId = null },
-                onNew = { n -> onToFolder(id, null, n); state.folderPickerFor = null; state.editId = null },
-                onDismiss = { state.folderPickerFor = null },
-            )
         }
 
         state.colorPickerFor?.let { id ->

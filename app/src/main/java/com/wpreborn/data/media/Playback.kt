@@ -135,6 +135,41 @@ fun rememberPlayback(includeExternal: Boolean = true): Playback? {
     return remember(ui, external, tick) { Playback.of(ui, external, tick) }
 }
 
+/** When music last played, so a paused player can leave the lock screen and Action Center. */
+object PlaybackIdle {
+    var lastPlayingAt by androidx.compose.runtime.mutableLongStateOf(0L)
+}
+
+/**
+ * [playback] while it plays, and for [graceMs] after it was paused (to resume with one tap);
+ * then null, so a stopped player no longer stays on the lock screen or in Action Center.
+ */
+@Composable
+fun rememberPlaybackVisible(playback: Playback?, graceMs: Long = 30_000): Playback? {
+    val playing = playback?.playing == true
+    var wasPlaying by remember { androidx.compose.runtime.mutableStateOf(false) }
+    var tick by remember { mutableLongStateOf(SystemClock.elapsedRealtime()) }
+    LaunchedEffect(playing) {
+        if (playing) {
+            PlaybackIdle.lastPlayingAt = SystemClock.elapsedRealtime()
+            wasPlaying = true
+        } else {
+            if (wasPlaying) {
+                PlaybackIdle.lastPlayingAt = SystemClock.elapsedRealtime()
+                wasPlaying = false
+            }
+            tick = SystemClock.elapsedRealtime()
+            val left = PlaybackIdle.lastPlayingAt + graceMs - tick
+            if (left > 0) {
+                delay(left)
+                tick = SystemClock.elapsedRealtime()
+            }
+        }
+    }
+    val visible = playing || (playback != null && tick - PlaybackIdle.lastPlayingAt < graceMs)
+    return playback.takeIf { visible }
+}
+
 /** The Playing Now bar the user closed (by [Playback.dismissKey]); it returns with new music. */
 object PlayingNowDismissal {
     var dismissed by androidx.compose.runtime.mutableStateOf<String?>(null)

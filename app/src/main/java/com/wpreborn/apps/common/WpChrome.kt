@@ -80,7 +80,8 @@ fun WpChrome(
                     Box(Modifier.statusBarsPadding().topSystemPadding())
                 }
                 // The system-wide Playing Now bar sits under every screen while music plays.
-                val playback = com.wpreborn.data.media.rememberPlayback()
+                // Paused for a couple of minutes: the bar goes away until music plays again.
+                val playback = com.wpreborn.data.media.rememberPlaybackVisible(com.wpreborn.data.media.rememberPlayback(), 120_000)
                 @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
                 val imeOpen = WindowInsets.isImeVisible
                 val bar = showPlayingNow && !chrome.hidePlayingNow && !imeOpen && playback != null &&

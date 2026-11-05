@@ -289,10 +289,12 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                 }
                 // Music widget: the same playback state as the Playing Now bar and the player.
                 val playback = com.wpreborn.data.media.rememberPlayback()
+                // A paused or stopped player leaves the lock screen after a short while.
+                val shown = com.wpreborn.data.media.rememberPlaybackVisible(playback)
                 val last = remember { arrayOfNulls<com.wpreborn.data.media.Playback>(1) }
                 if (playback != null) last[0] = playback
                 androidx.compose.animation.AnimatedVisibility(
-                    visible = playback != null && (playback.playing || playback.own),
+                    visible = shown != null,
                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
                 ) {

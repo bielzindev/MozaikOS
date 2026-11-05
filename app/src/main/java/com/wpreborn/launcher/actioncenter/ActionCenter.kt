@@ -220,7 +220,7 @@ fun ActionCenter(state: ActionCenterState) {
             }
 
             // Music: the same playback the Playing Now bar and the lock screen show.
-            val playback = com.wpreborn.data.media.rememberPlayback()
+            val playback = com.wpreborn.data.media.rememberPlaybackVisible(com.wpreborn.data.media.rememberPlayback())
             if (playback != null) {
                 Row(
                     Modifier
@@ -384,7 +384,7 @@ private fun NotificationRow(n: WpNotification, onOpen: () -> Unit) {
     val scope = rememberCoroutineScope()
     val offset = remember { Animatable(0f) }
     val density = LocalDensity.current
-    val dismissPx = with(density) { 140.dp.toPx() }
+    val dismissPx = with(density) { 90.dp.toPx() }
     Column(
         Modifier
             .fillMaxWidth()
@@ -398,17 +398,19 @@ private fun NotificationRow(n: WpNotification, onOpen: () -> Unit) {
                 detectHorizontalDragGestures(
                     onDragEnd = {
                         scope.launch {
-                            if (offset.value > dismissPx) {
-                                offset.animateTo(size.width.toFloat(), tween(150))
+                            if (abs(offset.value) > dismissPx) {
+                                val away = if (offset.value > 0) size.width.toFloat() else -size.width.toFloat()
+                                offset.animateTo(away, tween(150))
                                 NotificationCenter.dismiss(n.key)
                             } else {
                                 offset.animateTo(0f, tween(200))
                             }
                         }
                     },
+                    onDragCancel = { scope.launch { offset.animateTo(0f, tween(200)) } },
                 ) { change, dx ->
                     change.consume()
-                    scope.launch { offset.snapTo((offset.value + dx).coerceAtLeast(0f)) }
+                    scope.launch { offset.snapTo(offset.value + dx) }
                 }
             }
             .wpClickable(tilt = false, onClick = onOpen)

@@ -96,6 +96,8 @@ import com.wpreborn.core.icons.WpIcons
 import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
 import com.wpreborn.core.ui.WpIcon
+import com.wpreborn.core.ui.WpAppBar
+import com.wpreborn.core.ui.AppBarButton
 import com.wpreborn.core.ui.WpPivot
 import com.wpreborn.core.ui.WpText
 import com.wpreborn.core.ui.wpClickable
@@ -120,7 +122,7 @@ class LinkMenu(val link: String?, val image: String?)
 /** The reading view of a page: its title and its text as headings and paragraphs. */
 class ReaderPage(val title: String, val blocks: List<Pair<Boolean, String>>)
 
-private enum class Panel { None, Tabs, Menu, Hub, Settings, Find, Reader }
+private enum class Panel { None, Tabs, Menu, Hub, Settings, Find, Reader, Downloads }
 
 private const val MAX_TABS = 9
 private const val DESKTOP_UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36"
@@ -294,7 +296,8 @@ class BrowserActivity : WpActivity() {
             if (!mime.isNullOrBlank()) req.setMimeType(mime)
             if (!ua.isNullOrBlank()) req.addRequestHeader("User-Agent", ua)
             CookieManager.getInstance().getCookie(url)?.let { req.addRequestHeader("Cookie", it) }
-            (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            val id = (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(req)
+            store.addDownload(id)
             Toast.makeText(this, getString(R.string.browser_downloading, name), Toast.LENGTH_SHORT).show()
         }
     }
@@ -661,6 +664,7 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
             Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
             Panel.Settings -> SettingsPage(a, store)
             Panel.Reader -> reader?.let { ReaderView(it, store) }
+            Panel.Downloads -> DownloadsPage(a, store)
             else -> {}
         }
         a.linkMenu?.let { m -> LinkMenuPanel(a, m, t.private) { a.linkMenu = null } }
@@ -811,9 +815,7 @@ private fun MenuPanel(a: BrowserActivity, store: BrowserStore, t: BrowserTab, on
             Item(stringResource(R.string.browser_find), enabled = t.url.isNotBlank()) { open(Panel.Find) }
             Item(stringResource(R.string.browser_translate), enabled = t.url.isNotBlank()) { a.translatePage(t) }
             Item(stringResource(R.string.browser_print), enabled = t.url.isNotBlank()) { a.printPage(t) }
-            Item(stringResource(R.string.browser_downloads)) {
-                runCatching { a.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-            }
+            Item(stringResource(R.string.browser_downloads)) { open(Panel.Downloads) }
             Item(stringResource(if (t.desktop) R.string.browser_mobile_site else R.string.browser_desktop_site), enabled = t.url.isNotBlank()) { a.setDesktop(t, !t.desktop) }
             Item(stringResource(R.string.browser_settings)) { open(Panel.Settings) }
             if (t.blocked > 0) {
@@ -1026,5 +1028,145 @@ private fun ReaderView(page: ReaderPage, store: BrowserStore) {
                 }
             }
         }
+    }
+}
+
+
+/** One download of the browser as its page shows it. */
+private class Download(
+    val id: Long,
+    val title: String,
+    val status: Int,
+    val soFar: Long,
+    val total: Long,
+    val mime: String?,
+)
+
+private fun queryDownloads(dm: DownloadManager, ids: List<Long>): List<Download> {
+    if (ids.isEmpty()) return emptyList()
+    val out = ArrayList<Download>()
+    runCatching {
+        dm.query(DownloadManager.Query().setFilterById(*ids.toLongArray()))?.use { c ->
+            val iId = c.getColumnIndex(DownloadManager.COLUMN_ID)
+            val iTitle = c.getColumnIndex(DownloadManager.COLUMN_TITLE)
+            val iStatus = c.getColumnIndex(DownloadManager.COLUMN_STATUS)
+            val iSoFar = c.getColumnIndex(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)
+            val iTotal = c.getColumnIndex(DownloadManager.COLUMN_TOTAL_SIZE_BYTES)
+            val iMime = c.getColumnIndex(DownloadManager.COLUMN_MEDIA_TYPE)
+            while (c.moveToNext()) {
+                out += Download(c.getLong(iId), c.getString(iTitle).orEmpty(), c.getInt(iStatus), c.getLong(iSoFar), c.getLong(iTotal), c.getString(iMime))
+            }
+        }
+    }
+    return out.sortedByDescending { it.id }
+}
+
+/**
+ * The browser's own downloads page, like Internet Explorer's: what is downloading with its
+ * progress, what finished (tap to open), what failed; cancel, delete, open the folder.
+ */
+@Composable
+private fun DownloadsPage(a: BrowserActivity, store: BrowserStore) {
+    val dm = remember { a.getSystemService(DownloadManager::class.java) }
+    var rows by remember { mutableStateOf<List<Download>?>(null) }
+    var refresh by remember { mutableIntStateOf(0) }
+    var deleting by remember { mutableStateOf<Download?>(null) }
+    // Progress refreshes while the page is open.
+    LaunchedEffect(refresh) {
+        while (true) {
+            val ids = store.downloads
+            rows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { queryDownloads(dm, ids) }
+            kotlinx.coroutines.delay(700)
+        }
+    }
+    fun open(d: Download) {
+        runCatching {
+            val uri = dm.getUriForDownloadedFile(d.id) ?: return
+            a.startActivity(
+                Intent.createChooser(
+                    Intent(Intent.ACTION_VIEW).setDataAndType(uri, d.mime ?: a.contentResolver.getType(uri) ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION),
+                    d.title,
+                ),
+            )
+        }
+    }
+    Column(Modifier.fillMaxSize().background(Wp.palette.background)) {
+        Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 14.dp)) {
+            WpText(stringResource(R.string.app_browser).uppercase(), style = WpType.AppTitle)
+            WpText(stringResource(R.string.browser_downloads), style = WpType.Header)
+        }
+        val list = rows
+        Box(Modifier.weight(1f)) {
+            if (list != null && list.isEmpty()) {
+                WpText(stringResource(R.string.browser_dl_empty), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(20.dp))
+            }
+            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
+                items(list.orEmpty(), key = { it.id }) { d ->
+                    val done = d.status == DownloadManager.STATUS_SUCCESSFUL
+                    val context = a
+                    Row(
+                        Modifier.fillMaxWidth().wpClickable(enabled = done) { open(d) }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(56.dp).background(if (done) Wp.accent else Wp.palette.raised), contentAlignment = Alignment.Center) {
+                            WpIcon(if (done) WpIcons.Check else WpIcons.Download, tint = if (done) Color.White else Wp.palette.foreground, size = 26.dp)
+                        }
+                        Spacer(Modifier.width(14.dp))
+                        Column(Modifier.weight(1f)) {
+                            WpText(d.title, style = WpType.Large.copy(fontSize = 20.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            fun size(b: Long) = android.text.format.Formatter.formatShortFileSize(context, b.coerceAtLeast(0))
+                            val line = when (d.status) {
+                                DownloadManager.STATUS_SUCCESSFUL -> size(d.total) + " · " + stringResource(R.string.browser_dl_done)
+                                DownloadManager.STATUS_FAILED -> stringResource(R.string.browser_dl_failed)
+                                DownloadManager.STATUS_PAUSED -> stringResource(R.string.browser_dl_paused)
+                                DownloadManager.STATUS_PENDING -> stringResource(R.string.browser_dl_waiting)
+                                else -> if (d.total > 0) stringResource(R.string.browser_dl_of, size(d.soFar), size(d.total)) else size(d.soFar)
+                            }
+                            WpText(line, style = WpType.Small, color = if (d.status == DownloadManager.STATUS_FAILED) Wp.accent else Wp.palette.subtle, maxLines = 1)
+                            if (d.status == DownloadManager.STATUS_RUNNING || d.status == DownloadManager.STATUS_PENDING || d.status == DownloadManager.STATUS_PAUSED) {
+                                val p = if (d.total > 0) (d.soFar.toFloat() / d.total).coerceIn(0f, 1f) else 0f
+                                Box(Modifier.fillMaxWidth().padding(top = 4.dp).height(4.dp).background(Wp.palette.raised)) {
+                                    Box(Modifier.fillMaxWidth(p.coerceAtLeast(0.02f)).height(4.dp).background(Wp.accent))
+                                }
+                            }
+                        }
+                        // Cancel while it downloads; delete (the file too) once it is there.
+                        Box(
+                            Modifier.size(44.dp).wpClickable {
+                                if (done) deleting = d else { runCatching { dm.remove(d.id) }; store.removeDownload(d.id); refresh++ }
+                            },
+                            contentAlignment = Alignment.Center,
+                        ) { WpIcon(if (done) WpIcons.Delete else WpIcons.Close, tint = Wp.palette.foreground, size = 20.dp) }
+                    }
+                }
+            }
+        }
+        WpAppBar(
+            buttons = listOf(
+                AppBarButton(WpIcons.Folder, stringResource(R.string.browser_dl_folder)) {
+                    runCatching { a.startActivity(Intent(DownloadManager.ACTION_VIEW_DOWNLOADS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                },
+                AppBarButton(WpIcons.SelectAll, stringResource(R.string.browser_dl_clear), enabled = list.orEmpty().any { it.status == DownloadManager.STATUS_SUCCESSFUL || it.status == DownloadManager.STATUS_FAILED }) {
+                    // Takes the finished and failed ones off the list (the files stay).
+                    list.orEmpty().filter { it.status == DownloadManager.STATUS_SUCCESSFUL || it.status == DownloadManager.STATUS_FAILED }.forEach { store.removeDownload(it.id) }
+                    refresh++
+                },
+            ),
+        )
+    }
+    deleting?.let { d ->
+        com.wpreborn.core.ui.WpMessageBox(
+            title = stringResource(R.string.browser_dl_delete_title),
+            message = d.title,
+            confirm = stringResource(R.string.delete),
+            onConfirm = {
+                runCatching { dm.remove(d.id) }
+                store.removeDownload(d.id)
+                deleting = null
+                refresh++
+            },
+            dismiss = stringResource(R.string.cancel),
+            onDismiss = { deleting = null },
+        )
     }
 }

@@ -972,4 +972,13 @@
     <string name="glance_info">With the screen off, shows the time, weather and notification icons in dim accent-coloured type, like the Lumia. Double-tap to wake. Always on while charging, 15 minutes on battery, off in a pocket. Needs \'display over other apps\'; turn off the phone\'s own always-on display.</string>
     <string name="browser_open_link">Open in Explorer</string>
     <string name="set_splash">Splash screen when apps open</string>
+    <string name="browser_dl_empty">No downloads yet.</string>
+    <string name="browser_dl_done">done</string>
+    <string name="browser_dl_failed">failed</string>
+    <string name="browser_dl_paused">paused</string>
+    <string name="browser_dl_waiting">waiting</string>
+    <string name="browser_dl_of">%1$s of %2$s</string>
+    <string name="browser_dl_delete_title">Delete this file?</string>
+    <string name="browser_dl_folder">open folder</string>
+    <string name="browser_dl_clear">clear list</string>
 </resources>

@@ -973,4 +973,13 @@
     <string name="glance_info">Com a tela desligada, mostra a hora, o clima e os ícones de notificação em letras finas na cor de destaque, como no Lumia. Toque duas vezes para acordar. Sempre ligada enquanto carrega, 15 minutos na bateria e desligada no bolso. Precisa de \"sobrepor a outros apps\"; desative o always on display do próprio celular.</string>
     <string name="browser_open_link">Abrir no Explorer</string>
     <string name="set_splash">Tela de abertura nos apps</string>
+    <string name="browser_dl_empty">Nenhum download ainda.</string>
+    <string name="browser_dl_done">concluído</string>
+    <string name="browser_dl_failed">falhou</string>
+    <string name="browser_dl_paused">pausado</string>
+    <string name="browser_dl_waiting">aguardando</string>
+    <string name="browser_dl_of">%1$s de %2$s</string>
+    <string name="browser_dl_delete_title">Apagar este arquivo?</string>
+    <string name="browser_dl_folder">abrir pasta</string>
+    <string name="browser_dl_clear">limpar lista</string>
 </resources>

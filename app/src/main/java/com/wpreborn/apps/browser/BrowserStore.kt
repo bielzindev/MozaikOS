@@ -43,6 +43,14 @@ class BrowserStore private constructor(context: Context) {
         get() = prefs.getInt("reader_size", 19)
         set(v) = prefs.edit().putInt("reader_size", v).apply()
 
+    /** The browser's downloads (DownloadManager ids), newest last. */
+    var downloads: List<Long>
+        get() = prefs.getString("downloads", "").orEmpty().split(',').mapNotNull { it.toLongOrNull() }
+        set(v) = prefs.edit().putString("downloads", v.takeLast(200).joinToString(",")).apply()
+
+    fun addDownload(id: Long) { downloads = downloads + id }
+    fun removeDownload(id: Long) { downloads = downloads - id }
+
     var openTabs: List<String>
         get() = runCatching { JSONArray(prefs.getString("tabs", "[]")).let { a -> List(a.length()) { a.getString(it) } } }.getOrDefault(emptyList())
         set(v) = prefs.edit().putString("tabs", JSONArray(v).toString()).apply()

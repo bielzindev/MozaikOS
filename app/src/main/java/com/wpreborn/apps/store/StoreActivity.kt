@@ -1,7 +1,11 @@
 package com.wpreborn.apps.store
 
 import android.content.Intent
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,9 +13,11 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,12 +28,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -41,6 +51,7 @@ import com.wpreborn.core.motion.slideInStaggered
 import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
 import com.wpreborn.core.ui.AppBarButton
+import com.wpreborn.core.ui.AppBarMenuItem
 import com.wpreborn.core.ui.PanoramaSection
 import com.wpreborn.core.ui.WpAppBar
 import com.wpreborn.core.ui.WpButton
@@ -50,31 +61,50 @@ import com.wpreborn.core.ui.WpPanorama
 import com.wpreborn.core.ui.WpPivot
 import com.wpreborn.core.ui.WpText
 import com.wpreborn.core.ui.WpTextBox
+import com.wpreborn.core.ui.WpToggle
 import com.wpreborn.core.ui.wpClickable
+import com.wpreborn.data.apps.BuiltInApp
 import com.wpreborn.data.store.AppManager
 import com.wpreborn.data.store.AppState
 import com.wpreborn.data.store.CatalogApp
 import com.wpreborn.data.store.StoreCategory
+import com.wpreborn.data.store.StoreReview
+import com.wpreborn.data.store.StoreReviews
 import com.wpreborn.data.store.ZunexCatalog
+import com.wpreborn.data.tiles.PinRequests
 import com.wpreborn.navigation.WpNavHost
 import com.wpreborn.navigation.WpNavigator
 import com.wpreborn.navigation.rememberNavigator
+import java.util.Calendar
 
-private enum class StoreFilter { Installed, Updates, Available, Disabled }
+/** The quick links of the 8.1 Store, for the Mozaik family. */
+private enum class StoreFilter { Featured, New, Updates, Installed, Available, Disabled }
 
 private sealed interface StorePage {
     data object Hub : StorePage
     data class Filtered(val filter: StoreFilter) : StorePage
-    data class Category(val category: StoreCategory) : StorePage
+    /** Null: the whole "Mozaik collection". */
+    data class Category(val category: StoreCategory?) : StorePage
     data class Details(val id: String) : StorePage
+    data class Review(val id: String) : StorePage
     data object Search : StorePage
+    data object Settings : StorePage
 }
 
+/** Apps whose Start tile is live (the Store says "with Live Tile", like 8.1). */
+private val LiveTileApps = setOf(
+    BuiltInApp.People, BuiltInApp.Messaging, BuiltInApp.Music, BuiltInApp.Photos, BuiltInApp.Calendar, BuiltInApp.Weather,
+    BuiltInApp.Store, BuiltInApp.Alarms, BuiltInApp.Mail, BuiltInApp.News, BuiltInApp.Phone, BuiltInApp.Clock,
+)
+
+private const val SHARE_URL = "https://github.com/bielzindev/MozaikOS/releases/latest"
+
 /**
- * ZUNEX Store: the catalogue of the ZUNEX family and the place to manage it. Inspired by the
- * Windows Phone store: a panorama with spotlight apps, quick links, categories and every app;
- * a details pivot with install / open / update / turn off / uninstall that act for real
- * through [AppManager].
+ * The Mozaik Store, after the Windows Phone 8.1 Store: a panorama with the spotlight (a hero
+ * app and a grid of featured apps), quick links, categories and your apps; search; an app page
+ * with overview / reviews / details / related pivots and the install and share buttons. It lists
+ * only the Mozaik family, and installing, updating, turning off and uninstalling act for real
+ * through [AppManager] (the app appears on, or leaves, the phone, Start and the app list).
  */
 class StoreActivity : WpActivity() {
 
@@ -85,9 +115,11 @@ class StoreActivity : WpActivity() {
             when (page) {
                 StorePage.Hub -> StoreHub(nav)
                 is StorePage.Filtered -> AppListPage(filterTitle(page.filter), nav, filter = page.filter)
-                is StorePage.Category -> AppListPage(stringResource(page.category.label), nav, category = page.category)
+                is StorePage.Category -> AppListPage(page.category?.let { stringResource(it.label) } ?: stringResource(R.string.store_collection), nav, category = page.category)
                 is StorePage.Details -> ZunexCatalog.byId(page.id)?.let { DetailsPage(it, nav) }
+                is StorePage.Review -> ZunexCatalog.byId(page.id)?.let { ReviewPage(it) { nav.pop() } }
                 StorePage.Search -> SearchPage(nav)
+                StorePage.Settings -> StoreSettingsPage()
             }
         }
     }
@@ -96,6 +128,8 @@ class StoreActivity : WpActivity() {
 @Composable
 private fun filterTitle(f: StoreFilter) = stringResource(
     when (f) {
+        StoreFilter.Featured -> R.string.store_featured
+        StoreFilter.New -> R.string.store_new
         StoreFilter.Installed -> R.string.store_installed
         StoreFilter.Updates -> R.string.store_updates
         StoreFilter.Available -> R.string.store_available
@@ -103,11 +137,17 @@ private fun filterTitle(f: StoreFilter) = stringResource(
     },
 )
 
-private fun matches(f: StoreFilter, c: CatalogApp, s: AppState, manager: AppManager) = when (f) {
-    StoreFilter.Installed -> s.installed
-    StoreFilter.Updates -> manager.hasUpdate(c)
-    StoreFilter.Available -> !s.installed
-    StoreFilter.Disabled -> s.installed && !s.enabled
+private fun filtered(f: StoreFilter, manager: AppManager, states: Map<String, AppState>): List<CatalogApp> {
+    fun s(c: CatalogApp) = states[c.id] ?: manager.state(c.app)
+    return when (f) {
+        StoreFilter.Featured -> ZunexCatalog.apps.filter { it.featured }
+        // The newest versions first.
+        StoreFilter.New -> ZunexCatalog.apps.sortedByDescending { manager.updatedAt(it.id) * 1000 + it.versionCode }
+        StoreFilter.Installed -> ZunexCatalog.apps.filter { s(it).installed }
+        StoreFilter.Updates -> ZunexCatalog.apps.filter { manager.hasUpdate(it) }
+        StoreFilter.Available -> ZunexCatalog.apps.filter { !s(it).installed }
+        StoreFilter.Disabled -> ZunexCatalog.apps.filter { s(it).installed && !s(it).enabled }
+    }
 }
 
 @Composable
@@ -115,24 +155,44 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
     val context = LocalContext.current
     val manager = remember { AppManager.get(context) }
     val states by manager.states.collectAsState()
+    val reviews by remember { StoreReviews.get(context) }.reviews.collectAsState()
+    val progress by manager.progress.collectAsState()
     fun stateOf(c: CatalogApp) = states[c.id] ?: manager.state(c.app)
     val updates = ZunexCatalog.apps.count { manager.hasUpdate(it) }
+    val featured = ZunexCatalog.apps.filter { it.featured }
+    // A different hero every day, like the Store's spotlight.
+    val hero = featured[Calendar.getInstance().get(Calendar.DAY_OF_YEAR) % featured.size]
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             WpPanorama(
                 title = stringResource(R.string.store_short),
                 sections = listOf(
                     PanoramaSection(null) {
-                        // Spotlight: the featured apps as big tiles.
-                        val featured = ZunexCatalog.apps.filter { it.featured }
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 8.dp)) {
-                            featured.chunked(2).forEachIndexed { row, pair ->
-                                Row(Modifier.fillMaxWidth().slideInStaggered(row).padding(bottom = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 8.dp, bottom = 16.dp)) {
+                            // The spotlight app: wide, with its description.
+                            Column(Modifier.slideInStaggered(0).wpClickable { nav.navigate(StorePage.Details(hero.id)) }.padding(bottom = 16.dp)) {
+                                Row(verticalAlignment = Alignment.Top) {
+                                    AppTile(hero, Modifier.size(100.dp), 56.dp)
+                                    Spacer(Modifier.width(12.dp))
+                                    Column(Modifier.weight(1f)) {
+                                        WpText(stringResource(hero.app.label), style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                        Stars(reviews[hero.id]?.stars ?: 0, 16.dp)
+                                        WpText(priceLabel(hero, stateOf(hero), manager), style = WpType.Small, color = Wp.palette.subtle)
+                                    }
+                                }
+                                WpText(stringResource(hero.description), style = WpType.Normal, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
+                            }
+                            // The featured apps, two by two: big icon, NAME, price and stars.
+                            featured.filter { it != hero }.chunked(2).forEachIndexed { row, pair ->
+                                Row(Modifier.fillMaxWidth().slideInStaggered(row + 1).padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                     pair.forEach { c ->
                                         Column(Modifier.weight(1f).wpClickable { nav.navigate(StorePage.Details(c.id)) }) {
-                                            AppTile(c, Modifier.fillMaxWidth().aspectRatio(1f), 64.dp)
-                                            WpText(stringResource(c.app.label).uppercase(), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, modifier = Modifier.padding(top = 6.dp))
-                                            WpText(stateLabel(c, stateOf(c), manager), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+                                            AppTile(c, Modifier.fillMaxWidth().aspectRatio(1f), 64.dp, progress[c.id])
+                                            WpText(stringResource(c.app.label).uppercase(), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                                WpText(priceLabel(c, stateOf(c), manager), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, modifier = Modifier.weight(1f))
+                                                Stars(reviews[c.id]?.stars ?: 0, 10.dp)
+                                            }
                                         }
                                     }
                                     if (pair.size == 1) Spacer(Modifier.weight(1f))
@@ -141,81 +201,127 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                         }
                     },
                     PanoramaSection(stringResource(R.string.store_quick_links)) {
-                        Column(Modifier.fillMaxSize().padding(start = 20.dp, end = 8.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            listOf(StoreFilter.Installed, StoreFilter.Updates, StoreFilter.Available, StoreFilter.Disabled).chunked(2).forEachIndexed { row, pair ->
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            StoreFilter.entries.chunked(2).forEachIndexed { row, pair ->
                                 Row(Modifier.fillMaxWidth().slideInStaggered(row), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                                     pair.forEach { f ->
-                                        val count = ZunexCatalog.apps.count { matches(f, it, stateOf(it), manager) }
+                                        val count = filtered(f, manager, states).size
                                         Box(
-                                            Modifier.weight(1f).aspectRatio(1f).background(Wp.accent).wpClickable { nav.navigate(StorePage.Filtered(f)) }.padding(10.dp),
+                                            Modifier.weight(1f).aspectRatio(1.15f).background(Wp.accent).wpClickable { nav.navigate(StorePage.Filtered(f)) }.padding(10.dp),
                                         ) {
-                                            WpText(filterTitle(f), style = WpType.Large, color = Color.White)
-                                            WpText(count.toString(), style = WpType.TileCount, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd))
+                                            WpText(filterTitle(f).replaceFirstChar { it.uppercase() }, style = WpType.Large, color = Color.White, maxLines = 3)
+                                            if (f == StoreFilter.Updates || f == StoreFilter.Disabled || f == StoreFilter.Available) {
+                                                WpText(count.toString(), style = WpType.TileCount, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd))
+                                            }
                                         }
                                     }
                                 }
                             }
                             if (updates > 0) {
-                                WpButton(stringResource(R.string.store_update_all, updates)) { manager.updateAll() }
+                                WpButton(stringResource(R.string.store_update_all, updates)) { ZunexCatalog.apps.filter { manager.hasUpdate(it) }.forEach { manager.installWithProgress(it.app, update = true) } }
                             }
                         }
                     },
                     PanoramaSection(stringResource(R.string.store_categories)) {
-                        Column(Modifier.fillMaxSize().padding(start = 20.dp)) {
-                            StoreCategory.entries.forEachIndexed { i, cat ->
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp)) {
+                            (listOf<StoreCategory?>(null) + StoreCategory.entries).forEachIndexed { i, cat ->
                                 WpText(
-                                    stringResource(cat.label).lowercase(),
+                                    cat?.let { stringResource(it.label).lowercase() } ?: stringResource(R.string.store_collection),
                                     style = WpType.ExtraLarge,
-                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Category(cat)) }.padding(vertical = 8.dp),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Category(cat)) }.padding(vertical = 6.dp),
                                 )
                             }
                         }
                     },
-                    PanoramaSection(stringResource(R.string.store_all_apps)) {
+                    PanoramaSection(stringResource(R.string.store_my_apps)) {
+                        val mine = ZunexCatalog.apps.filter { stateOf(it).installed }
                         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 8.dp, bottom = 12.dp)) {
-                            itemsIndexed(ZunexCatalog.apps, key = { _, c -> c.id }) { i, c ->
-                                AppRow(c, stateOf(c), manager, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
+                            itemsIndexed(mine, key = { _, c -> c.id }) { i, c ->
+                                AppRow(c, stateOf(c), manager, reviews[c.id], Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
                             }
                         }
                     },
                 ),
             )
         }
-        WpAppBar(buttons = listOf(AppBarButton(WpIcons.Search, stringResource(R.string.search)) { nav.navigate(StorePage.Search) }))
+        WpAppBar(
+            buttons = listOf(AppBarButton(WpIcons.Search, stringResource(R.string.search)) { nav.navigate(StorePage.Search) }),
+            menuItems = listOf(
+                AppBarMenuItem(stringResource(R.string.store_my_apps)) { nav.navigate(StorePage.Filtered(StoreFilter.Installed)) },
+                AppBarMenuItem(stringResource(R.string.store_updates)) { nav.navigate(StorePage.Filtered(StoreFilter.Updates)) },
+                AppBarMenuItem(stringResource(R.string.settings_lower)) { nav.navigate(StorePage.Settings) },
+            ),
+        )
     }
 }
 
+/** "free", "installed", "update", "off" — what the 8.1 Store wrote under an app. */
 @Composable
-private fun stateLabel(c: CatalogApp, s: AppState, manager: AppManager): String = stringResource(
+private fun priceLabel(c: CatalogApp, s: AppState, manager: AppManager): String = stringResource(
     when {
-        !s.installed -> R.string.store_state_free
+        !s.installed -> R.string.store_free
         manager.hasUpdate(c) -> R.string.store_state_update
         !s.enabled -> R.string.store_state_off
         else -> R.string.store_state_installed
     },
 )
 
-/** The app's identity: its colour with its glyph. */
+/** The app's icon: its colour with its glyph, and the install progress across the bottom. */
 @Composable
-fun AppTile(c: CatalogApp, modifier: Modifier, glyph: Dp) {
+fun AppTile(c: CatalogApp, modifier: Modifier, glyph: Dp, progress: Float? = null) {
     Box(modifier.background(c.color), contentAlignment = Alignment.Center) {
         WpIcon(c.app.icon, tint = Color.White, size = glyph)
+        if (progress != null) {
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color.Black.copy(alpha = 0.35f)))
+            Box(Modifier.align(Alignment.BottomStart).fillMaxWidth(progress).height(4.dp).background(Color.White))
+        }
+    }
+}
+
+/** Five stars, the first [filled] of them solid, as in the Store's lists. */
+@Composable
+fun Stars(filled: Int, size: Dp, color: Color = Wp.palette.foreground, onPick: ((Int) -> Unit)? = null) {
+    Row(horizontalArrangement = Arrangement.spacedBy(size / 6)) {
+        for (i in 1..5) {
+            Canvas(Modifier.size(size).then(if (onPick != null) Modifier.wpClickable { onPick(i) } else Modifier)) {
+                val cx = this.size.width / 2
+                val cy = this.size.height / 2
+                val r = this.size.minDimension / 2
+                val path = Path()
+                for (k in 0 until 10) {
+                    val rr = if (k % 2 == 0) r else r * 0.42f
+                    val a = Math.toRadians((-90 + k * 36).toDouble())
+                    val p = Offset(cx + (rr * Math.cos(a)).toFloat(), cy + (rr * Math.sin(a)).toFloat())
+                    if (k == 0) path.moveTo(p.x, p.y) else path.lineTo(p.x, p.y)
+                }
+                path.close()
+                if (i <= filled) drawPath(path, color) else drawPath(path, color.copy(alpha = 0.45f), style = Stroke(r * 0.12f))
+            }
+        }
     }
 }
 
 @Composable
-private fun AppRow(c: CatalogApp, s: AppState, manager: AppManager, modifier: Modifier, onClick: () -> Unit) {
+private fun AppRow(c: CatalogApp, s: AppState, manager: AppManager, review: StoreReview?, modifier: Modifier, onClick: () -> Unit) {
+    val progress by manager.progress.collectAsState()
     Row(modifier.fillMaxWidth().wpClickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        AppTile(c, Modifier.size(62.dp).then(if (!s.active) Modifier.background(Color.Black.copy(alpha = 0.4f)) else Modifier), 34.dp)
+        AppTile(c, Modifier.size(62.dp).then(if (!s.active) Modifier.background(Color.Black.copy(alpha = 0.4f)) else Modifier), 34.dp, progress[c.id])
         Spacer(Modifier.width(14.dp))
         Column(Modifier.weight(1f)) {
-            WpText(stringResource(c.app.label), style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            WpText(
-                stateLabel(c, s, manager) + "  ·  " + stringResource(c.category.label),
-                style = WpType.Small,
-                color = if (manager.hasUpdate(c) || !s.installed) Wp.accent else Wp.palette.subtle,
-                maxLines = 1,
-            )
+            WpText(stringResource(c.app.label), style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText("Mozaik", style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                WpText(
+                    if (progress[c.id] != null) stringResource(R.string.store_installing) else priceLabel(c, s, manager),
+                    style = WpType.Small,
+                    color = if (manager.hasUpdate(c) || progress[c.id] != null) Wp.accent else Wp.palette.foreground,
+                    maxLines = 1,
+                    modifier = Modifier.weight(1f),
+                )
+                Stars(review?.stars ?: 0, 11.dp)
+            }
         }
     }
 }
@@ -225,22 +331,27 @@ private fun AppListPage(title: String, nav: WpNavigator<StorePage>, filter: Stor
     val context = LocalContext.current
     val manager = remember { AppManager.get(context) }
     val states by manager.states.collectAsState()
-    val list = ZunexCatalog.apps.filter { c ->
-        val s = states[c.id] ?: manager.state(c.app)
-        (filter == null || matches(filter, c, s, manager)) && (category == null || c.category == category)
-    }
+    val reviews by remember { StoreReviews.get(context) }.reviews.collectAsState()
+    val list = (if (filter != null) filtered(filter, manager, states) else ZunexCatalog.apps).filter { c -> category == null || c.category == category }
     Column(Modifier.fillMaxSize()) {
         WpText(stringResource(R.string.app_store).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
-        WpText(title.lowercase(), style = WpType.Header, maxLines = 1, modifier = Modifier.padding(start = 20.dp, bottom = 8.dp))
+        WpText(title.lowercase(), style = WpType.Header, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(start = 20.dp, bottom = 8.dp))
         if (filter == StoreFilter.Updates && list.isNotEmpty()) {
-            WpButton(stringResource(R.string.store_update_all, list.size), Modifier.padding(start = 20.dp, bottom = 8.dp)) { manager.updateAll() }
+            WpButton(stringResource(R.string.store_update_all, list.size), Modifier.padding(start = 20.dp, bottom = 8.dp)) {
+                list.forEach { manager.installWithProgress(it.app, update = true) }
+            }
         }
         if (list.isEmpty()) {
-            WpText(stringResource(R.string.store_nothing_here), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(start = 20.dp))
+            WpText(
+                stringResource(if (filter == StoreFilter.Updates) R.string.store_no_updates else R.string.store_nothing_here),
+                style = WpType.Large,
+                color = Wp.palette.subtle,
+                modifier = Modifier.padding(start = 20.dp),
+            )
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
             itemsIndexed(list, key = { _, c -> c.id }) { i, c ->
-                AppRow(c, states[c.id] ?: manager.state(c.app), manager, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
+                AppRow(c, states[c.id] ?: manager.state(c.app), manager, reviews[c.id], Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
             }
         }
     }
@@ -251,21 +362,26 @@ private fun SearchPage(nav: WpNavigator<StorePage>) {
     val context = LocalContext.current
     val manager = remember { AppManager.get(context) }
     val states by manager.states.collectAsState()
+    val reviews by remember { StoreReviews.get(context) }.reviews.collectAsState()
     var query by remember { mutableStateOf("") }
+    val focus = remember { androidx.compose.ui.focus.FocusRequester() }
+    androidx.compose.runtime.LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
     val q = query.trim()
     val results = if (q.isEmpty()) emptyList() else ZunexCatalog.apps.filter { c ->
         context.getString(c.app.label).contains(q, true) || context.getString(c.description).contains(q, true) || context.getString(c.category.label).contains(q, true)
     }
     Column(Modifier.fillMaxSize()) {
-        WpText(stringResource(R.string.app_store).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
-        WpText(stringResource(R.string.search), style = WpType.Header, modifier = Modifier.padding(start = 20.dp, bottom = 8.dp))
-        WpTextBox(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp), placeholder = stringResource(R.string.store_search_hint))
+        WpText(stringResource(R.string.store_search_title).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 10.dp))
+        WpTextBox(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp), placeholder = stringResource(R.string.store_search_hint), focusRequester = focus)
+        if (q.isNotEmpty()) {
+            WpText(stringResource(R.string.store_apps_header), style = WpType.Header, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
+        }
         if (q.isNotEmpty() && results.isEmpty()) {
             WpText(stringResource(R.string.store_no_results), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(20.dp))
         }
-        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, top = 8.dp, bottom = 16.dp)) {
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
             itemsIndexed(results, key = { _, c -> c.id }) { i, c ->
-                AppRow(c, states[c.id] ?: manager.state(c.app), manager, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
+                AppRow(c, states[c.id] ?: manager.state(c.app), manager, reviews[c.id], Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
             }
         }
     }
@@ -278,90 +394,85 @@ private fun DetailsPage(c: CatalogApp, nav: WpNavigator<StorePage>) {
     val context = LocalContext.current
     val manager = remember { AppManager.get(context) }
     val states by manager.states.collectAsState()
+    val progress by manager.progress.collectAsState()
+    val reviews by remember { StoreReviews.get(context) }.reviews.collectAsState()
+    val review = reviews[c.id]
     val s = states[c.id] ?: manager.state(c.app)
+    val installing = progress[c.id]
     var confirm by remember { mutableStateOf<Confirm?>(null) }
     var notice by remember { mutableStateOf<String?>(null) }
+    var menu by remember { mutableStateOf(false) }
     val name = stringResource(c.app.label)
 
-    Box(Modifier.fillMaxSize()) {
-        WpPivot(
-            title = stringResource(R.string.app_store) + " · " + name,
-            headers = listOf(stringResource(R.string.store_details), stringResource(R.string.store_related)),
-        ) { index ->
-            if (index == 0) {
-                Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
-                    Row(Modifier.slideInStaggered(0)) {
-                        AppTile(c, Modifier.size(120.dp), 64.dp)
-                        Spacer(Modifier.width(16.dp))
-                        Column {
-                            WpText(name, style = WpType.ExtraLarge, maxLines = 2)
-                            WpText("Mozaik · João Gabriel", style = WpType.Normal, color = Wp.palette.subtle)
-                            WpText(stringResource(c.category.label), style = WpType.Small, color = Wp.palette.subtle)
-                            WpText(
-                                stateLabel(c, s, manager),
-                                style = WpType.Normal,
-                                color = Wp.accent,
-                                modifier = Modifier.padding(top = 6.dp),
-                            )
-                        }
-                    }
-                    Spacer(Modifier.height(16.dp))
-                    // Actions for the current state.
-                    Row(Modifier.slideInStaggered(1), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                        when {
-                            !s.installed -> WpButton(stringResource(R.string.store_install)) {
-                                val added = manager.install(c.app)
-                                val extra = added.filter { it != c.app }
-                                if (extra.isNotEmpty()) notice = context.getString(R.string.store_installed_with, extra.joinToString { context.getString(it.label) })
-                            }
-                            !s.enabled -> WpButton(stringResource(R.string.store_enable)) { manager.enable(c.app) }
-                            else -> WpButton(stringResource(R.string.store_open)) {
-                                runCatching { context.startActivity(Intent(context, c.app.activity).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                            }
-                        }
-                        if (manager.hasUpdate(c)) WpButton(stringResource(R.string.store_update)) { manager.update(c.app) }
-                    }
-                    if (s.installed && !c.required) {
-                        Row(Modifier.padding(top = 10.dp).slideInStaggered(2), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                            if (s.enabled) WpButton(stringResource(R.string.store_disable)) { confirm = Confirm.Disable }
-                            WpButton(stringResource(R.string.store_uninstall)) { confirm = Confirm.Uninstall }
-                        }
-                    }
-                    if (c.required) {
-                        WpText(stringResource(R.string.store_required), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 10.dp))
-                    }
+    fun install() = manager.installWithProgress(c.app) { added ->
+        val extra = added.filter { it != c.app }
+        if (extra.isNotEmpty()) notice = context.getString(R.string.store_installed_with, extra.joinToString { context.getString(it.label) })
+    }
 
-                    Section(stringResource(R.string.store_description), 3)
-                    WpText(stringResource(c.description), style = WpType.Normal)
-                    Section(stringResource(R.string.store_whats_new), 4)
-                    WpText(stringResource(c.whatsNew), style = WpType.Normal)
-                    Section(stringResource(R.string.store_information), 5)
-                    InfoLine(stringResource(R.string.store_version), c.version)
-                    if (s.installed && s.versionCode < c.versionCode) InfoLine(stringResource(R.string.store_installed_version), stringResource(R.string.store_older))
-                    InfoLine(stringResource(R.string.store_publisher), "João Gabriel (Mozaik)")
-                    InfoLine(stringResource(R.string.store_category), stringResource(c.category.label))
-                    if (c.permissions.isNotEmpty()) {
-                        Section(stringResource(R.string.store_permissions), 6)
-                        c.permissions.forEach { WpText("•  " + stringResource(it), style = WpType.Normal) }
-                    }
-                    if (c.dependsOn.isNotEmpty()) {
-                        Section(stringResource(R.string.store_requires), 7)
-                        c.dependsOn.forEach { d ->
-                            WpText(
-                                stringResource(d.label) + if (!manager.isActive(d)) "  (" + stringResource(R.string.store_state_off) + ")" else "",
-                                style = WpType.Large,
-                                color = Wp.accent,
-                                modifier = Modifier.wpClickable { nav.navigate(StorePage.Details(d.id)) }.padding(vertical = 2.dp),
-                            )
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) {
+                WpPivot(
+                    title = name.uppercase(),
+                    headers = listOf(stringResource(R.string.store_overview), stringResource(R.string.store_reviews), stringResource(R.string.store_details), stringResource(R.string.store_related)),
+                ) { index ->
+                    when (index) {
+                        0 -> Overview(c, s, manager, review, installing)
+                        1 -> ReviewsPivot(review) { nav.navigate(StorePage.Review(c.id)) }
+                        2 -> DetailsPivot(c, s, manager, nav)
+                        else -> {
+                            val related = ZunexCatalog.apps.filter { it.category == c.category && it.id != c.id }.ifEmpty { ZunexCatalog.apps.filter { it.featured && it.id != c.id } }
+                            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
+                                itemsIndexed(related, key = { _, r -> r.id }) { i, r ->
+                                    AppRow(r, states[r.id] ?: manager.state(r.app), manager, reviews[r.id], Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(r.id)) }
+                                }
+                            }
                         }
                     }
                 }
-            } else {
-                val related = ZunexCatalog.apps.filter { it.category == c.category && it.id != c.id }.ifEmpty { ZunexCatalog.apps.filter { it.featured && it.id != c.id } }
-                LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
-                    itemsIndexed(related, key = { _, r -> r.id }) { i, r ->
-                        AppRow(r, states[r.id] ?: manager.state(r.app), manager, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(r.id)) }
+            }
+            // The 8.1 Store's bottom bar: two wide buttons and "...".
+            Column(Modifier.fillMaxWidth().background(Wp.palette.chrome).navigationBarsPadding()) {
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    val primary: Pair<String, () -> Unit> = when {
+                        installing != null -> stringResource(R.string.store_installing) to {}
+                        !s.installed -> stringResource(R.string.store_install) to { install() }
+                        manager.hasUpdate(c) -> stringResource(R.string.store_update) to { manager.installWithProgress(c.app, update = true) }
+                        !s.enabled -> stringResource(R.string.store_enable) to { manager.enable(c.app) }
+                        else -> stringResource(R.string.store_open) to {
+                            runCatching { context.startActivity(Intent(context, c.app.activity).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                            Unit
+                        }
                     }
+                    WpButton(primary.first, Modifier.weight(1f), enabled = installing == null, onClick = primary.second)
+                    Spacer(Modifier.width(12.dp))
+                    WpButton(stringResource(R.string.share), Modifier.weight(1f)) {
+                        val text = context.getString(R.string.store_share_text, name, SHARE_URL)
+                        runCatching {
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    }
+                    WpText("•••", style = WpType.Large, modifier = Modifier.wpClickable { menu = !menu }.padding(horizontal = 16.dp, vertical = 6.dp))
+                }
+                if (menu) {
+                    val items = buildList {
+                        if (s.active) add(stringResource(R.string.pin_to_start) to { PinRequests.pin("builtin:${c.id}") })
+                        add(stringResource(R.string.store_rate) to { nav.navigate(StorePage.Review(c.id)) })
+                        if (s.installed && !c.required && s.enabled) add(stringResource(R.string.store_disable) to { confirm = Confirm.Disable })
+                        if (s.installed && !c.required) add(stringResource(R.string.store_uninstall) to { confirm = Confirm.Uninstall })
+                    }
+                    BackHandler { menu = false }
+                    items.forEach { (label, action) ->
+                        WpText(
+                            label.lowercase(),
+                            style = WpType.Large,
+                            modifier = Modifier.fillMaxWidth().wpClickable {
+                                menu = false
+                                action()
+                            }.padding(horizontal = 20.dp, vertical = 10.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
                 }
             }
         }
@@ -397,15 +508,195 @@ private fun DetailsPage(c: CatalogApp, nav: WpNavigator<StorePage>) {
     }
 }
 
+/** Overview: the icon, name, publisher, price, stars, description with "more", the tiles. */
 @Composable
-private fun Section(title: String, index: Int) {
-    WpText(title.uppercase(), style = WpType.AppTitle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 20.dp, bottom = 6.dp).slideInStaggered(index))
+private fun Overview(c: CatalogApp, s: AppState, manager: AppManager, review: StoreReview?, installing: Float?) {
+    var more by remember { mutableStateOf(false) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+        Row(Modifier.slideInStaggered(0)) {
+            AppTile(c, Modifier.size(130.dp), 72.dp)
+            Spacer(Modifier.width(16.dp))
+            Column {
+                WpText(stringResource(c.app.label), style = WpType.ExtraLarge, maxLines = 2)
+                WpText("Mozaik", style = WpType.Normal, color = Wp.palette.subtle)
+                WpText(priceLabel(c, s, manager), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(top = 4.dp))
+                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 6.dp)) {
+                    Stars(review?.stars ?: 0, 18.dp)
+                }
+                WpText(
+                    LocalContext.current.resources.getQuantityString(R.plurals.store_ratings, if (review != null) 1 else 0, if (review != null) 1 else 0),
+                    style = WpType.Small,
+                    color = Wp.palette.subtle,
+                )
+            }
+        }
+        if (c.app in LiveTileApps) {
+            WpText(stringResource(R.string.store_live_tile), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 4.dp))
+        }
+        if (installing != null) {
+            Column(Modifier.padding(top = 14.dp)) {
+                WpText(stringResource(R.string.store_installing), style = WpType.Normal, color = Wp.accent)
+                Box(Modifier.padding(top = 6.dp).fillMaxWidth().height(4.dp).background(Wp.palette.subtle.copy(alpha = 0.3f))) {
+                    Box(Modifier.fillMaxWidth(installing).fillMaxHeight().background(Wp.accent))
+                }
+            }
+        }
+        WpText(
+            stringResource(c.description),
+            style = WpType.Normal,
+            maxLines = if (more) Int.MAX_VALUE else 4,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 16.dp).slideInStaggered(1),
+        )
+        if (!more) {
+            WpText(stringResource(R.string.store_read_more), style = WpType.Normal, color = Wp.accent, modifier = Modifier.wpClickable { more = true }.padding(vertical = 4.dp))
+        }
+        if (!s.installed) {
+            WpText(stringResource(R.string.store_terms), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp))
+        }
+        // In place of screenshots: the app's tiles on Start, small, medium and wide.
+        Row(Modifier.padding(top = 18.dp).horizontalScroll(rememberScrollState()).slideInStaggered(2), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
+            TilePreview(c, 150.dp, 150.dp, 56.dp, true)
+            TilePreview(c, 306.dp, 150.dp, 56.dp, true)
+            TilePreview(c, 72.dp, 72.dp, 32.dp, false)
+        }
+        WpText(stringResource(R.string.store_whats_new).uppercase(), style = WpType.AppTitle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
+        WpText(stringResource(c.whatsNew), style = WpType.Normal)
+    }
+}
+
+@Composable
+private fun TilePreview(c: CatalogApp, w: Dp, h: Dp, glyph: Dp, label: Boolean) {
+    Box(Modifier.size(w, h).background(c.color)) {
+        WpIcon(c.app.icon, Modifier.align(Alignment.Center), tint = Color.White, size = glyph)
+        if (label) WpText(stringResource(c.app.label), style = WpType.Small, color = Color.White, maxLines = 1, modifier = Modifier.align(Alignment.BottomStart).padding(8.dp))
+    }
+}
+
+@Composable
+private fun ReviewsPivot(review: StoreReview?, onRate: () -> Unit) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+        if (review == null) {
+            WpText(stringResource(R.string.store_first_review), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(bottom = 16.dp))
+        } else {
+            Stars(review.stars, 16.dp)
+            WpText(
+                stringResource(R.string.store_you) + "  ·  " + android.text.format.DateFormat.getDateFormat(LocalContext.current).format(java.util.Date(review.at)),
+                style = WpType.Small,
+                color = Wp.palette.subtle,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+            if (review.text.isNotEmpty()) WpText(review.text, style = WpType.Normal, modifier = Modifier.padding(top = 6.dp, bottom = 16.dp))
+        }
+        WpButton(stringResource(if (review == null) R.string.store_rate else R.string.store_edit_review), onClick = onRate)
+    }
+}
+
+/** Details: information (updated, version, size, category), permissions, what it works with, publisher. */
+@Composable
+private fun DetailsPivot(c: CatalogApp, s: AppState, manager: AppManager, nav: WpNavigator<StorePage>) {
+    val context = LocalContext.current
+    val pkg = remember { runCatching { context.packageManager.getPackageInfo(context.packageName, 0) }.getOrNull() }
+    val updated = manager.updatedAt(c.id).takeIf { it > 0 } ?: pkg?.lastUpdateTime ?: 0L
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+        Section(stringResource(R.string.store_information))
+        InfoLine(stringResource(R.string.store_last_updated), if (updated > 0) android.text.format.DateFormat.getDateFormat(context).format(java.util.Date(updated)) else "—")
+        InfoLine(stringResource(R.string.store_version), c.version)
+        if (s.installed && s.versionCode < c.versionCode) InfoLine(stringResource(R.string.store_installed_version), stringResource(R.string.store_older))
+        InfoLine(stringResource(R.string.store_size), stringResource(R.string.store_size_included))
+        InfoLine(stringResource(R.string.store_category), stringResource(c.category.label).lowercase())
+        if (c.required) WpText(stringResource(R.string.store_required), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 8.dp))
+        if (c.permissions.isNotEmpty()) {
+            Section(stringResource(R.string.store_permissions))
+            c.permissions.forEach { WpText(stringResource(it), style = WpType.Normal, modifier = Modifier.padding(vertical = 1.dp)) }
+        }
+        if (c.dependsOn.isNotEmpty()) {
+            Section(stringResource(R.string.store_requires))
+            c.dependsOn.forEach { d ->
+                WpText(
+                    stringResource(d.label) + if (!manager.isActive(d)) "  (" + stringResource(R.string.store_state_off) + ")" else "",
+                    style = WpType.Large,
+                    color = Wp.accent,
+                    modifier = Modifier.wpClickable { nav.navigate(StorePage.Details(d.id)) }.padding(vertical = 2.dp),
+                )
+            }
+        }
+        Section(stringResource(R.string.store_publisher))
+        InfoLine(stringResource(R.string.store_name), "Mozaik (João Gabriel)")
+        WpText(
+            stringResource(R.string.store_more_from),
+            style = WpType.Normal,
+            color = Wp.accent,
+            modifier = Modifier.padding(top = 8.dp).wpClickable { nav.navigate(StorePage.Category(null)) }.padding(vertical = 4.dp),
+        )
+    }
+}
+
+/** Rate and review: tap the stars, write a few words, submit. */
+@Composable
+private fun ReviewPage(c: CatalogApp, onDone: () -> Unit) {
+    val context = LocalContext.current
+    val store = remember { StoreReviews.get(context) }
+    val old = remember { store.reviews.value[c.id] }
+    var stars by remember { mutableIntStateOf(old?.stars ?: 0) }
+    var text by remember { mutableStateOf(old?.text ?: "") }
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)) {
+            WpText(stringResource(c.app.label).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(top = 14.dp))
+            WpText(stringResource(R.string.store_rate_title), style = WpType.Header, modifier = Modifier.padding(bottom = 12.dp))
+            Stars(stars, 40.dp, color = Wp.accent) { stars = it }
+            Spacer(Modifier.height(20.dp))
+            WpText(stringResource(R.string.store_review_hint), style = WpType.Subtle, color = Wp.palette.subtle)
+            WpTextBox(text, { text = it }, Modifier.fillMaxWidth().padding(top = 6.dp), singleLine = false, maxLines = 6)
+            if (old != null) {
+                WpText(
+                    stringResource(R.string.store_delete_review),
+                    style = WpType.Normal,
+                    color = Wp.accent,
+                    modifier = Modifier.padding(top = 16.dp).wpClickable {
+                        store.delete(c.id)
+                        onDone()
+                    }.padding(vertical = 4.dp),
+                )
+            }
+        }
+        WpAppBar(
+            buttons = listOf(
+                AppBarButton(WpIcons.Check, stringResource(R.string.store_submit), enabled = stars > 0) {
+                    store.save(c.id, stars, text)
+                    onDone()
+                },
+                AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { onDone() },
+            ),
+        )
+    }
+}
+
+@Composable
+private fun StoreSettingsPage() {
+    val context = LocalContext.current
+    val manager = remember { AppManager.get(context) }
+    var auto by remember { mutableStateOf(manager.autoUpdate) }
+    Column(Modifier.fillMaxSize().padding(horizontal = 20.dp)) {
+        WpText(stringResource(R.string.app_store).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(top = 14.dp))
+        WpText(stringResource(R.string.settings_lower), style = WpType.Header, modifier = Modifier.padding(bottom = 12.dp))
+        WpToggle(stringResource(R.string.store_auto_update), auto, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
+            auto = it
+            manager.autoUpdate = it
+        }
+        WpText(stringResource(R.string.store_auto_update_info), style = WpType.Small, color = Wp.palette.subtle)
+    }
+}
+
+@Composable
+private fun Section(title: String) {
+    WpText(title, style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(top = 20.dp, bottom = 6.dp))
 }
 
 @Composable
 private fun InfoLine(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
-        WpText(label, style = WpType.Normal, color = Wp.palette.subtle, modifier = Modifier.width(140.dp))
+        WpText("$label: ", style = WpType.Normal, color = Wp.palette.subtle)
         WpText(value, style = WpType.Normal)
     }
 }

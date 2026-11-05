@@ -5,6 +5,11 @@ import android.content.Context
 import android.content.pm.PackageManager
 import com.wpreborn.data.apps.AppRepository
 import com.wpreborn.data.apps.BuiltInApp
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -26,9 +31,55 @@ class AppManager private constructor(private val context: Context) {
     private val _states = MutableStateFlow(load())
     val states: StateFlow<Map<String, AppState>> = _states.asStateFlow()
 
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val _progress = MutableStateFlow<Map<String, Float>>(emptyMap())
+    /** Apps being installed or updated right now, with how far along (0 to 1). */
+    val progress: StateFlow<Map<String, Float>> = _progress.asStateFlow()
+
+    /** Apps of the family update by themselves when a new Mozaik brings newer versions. */
+    var autoUpdate: Boolean
+        get() = prefs.getBoolean("auto_update", true)
+        set(value) {
+            prefs.edit().putBoolean("auto_update", value).apply()
+            if (value) updateAll()
+        }
+
     init {
         // Make Android match what we recorded (e.g. after the app was updated).
         _states.value.forEach { (id, s) -> BuiltInApp.byId(id)?.let { setComponent(it, s.active) } }
+        if (autoUpdate) ZunexCatalog.apps.filter { hasUpdate(it) }.forEach { c ->
+            val s = state(c.app)
+            _states.value = _states.value + (c.id to s.copy(versionCode = c.versionCode))
+            markUpdated(c.id)
+        }
+        save()
+    }
+
+    /** When the app was last installed or updated (0: it came with Mozaik). */
+    fun updatedAt(id: String): Long = prefs.getLong("at_$id", 0L)
+
+    private fun markUpdated(id: String) = prefs.edit().putLong("at_$id", System.currentTimeMillis()).apply()
+
+    /**
+     * Installs (or updates) [app] the way the Windows Phone store did: the progress bar fills,
+     * then the app appears on the phone. [onDone] gets what was installed.
+     */
+    fun installWithProgress(app: BuiltInApp, update: Boolean = false, onDone: (List<BuiltInApp>) -> Unit = {}) {
+        if (app.id in _progress.value) return
+        scope.launch {
+            for (i in 1..24) {
+                _progress.value = _progress.value + (app.id to i / 24f)
+                delay(55)
+            }
+            val result = if (update) {
+                update(app)
+                listOf(app)
+            } else {
+                install(app)
+            }
+            _progress.value = _progress.value - app.id
+            onDone(result)
+        }
     }
 
     fun state(app: BuiltInApp): AppState = _states.value[app.id] ?: AppState(true, true, ZunexCatalog.of(app)?.versionCode ?: 1)
@@ -46,6 +97,7 @@ class AppManager private constructor(private val context: Context) {
         val installed = ArrayList<BuiltInApp>()
         catalog.dependsOn.filterNot { isActive(it) }.forEach { installed += install(it) }
         put(app, AppState(installed = true, enabled = true, versionCode = catalog.versionCode))
+        markUpdated(app.id)
         installed += app
         return installed
     }
@@ -79,6 +131,7 @@ class AppManager private constructor(private val context: Context) {
         val s = state(app)
         if (!s.installed) return
         put(app, s.copy(versionCode = catalog.versionCode))
+        markUpdated(app.id)
     }
 
     fun updateAll() = ZunexCatalog.apps.filter { hasUpdate(it) }.forEach { update(it.app) }

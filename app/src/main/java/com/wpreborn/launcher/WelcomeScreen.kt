@@ -77,10 +77,11 @@ private enum class Step { Hello, Look, Home, Tiles, Finishing }
  * First start, after the Windows Phone 8.1 out-of-box experience: "hello" in many languages
  * on black, then a few pages (look, Start screen, live tiles), each with "next" at the
  * bottom right, and finally "hi there / we're setting things up for you" with the flowing
- * dots before Start appears. Shown only once, on the first install.
+ * dots before Start appears. Shown only once, on the first install. With [preview] (from
+ * Settings) it only shows the pages: choices and buttons change nothing on the phone.
  */
 @Composable
-fun WelcomeScreen(onMakeDefault: () -> Unit, onDone: () -> Unit) {
+fun WelcomeScreen(onMakeDefault: () -> Unit, onDone: () -> Unit, preview: Boolean = false) {
     var index by remember { mutableIntStateOf(0) }
     val step = Step.entries[index]
     BackHandler(enabled = index in 1 until Step.Finishing.ordinal) { index-- }
@@ -101,18 +102,18 @@ fun WelcomeScreen(onMakeDefault: () -> Unit, onDone: () -> Unit) {
         ) { s ->
             when (s) {
                 Step.Hello -> HelloPage { index = Step.Look.ordinal }
-                Step.Look -> Page(R.string.welcome_look_title, onNext = { index++ }) { LookChooser() }
+                Step.Look -> Page(R.string.welcome_look_title, onNext = { index++ }) { LookChooser(preview) }
                 Step.Home -> Page(R.string.welcome_default_title, onNext = { index++ }) {
                     WpText(stringResource(R.string.welcome_default_body), style = WpType.Normal, color = Wp.palette.foreground)
                     Spacer(Modifier.height(20.dp))
-                    WpButton(stringResource(R.string.welcome_default_button), onClick = onMakeDefault)
+                    WpButton(stringResource(R.string.welcome_default_button), onClick = { if (!preview) onMakeDefault() })
                 }
                 Step.Tiles -> Page(R.string.welcome_notifications_title, onNext = { index++ }) {
                     val context = LocalContext.current
                     WpText(stringResource(R.string.welcome_notifications_body), style = WpType.Normal, color = Wp.palette.foreground)
                     Spacer(Modifier.height(20.dp))
                     WpButton(stringResource(R.string.allow)) {
-                        runCatching { context.startActivity(NotificationCenter.accessSettingsIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        if (!preview) runCatching { context.startActivity(NotificationCenter.accessSettingsIntent(context).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
                     }
                 }
                 Step.Finishing -> FinishingPage(onDone)
@@ -187,10 +188,13 @@ private fun NextButton(label: String, color: Color, onClick: () -> Unit) {
 
 /** Background (dark or light) and accent colour, applied at once. */
 @Composable
-private fun LookChooser() {
+private fun LookChooser(preview: Boolean) {
     val context = LocalContext.current
     val repo = remember { SettingsRepository.get(context) }
-    val settings = Wp.settings
+    val real = Wp.settings
+    // In the preview, the choices are only shown, not applied.
+    var local by remember { androidx.compose.runtime.mutableStateOf(real.darkTheme to real.accent) }
+    val settings = if (preview) real.copy(darkTheme = local.first, accent = local.second) else real
     WpText(stringResource(R.string.welcome_look_body), style = WpType.Normal, color = Wp.palette.foreground)
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -201,7 +205,7 @@ private fun LookChooser() {
                     .width(120.dp).height(48.dp)
                     .background(if (dark) Color.Black else Color.White)
                     .border(3.dp, if (on) Wp.accent else Wp.palette.subtle)
-                    .wpClickable { repo.setDarkTheme(dark) },
+                    .wpClickable { if (preview) local = dark to local.second else repo.setDarkTheme(dark) },
                 contentAlignment = Alignment.Center,
             ) { WpText(stringResource(label), style = WpType.Normal, color = if (dark) Color.White else Color.Black) }
         }
@@ -216,7 +220,7 @@ private fun LookChooser() {
                         .aspectRatio(1f)
                         .background(a.color)
                         .then(if (settings.accent == a) Modifier.border(3.dp, Wp.palette.foreground) else Modifier)
-                        .wpClickable { repo.setAccent(a) },
+                        .wpClickable { if (preview) local = local.first to a else repo.setAccent(a) },
                 )
             }
             repeat(5 - row.size) { Spacer(Modifier.weight(1f)) }

@@ -59,6 +59,21 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     private val parkedTiles = HashMap<String, List<TileSpec>>()
 
     init {
+        // Pins asked for elsewhere (the Store's "pin to Start"), once the layout is loaded.
+        viewModelScope.launch {
+            _tiles.first { it.isNotEmpty() }
+            com.wpreborn.data.tiles.PinRequests.pending.collect { keys ->
+                if (keys.isEmpty()) return@collect
+                com.wpreborn.data.tiles.PinRequests.pending.value = emptyList()
+                keys.forEach { key ->
+                    val pinned = _tiles.value.any { it.appKey == key } || folderStore.folders.value.values.any { key in it.apps }
+                    if (!pinned) {
+                        val size = com.wpreborn.data.apps.BuiltInApp.byId(key.removePrefix("builtin:"))?.defaultSize?.let { if (it == TileSize.Wide) TileSize.Medium else it } ?: TileSize.Medium
+                        update(_tiles.value + TileSpec(appKey = key, size = size))
+                    }
+                }
+            }
+        }
         viewModelScope.launch {
             val saved = tileRepo.tiles.first()
             if (saved != null) {

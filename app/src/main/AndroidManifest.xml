@@ -142,6 +142,12 @@
             </intent-filter>
         </service>
         <activity
+            android:name=".launcher.WelcomePreviewActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:screenOrientation="portrait"
+            android:theme="@style/Theme.WpReborn.Lock" />
+        <activity
             android:name=".launcher.lock.GlanceActivity"
             android:exported="false"
             android:taskAffinity="com.wpreborn.glance"

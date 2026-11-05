@@ -1039,4 +1039,12 @@
     <string name="battery_saver">Economia de bateria</string>
     <string name="battery_saver_open">configurar economia de bateria</string>
     <string name="tr_listening">Ouvindo… fale agora (toque no microfone para parar)</string>
+    <string name="wifi_networking">Rede Wi-Fi</string>
+    <string name="wifi_needs_permission">Para ver as redes ao redor, o Android pede permissão de dispositivos próximos / localização.</string>
+    <string name="wifi_searching">Procurando redes…</string>
+    <string name="wifi_secured">protegida (%1$s)</string>
+    <string name="wifi_open">aberta</string>
+    <string name="wifi_more">mais opções</string>
+    <string name="wifi_password">Senha</string>
+    <string name="wifi_connect">conectar</string>
 </resources>

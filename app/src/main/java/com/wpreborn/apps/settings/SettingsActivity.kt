@@ -79,7 +79,7 @@ import com.wpreborn.permissions.canWriteSettings
 import com.wpreborn.permissions.overlayIntent
 import com.wpreborn.permissions.writeSettingsIntent
 
-private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher, Sounds, Battery }
+private enum class SettingsPage { Home, StartTheme, Accent, LockScreen, Notifications, Display, Storage, About, Launcher, Sounds, Battery, Wifi }
 
 /**
  * Settings, laid out like Windows Phone 8.1 ("system" and "applications" pivots). Launcher
@@ -109,6 +109,7 @@ class SettingsActivity : WpActivity() {
                 SettingsPage.Launcher -> LauncherPage()
                 SettingsPage.Sounds -> SoundsPage()
                 SettingsPage.Battery -> BatteryPage()
+                SettingsPage.Wifi -> WifiPage()
             }
         }
     }
@@ -157,7 +158,7 @@ private fun SettingsHome(go: (SettingsPage) -> Unit) {
         Entry(stringResource(R.string.set_lock_screen), onOff(settings.lockEnabled)) { go(SettingsPage.LockScreen) },
         Entry(stringResource(R.string.set_notifications), onOff(notifAccess)) { go(SettingsPage.Notifications) },
         Entry(stringResource(R.string.set_wifi), if (net.wifiConnected) stringResource(R.string.connected) else stringResource(R.string.not_connected)) {
-            context.open(Settings.ACTION_WIFI_SETTINGS)
+            go(SettingsPage.Wifi)
         },
         Entry(stringResource(R.string.set_bluetooth), onOff(radios.bluetooth)) { context.open(Settings.ACTION_BLUETOOTH_SETTINGS) },
         Entry(stringResource(R.string.set_airplane), onOff(radios.airplane)) { context.open(Settings.ACTION_AIRPLANE_MODE_SETTINGS) },

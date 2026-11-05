@@ -96,6 +96,7 @@ private sealed interface PhotosPage {
     data class AlbumPage(val id: Long) : PhotosPage
     data class Viewer(val albumId: Long?, val index: Int) : PhotosPage
     data class Edit(val photoId: Long) : PhotosPage
+    data object Trash : PhotosPage
 }
 
 /** Photos hub: "collection" by month, "albums", an album page and the full-screen viewer. */
@@ -121,6 +122,9 @@ class PhotosActivity : WpActivity() {
             if (perm.granted) photos = library.load(videos = context.hasPermissions(Perms.VIDEOS))
         }
         val albums = remember(photos) { photos?.let { library.albums(it) }.orEmpty() }
+        val trash by androidx.compose.runtime.produceState<List<Photo>>(emptyList(), perm.granted, reload) {
+            if (perm.granted) value = library.trash(videos = context.hasPermissions(Perms.VIDEOS))
+        }
         val nav = rememberNavigator<PhotosPage>(PhotosPage.Hub)
         WpNavHost(nav) { page ->
             when (page) {
@@ -138,7 +142,7 @@ class PhotosActivity : WpActivity() {
                                     list == null -> LoadingDots(Modifier.padding(top = 24.dp))
                                     list.isEmpty() -> CenteredMessage(stringResource(R.string.photos_empty), Modifier.padding(start = 20.dp))
                                     index == 0 -> Collection(list, selection) { nav.navigate(PhotosPage.Viewer(null, it)) }
-                                    else -> Albums(albums) { nav.navigate(PhotosPage.AlbumPage(it.id)) }
+                                    else -> Albums(albums, trash, onTrash = { nav.navigate(PhotosPage.Trash) }) { nav.navigate(PhotosPage.AlbumPage(it.id)) }
                                 }
                             }
                         }
@@ -160,6 +164,7 @@ class PhotosActivity : WpActivity() {
                     if (list.isEmpty()) GoneBack(photos != null) { nav.pop() }
                     else Viewer(list, page.index, onDeleted = { reload++; nav.pop() }, onEdit = { nav.navigate(PhotosPage.Edit(it.id)) })
                 }
+                PhotosPage.Trash -> TrashPage(trash) { reload++ }
                 is PhotosPage.Edit -> photos?.firstOrNull { it.id == page.photoId }?.let { photo ->
                     PhotoEditorPage(photo, onSaved = { reload++ })
                 } ?: GoneBack(photos != null) { nav.pop() }
@@ -213,7 +218,7 @@ private fun PhotoGrid(photos: List<Photo>, selection: PhotoSelection, onOpen: (I
 }
 
 @Composable
-private fun Albums(albums: List<PhotoAlbum>, onOpen: (PhotoAlbum) -> Unit) {
+private fun Albums(albums: List<PhotoAlbum>, trash: List<Photo>, onTrash: () -> Unit, onOpen: (PhotoAlbum) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Fixed(2),
         modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
@@ -226,6 +231,100 @@ private fun Albums(albums: List<PhotoAlbum>, onOpen: (PhotoAlbum) -> Unit) {
                 WpText(a.name.lowercase(), style = WpType.Large, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 4.dp))
                 WpText(a.photos.size.toString(), style = WpType.Small, color = Wp.palette.subtle)
             }
+        }
+        // The trash, last: what was deleted in the past 30 days.
+        if (Build.VERSION.SDK_INT >= 30) {
+            item(key = "trash") {
+                Column(Modifier.wpClickable(onClick = onTrash)) {
+                    Box(Modifier.fillMaxWidth().aspectRatio(1f).background(Wp.palette.raised), contentAlignment = Alignment.Center) {
+                        trash.firstOrNull()?.let { Thumbnail(it.uri, Modifier.fillMaxSize(), sizePx = 512) }
+                        Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = if (trash.isEmpty()) 0f else 0.45f)))
+                        WpIcon(WpIcons.Delete, tint = Color.White, size = 48.dp)
+                    }
+                    WpText(stringResource(R.string.photos_trash), style = WpType.Large, maxLines = 1, modifier = Modifier.padding(top = 4.dp))
+                    WpText(trash.size.toString(), style = WpType.Small, color = Wp.palette.subtle)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * The trash: deleted pictures and videos with the days left before Android deletes them for
+ * good; restore or delete for good the chosen ones, or everything.
+ */
+@Composable
+private fun TrashPage(trashed: List<Photo>, onChanged: () -> Unit) {
+    val context = LocalContext.current
+    val selection = rememberPhotoSelection()
+    val launcher = rememberLauncherForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) {
+        if (it.resultCode == Activity.RESULT_OK) {
+            selection.clear()
+            onChanged()
+        }
+    }
+    fun restore(list: List<Photo>) {
+        if (list.isEmpty() || Build.VERSION.SDK_INT < 30) return
+        runCatching {
+            val pi = MediaStore.createTrashRequest(context.contentResolver, list.map { it.uri }, false)
+            launcher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+        }
+    }
+    fun deleteForGood(list: List<Photo>) {
+        if (list.isEmpty() || Build.VERSION.SDK_INT < 30) return
+        runCatching {
+            val pi = MediaStore.createDeleteRequest(context.contentResolver, list.map { it.uri })
+            launcher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
+        }
+    }
+    Column(Modifier.fillMaxSize()) {
+        WpPageHeader(stringResource(R.string.app_photos), stringResource(R.string.photos_trash))
+        WpText(stringResource(R.string.photos_trash_info), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(start = 20.dp, end = 20.dp, bottom = 8.dp))
+        Box(Modifier.weight(1f)) {
+            if (trashed.isEmpty()) {
+                CenteredMessage(stringResource(R.string.photos_trash_empty), Modifier.padding(start = 20.dp))
+            } else {
+                LazyVerticalGrid(
+                    columns = GridCells.Fixed(4),
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(trashed.size, key = { trashed[it].id }) { i ->
+                        val p = trashed[i]
+                        Box {
+                            // A tap here selects (a deleted item is not opened).
+                            SelectableThumb(p, selection) { selection.active = true; selection.toggle(p.id) }
+                            val days = ((p.expiresAt - System.currentTimeMillis()) / 86_400_000L + 1).coerceAtLeast(0)
+                            WpText(
+                                stringResource(R.string.photos_days_left, days.toInt()), style = WpType.Small, color = Color.White,
+                                modifier = Modifier.align(Alignment.BottomEnd).background(Color.Black.copy(alpha = 0.5f)).padding(horizontal = 4.dp),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+        val chosen = trashed.filter { it.id in selection.ids }
+        if (selection.active) {
+            WpAppBar(
+                buttons = listOf(
+                    AppBarButton(WpIcons.Sync, stringResource(R.string.photos_restore), enabled = chosen.isNotEmpty()) { restore(chosen) },
+                    AppBarButton(WpIcons.Delete, stringResource(R.string.photos_delete_forever), enabled = chosen.isNotEmpty()) { deleteForGood(chosen) },
+                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select_all)) {
+                        selection.ids = if (selection.ids.size == trashed.size) emptySet() else trashed.map { it.id }.toSet()
+                    },
+                    AppBarButton(WpIcons.Close, stringResource(R.string.cancel)) { selection.clear() },
+                ),
+            )
+        } else {
+            WpAppBar(
+                buttons = listOf(
+                    AppBarButton(WpIcons.SelectAll, stringResource(R.string.photos_select), enabled = trashed.isNotEmpty()) { selection.active = true },
+                    AppBarButton(WpIcons.Sync, stringResource(R.string.photos_restore_all), enabled = trashed.isNotEmpty()) { restore(trashed) },
+                    AppBarButton(WpIcons.Delete, stringResource(R.string.photos_empty_trash), enabled = trashed.isNotEmpty()) { deleteForGood(trashed) },
+                ),
+            )
         }
     }
 }
@@ -269,7 +368,8 @@ private fun Viewer(photos: List<Photo>, start: Int, onDeleted: () -> Unit, onEdi
                         })
                         if (Build.VERSION.SDK_INT >= 30) {
                             add(AppBarButton(WpIcons.Delete, stringResource(R.string.delete)) {
-                                val pi = MediaStore.createDeleteRequest(context.contentResolver, listOf(p.uri))
+                                // To the trash (30 days), not deleted for good.
+                                val pi = MediaStore.createTrashRequest(context.contentResolver, listOf(p.uri), true)
                                 deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                             })
                         }
@@ -450,7 +550,7 @@ private fun SelectionAppBar(selection: PhotoSelection, photos: List<Photo>, onDe
             },
             AppBarButton(WpIcons.Delete, stringResource(R.string.delete), enabled = chosen.isNotEmpty()) {
                 if (android.os.Build.VERSION.SDK_INT >= 30) {
-                    val pi = MediaStore.createDeleteRequest(context.contentResolver, chosen.map { it.uri })
+                    val pi = MediaStore.createTrashRequest(context.contentResolver, chosen.map { it.uri }, true)
                     deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
                 } else {
                     chosen.forEach { runCatching { context.contentResolver.delete(it.uri, null, null) } }

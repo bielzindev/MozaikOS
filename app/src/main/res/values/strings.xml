@@ -955,4 +955,12 @@
         <item quantity="one">copy %d item to</item>
         <item quantity="other">copy %d items to</item>
     </plurals>
+    <string name="photos_trash">trash</string>
+    <string name="photos_trash_info">Deleted pictures and videos stay here for 30 days, then Android deletes them for good.</string>
+    <string name="photos_trash_empty">The trash is empty.</string>
+    <string name="photos_days_left">%1$d d</string>
+    <string name="photos_restore">restore</string>
+    <string name="photos_restore_all">restore all</string>
+    <string name="photos_delete_forever">delete for good</string>
+    <string name="photos_empty_trash">empty trash</string>
 </resources>

@@ -956,4 +956,12 @@
         <item quantity="one">copiar %d item para</item>
         <item quantity="other">copiar %d itens para</item>
     </plurals>
+    <string name="photos_trash">lixeira</string>
+    <string name="photos_trash_info">Fotos e vídeos apagados ficam aqui por 30 dias; depois o Android os apaga de vez.</string>
+    <string name="photos_trash_empty">A lixeira está vazia.</string>
+    <string name="photos_days_left">%1$d d</string>
+    <string name="photos_restore">restaurar</string>
+    <string name="photos_restore_all">restaurar tudo</string>
+    <string name="photos_delete_forever">apagar de vez</string>
+    <string name="photos_empty_trash">esvaziar lixeira</string>
 </resources>

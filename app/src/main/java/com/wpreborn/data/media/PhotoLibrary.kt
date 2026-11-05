@@ -7,7 +7,16 @@ import android.provider.MediaStore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-data class Photo(val id: Long, val dateTaken: Long, val bucketId: Long, val bucket: String, val isVideo: Boolean, val durationMs: Long = 0) {
+data class Photo(
+    val id: Long,
+    val dateTaken: Long,
+    val bucketId: Long,
+    val bucket: String,
+    val isVideo: Boolean,
+    val durationMs: Long = 0,
+    /** In the trash: when Android deletes it for good (ms; 0 = not in the trash). */
+    val expiresAt: Long = 0,
+) {
     val uri: Uri
         get() = ContentUris.withAppendedId(
             if (isVideo) MediaStore.Video.Media.EXTERNAL_CONTENT_URI else MediaStore.Images.Media.EXTERNAL_CONTENT_URI,
@@ -47,6 +56,44 @@ class PhotoLibrary(private val context: Context) {
         read(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false)
         if (videos) read(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
         result.sortedByDescending { it.dateTaken }.take(limit)
+    }
+
+    /**
+     * The trash (Android 11+): pictures and videos deleted from Photos, which Android keeps
+     * for 30 days before deleting them for good. Newest deletions first.
+     */
+    suspend fun trash(videos: Boolean = true): List<Photo> = withContext(Dispatchers.IO) {
+        if (android.os.Build.VERSION.SDK_INT < 30) return@withContext emptyList()
+        val result = ArrayList<Photo>()
+        fun read(uri: Uri, video: Boolean) {
+            val projection = arrayOf(
+                MediaStore.MediaColumns._ID,
+                MediaStore.MediaColumns.DATE_TAKEN,
+                MediaStore.MediaColumns.DATE_ADDED,
+                MediaStore.MediaColumns.BUCKET_ID,
+                MediaStore.MediaColumns.BUCKET_DISPLAY_NAME,
+                MediaStore.MediaColumns.DURATION,
+                MediaStore.MediaColumns.DATE_EXPIRES,
+            )
+            val args = android.os.Bundle().apply {
+                putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
+                putString(android.content.ContentResolver.QUERY_ARG_SQL_SORT_ORDER, "${MediaStore.MediaColumns.DATE_EXPIRES} DESC")
+            }
+            runCatching {
+                context.contentResolver.query(uri, projection, args, null)?.use { c ->
+                    while (c.moveToNext()) {
+                        val taken = c.getLong(1).takeIf { it > 0 } ?: (c.getLong(2) * 1000)
+                        result += Photo(
+                            c.getLong(0), taken, c.getLong(3), c.getString(4) ?: "", isVideo = video,
+                            durationMs = if (video) c.getLong(5) else 0, expiresAt = c.getLong(6) * 1000,
+                        )
+                    }
+                }
+            }
+        }
+        read(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, false)
+        if (videos) read(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true)
+        result.sortedByDescending { it.expiresAt }
     }
 
     fun albums(photos: List<Photo>): List<PhotoAlbum> =

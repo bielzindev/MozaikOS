@@ -87,6 +87,13 @@ class NewsRepository private constructor(private val context: Context) {
         _articles.value = _articles.value.filter { it.sourceId !in s }
     }
 
+    /** The saved news, at once: a refresh that is still downloading holds the lock and would make a tile wait. */
+    suspend fun showCached() {
+        if (_articles.value.isNotEmpty()) return
+        val saved = withContext(Dispatchers.IO) { readCache() } ?: return
+        if (_articles.value.isEmpty()) _articles.value = saved.filter { it.sourceId !in _disabled.value }
+    }
+
     /** Cached news first, then fresh ones when older than [maxAgeMs] (or forced). */
     suspend fun refresh(force: Boolean = false, maxAgeMs: Long = 20 * 60_000L) = mutex.withLock {
         if (!loadedCache) {

@@ -860,24 +860,39 @@ private fun NewsTile(size: TileSize, live: Boolean, seed: Int) {
     val articles by repo.articles.collectAsState()
     androidx.compose.runtime.LaunchedEffect(live) {
         if (!live) return@LaunchedEffect
+        // The saved news show at once; then they are refreshed every 20 minutes. When there is
+        // nothing yet (no network just after the phone starts, a feed that failed) it tries again
+        // soon, 30 s then longer, instead of leaving the tile idle for 20 minutes.
+        runCatching { repo.showCached() }
+        var wait = 30_000L
         while (true) {
             runCatching { repo.refresh() }
-            kotlinx.coroutines.delay(20 * 60_000L)
+            if (repo.articles.value.isEmpty()) {
+                kotlinx.coroutines.delay(wait)
+                wait = (wait * 2).coerceAtMost(5 * 60_000L)
+            } else {
+                wait = 30_000L
+                kotlinx.coroutines.delay(20 * 60_000L)
+            }
         }
     }
-    val top = remember(articles) { repo.inCategory(articles, com.wpreborn.data.news.NewsCategory.Top).filter { it.image != null }.take(6) }
+    val headlines = remember(articles) { repo.inCategory(articles, com.wpreborn.data.news.NewsCategory.Top).take(8) }
+    // With pictures when the feeds give them; otherwise the headlines alone on the tile's colour.
+    val top = remember(headlines) { headlines.filter { it.image != null }.take(6).ifEmpty { headlines.take(6) } }
     if (!live || top.isEmpty() || size == TileSize.Small) {
         Box(Modifier.fillMaxSize()) { IconTile(com.wpreborn.core.icons.Glyphs.News, size) }
         return
     }
     CycleTile(top, enabled = top.size > 1, seed = seed) { a ->
         Box(Modifier.fillMaxSize()) {
-            com.wpreborn.apps.news.WebImage(a.image!!, Modifier.fillMaxSize(), if (size == TileSize.Medium) 360 else 720)
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(androidx.compose.ui.graphics.Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))),
-            )
+            if (a.image != null) {
+                com.wpreborn.apps.news.WebImage(a.image, Modifier.fillMaxSize(), if (size == TileSize.Medium) 360 else 720)
+                Box(
+                    Modifier
+                        .fillMaxSize()
+                        .background(androidx.compose.ui.graphics.Brush.verticalGradient(0.35f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f))),
+                )
+            }
             WpText(
                 a.title,
                 style = WpType.Normal.copy(fontSize = if (size == TileSize.Medium) 14.sp else 16.sp, lineHeight = if (size == TileSize.Medium) 17.sp else 20.sp, fontWeight = FontWeight.SemiBold),

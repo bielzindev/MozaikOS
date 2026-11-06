@@ -271,14 +271,21 @@ object WebImages {
         runCatching {
             val dir = File(context.cacheDir, "web-images").apply { mkdirs() }
             val file = File(dir, url.hashCode().toString() + "_" + url.length)
-            if (!file.exists()) {
-                val conn = URL(url).openConnection() as HttpURLConnection
+            if (!file.exists() || file.length() == 0L) {
+                // Feeds often give http:// addresses; Android doesn't allow cleartext, and these
+                // servers all answer on https.
+                val address = if (url.startsWith("http://")) "https://" + url.removePrefix("http://") else url
+                val conn = URL(address).openConnection() as HttpURLConnection
                 conn.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 14) Mozaik-News")
                 conn.instanceFollowRedirects = true
                 conn.connectTimeout = 10_000
                 conn.readTimeout = 15_000
                 try {
                     conn.inputStream.use { input -> file.outputStream().use { input.copyTo(it) } }
+                } catch (e: Exception) {
+                    // Never keep a half-downloaded picture: it would be taken for the real one next time.
+                    file.delete()
+                    throw e
                 } finally {
                     conn.disconnect()
                 }

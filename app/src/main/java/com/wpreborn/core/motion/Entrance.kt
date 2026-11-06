@@ -11,33 +11,57 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The Windows Phone Toolkit's SlideInEffect (Ms-PL), used when pivot items and list rows come in:
- * row [index] starts (index + 1) × 50 px (of a 480 px wide screen) to the right, stays there for
- * 350 ms, moves linearly to 90 % of that by 420 ms and then glides home with an ExponentialEase
- * (EaseOut, Exponent 5) by 1050 ms. Rows further down start further away, so they come in one
- * after the other. ([distanceDp] is kept for callers; the toolkit's offsets are used.)
+ * The entrance of list rows and page content in Windows Phone 8.1 (the animation library's
+ * enterContent / EntranceThemeTransition): each of the first rows comes 40 px (of a 400 px wide
+ * screen) from the right in 550 ms with the standard deceleration (cubic-bezier .1,.9,.2,1),
+ * fading in over the first 170 ms, 33 ms after the row above (at most 250 ms).
+ *
+ * Only the rows that are on screen when the page (or [key]) appears move: a row created later,
+ * while the list scrolls, just shows up in place, as on the phone. ([distanceDp] is kept for callers.)
  */
 @Suppress("UNUSED_PARAMETER")
 fun Modifier.slideInStaggered(index: Int, key: Any? = Unit, distanceDp: Float = 80f): Modifier = composed {
-    val progress = remember(key) { Animatable(0f) }
     val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
+    val animate = remember(key) { EntranceWave.joins(index) }
+    val progress = remember(key) { Animatable(if (animate) 0f else 1f) }
     LaunchedEffect(key) {
-        progress.animateTo(1f, tween(SLIDE_END, easing = androidx.compose.animation.core.LinearEasing))
+        if (!animate) return@LaunchedEffect
+        delay(minOf(index * 33L, 250L))
+        progress.animateTo(1f, tween(ENTER_MS, easing = androidx.compose.animation.core.LinearEasing))
     }
     this.graphicsLayer {
-        val from = (minOf(index, 12) + 1) * 50f * screenWidthDp / 480f * density
-        val t = progress.value * SLIDE_END
-        translationX = when {
-            t <= SLIDE_BEGIN -> from
-            t <= SLIDE_BREAK -> from + (from * 0.9f - from) * ((t - SLIDE_BEGIN) / (SLIDE_BREAK - SLIDE_BEGIN))
-            else -> from * 0.9f * (1f - WpEasing.ExpOut5.transform((t - SLIDE_BREAK) / (SLIDE_END - SLIDE_BREAK)))
+        val p = progress.value
+        if (p < 1f) {
+            val offset = 40f * screenWidthDp / 400f * density
+            translationX = (1f - WpEasing.Decelerate.transform(p)) * offset
+            alpha = (p * ENTER_MS / FADE_MS).coerceIn(0f, 1f)
         }
     }
 }
 
-private const val SLIDE_BEGIN = 350f
-private const val SLIDE_BREAK = 420f
-private const val SLIDE_END = 1050
+private const val ENTER_MS = 550
+private const val FADE_MS = 170f
+
+/**
+ * Which rows take part in an entrance: the first 8, created within 600 ms of the first one of the
+ * wave. A row composed later (scrolling) starts no movement of its own.
+ */
+internal object EntranceWave {
+    private var startedAt = 0L
+
+    fun joins(index: Int): Boolean {
+        if (index >= 8) return false
+        val now = android.os.SystemClock.uptimeMillis()
+        if (now - startedAt <= 600L) return true
+        // A new page or list appearing: its top row starts the wave.
+        return if (index == 0) {
+            startedAt = now
+            true
+        } else {
+            false
+        }
+    }
+}
 
 /** The vertical "slide up and fade" (SlideTransition SlideUpFadeIn) used by message dialogs and menus. */
 fun Modifier.slideUpFadeIn(key: Any? = Unit, distanceDp: Float = 30f): Modifier = composed {

@@ -137,6 +137,16 @@ private fun filterTitle(f: StoreFilter) = stringResource(
     },
 )
 
+/** The short names on the quick-link tiles. */
+@Composable
+private fun quickLinkTitle(f: StoreFilter) = stringResource(
+    when (f) {
+        StoreFilter.Featured -> R.string.store_ql_featured
+        StoreFilter.New -> R.string.store_ql_new
+        else -> return filterTitle(f)
+    },
+)
+
 private fun filtered(f: StoreFilter, manager: AppManager, states: Map<String, AppState>): List<CatalogApp> {
     fun s(c: CatalogApp) = states[c.id] ?: manager.state(c.app)
     return when (f) {
@@ -209,8 +219,15 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                                         Box(
                                             Modifier.weight(1f).aspectRatio(1.15f).background(Wp.accent).wpClickable { nav.navigate(StorePage.Filtered(f)) }.padding(10.dp),
                                         ) {
-                                            WpText(filterTitle(f).replaceFirstChar { it.uppercase() }, style = WpType.Large, color = Color.White, maxLines = 3)
-                                            if (f == StoreFilter.Updates || f == StoreFilter.Disabled || f == StoreFilter.Available) {
+                                            // A smaller type and short names, so no word breaks in the middle.
+                                            WpText(
+                                                quickLinkTitle(f).replaceFirstChar { it.uppercase() },
+                                                style = WpType.Normal,
+                                                color = Color.White,
+                                                maxLines = 3,
+                                                modifier = Modifier.align(Alignment.TopStart),
+                                            )
+                                            if (f != StoreFilter.Featured && f != StoreFilter.New) {
                                                 WpText(count.toString(), style = WpType.TileCount, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd))
                                             }
                                         }

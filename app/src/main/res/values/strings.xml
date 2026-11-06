@@ -1170,4 +1170,6 @@
         <item quantity="other">%d ratings</item>
     </plurals>
     <string name="about_welcome">see the welcome screen</string>
+    <string name="store_ql_featured">featured</string>
+    <string name="store_ql_new">new</string>
 </resources>

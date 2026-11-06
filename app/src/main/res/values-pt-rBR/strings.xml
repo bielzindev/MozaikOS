@@ -1171,4 +1171,6 @@
         <item quantity="other">%d avaliações</item>
     </plurals>
     <string name="about_welcome">ver tela de boas-vindas</string>
+    <string name="store_ql_featured">em destaque</string>
+    <string name="store_ql_new">novidades</string>
 </resources>

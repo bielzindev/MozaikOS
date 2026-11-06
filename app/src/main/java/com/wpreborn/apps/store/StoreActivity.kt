@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.core.graphics.drawable.toBitmap
 import com.wpreborn.R
 import com.wpreborn.apps.common.WpActivity
 import com.wpreborn.core.icons.WpIcons
@@ -148,16 +149,6 @@ private fun filterTitle(f: StoreFilter) = stringResource(
         StoreFilter.Updates -> R.string.store_updates
         StoreFilter.Available -> R.string.store_available
         StoreFilter.Disabled -> R.string.store_disabled
-    },
-)
-
-/** The short names on the quick-link tiles. */
-@Composable
-private fun quickLinkTitle(f: StoreFilter) = stringResource(
-    when (f) {
-        StoreFilter.Featured -> R.string.store_ql_featured
-        StoreFilter.New -> R.string.store_ql_new
-        else -> return filterTitle(f)
     },
 )
 
@@ -781,7 +772,7 @@ private fun GameTile(g: GameApp, installed: Boolean, modifier: Modifier, textSiz
     val context = LocalContext.current
     val icon = remember(g.id, installed) {
         if (!installed) null else runCatching {
-            androidx.core.graphics.drawable.toBitmap(context.packageManager.getApplicationIcon(g.id), 192, 192).asImageBitmap()
+            context.packageManager.getApplicationIcon(g.id).toBitmap(192, 192).asImageBitmap()
         }.getOrNull()
     }
     Box(modifier.background(g.color), contentAlignment = Alignment.Center) {

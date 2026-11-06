@@ -516,14 +516,14 @@ fun StartScreen(
                         val w = geo.w(tile.size, geo.columns)
                         val h = geo.h(tile.size)
                         // Tiles fly out/in from the top-left corner towards the bottom-right.
-                        val feather = ((pl.y / 2) + (pl.x / 2)).coerceAtMost(7)
+                        val feather = ((pl.y / 2) + (pl.x / 2)).coerceAtMost(9)
                         val tileColor = tile.fixedColor ?: rememberBrandColor(app) ?: Wp.accent
                         Box(
                             Modifier
                                 .offset { pos }
                                 .size(w, h)
                                 .zIndex(if (dragging) 2f else if (selected) 1f else 0f)
-                                .turnstileItem(if (state.launchingId == tile.id) 6 else feather)
+                                .turnstileItem(if (state.launchingId == tile.id) 10 else feather)
                                 .graphicsLayer {
                                     scaleX = scale
                                     scaleY = scale

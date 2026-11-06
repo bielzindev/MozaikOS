@@ -11,21 +11,33 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
- * The staggered "slide in from the right" used when pivot items and list rows appear:
- * each row starts a little later than the previous one and decelerates exponentially.
+ * The Windows Phone Toolkit's SlideInEffect (Ms-PL), used when pivot items and list rows come in:
+ * row [index] starts (index + 1) × 50 px (of a 480 px wide screen) to the right, stays there for
+ * 350 ms, moves linearly to 90 % of that by 420 ms and then glides home with an ExponentialEase
+ * (EaseOut, Exponent 5) by 1050 ms. Rows further down start further away, so they come in one
+ * after the other. ([distanceDp] is kept for callers; the toolkit's offsets are used.)
  */
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.slideInStaggered(index: Int, key: Any? = Unit, distanceDp: Float = 80f): Modifier = composed {
     val progress = remember(key) { Animatable(0f) }
+    val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     LaunchedEffect(key) {
-        delay(minOf(index, 10) * 30L)
-        launch { progress.animateTo(1f, tween(WpDurations.SlideIn, easing = WpEasing.ExpOut)) }
+        progress.animateTo(1f, tween(SLIDE_END, easing = androidx.compose.animation.core.LinearEasing))
     }
     this.graphicsLayer {
-        val p = progress.value
-        translationX = (1f - p) * distanceDp * density
-        alpha = if (p <= 0f) 0f else minOf(1f, p * 2.5f)
+        val from = (minOf(index, 12) + 1) * 50f * screenWidthDp / 480f * density
+        val t = progress.value * SLIDE_END
+        translationX = when {
+            t <= SLIDE_BEGIN -> from
+            t <= SLIDE_BREAK -> from + (from * 0.9f - from) * ((t - SLIDE_BEGIN) / (SLIDE_BREAK - SLIDE_BEGIN))
+            else -> from * 0.9f * (1f - WpEasing.ExpOut5.transform((t - SLIDE_BREAK) / (SLIDE_END - SLIDE_BREAK)))
+        }
     }
 }
+
+private const val SLIDE_BEGIN = 350f
+private const val SLIDE_BREAK = 420f
+private const val SLIDE_END = 1050
 
 /** The vertical "slide up and fade" (SlideTransition SlideUpFadeIn) used by message dialogs and menus. */
 fun Modifier.slideUpFadeIn(key: Any? = Unit, distanceDp: Float = 30f): Modifier = composed {

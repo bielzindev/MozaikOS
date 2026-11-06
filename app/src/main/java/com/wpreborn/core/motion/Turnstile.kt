@@ -28,31 +28,38 @@ import kotlin.math.max
 import kotlin.math.min
 
 /**
- * Turnstile transition, as implemented by the Windows Phone Toolkit (TurnstileTransition):
- * the page rotates around the left edge of the screen like a revolving door.
+ * The Windows Phone 8.1 turnstile, with the animation library's own numbers (WinJS
+ * Animations.js turnstileForwardIn/Out, turnstileBackwardIn/Out): the page turns like a
+ * revolving door hinged 40 px left of the screen, at the screen's vertical middle.
  *
- *  - ForwardIn:   RotationY -80 -> 0, 350 ms, exponential ease-out
- *  - ForwardOut:  RotationY 0 -> 50,  250 ms, exponential ease-in
- *  - BackwardIn:  RotationY 50 -> 0,  350 ms, exponential ease-out
- *  - BackwardOut: RotationY 0 -> -80, 250 ms, exponential ease-in
+ *  - ForwardIn:   rotateY 80 -> 0,   300 ms, cubic-bezier(0.01, 0.975, 0.4775, 0.9775), perspective 600
+ *  - ForwardOut:  rotateY 0 -> -50,  128 ms, cubic-bezier(0.4925, 0.01, 0.7675, -0.01), perspective 600
+ *  - BackwardIn:  rotateY -50 -> 0,  300 ms, in curve, perspective 600
+ *  - BackwardOut: rotateY 0 -> 80,   128 ms, out curve, perspective 800
+ *
+ * Opacity: visible from the first frame when coming in, until the last frame when going out.
+ * Several elements (tiles, list rows) are staggered 50 ms apart, as WinJS does.
  */
-enum class TurnstileMode(val from: Float, val to: Float, val entering: Boolean) {
-    ForwardIn(-80f, 0f, true),
-    ForwardOut(0f, 50f, false),
-    BackwardIn(50f, 0f, true),
-    BackwardOut(0f, -80f, false),
-    None(0f, 0f, true);
+enum class TurnstileMode(val from: Float, val to: Float, val entering: Boolean, val perspectivePx: Float) {
+    ForwardIn(80f, 0f, true, 600f),
+    ForwardOut(0f, -50f, false, 600f),
+    BackwardIn(-50f, 0f, true, 600f),
+    BackwardOut(0f, 80f, false, 800f),
+    None(0f, 0f, true, 600f);
 
     val duration get() = if (entering) WpDurations.TurnstileIn else WpDurations.TurnstileOut
 }
 
-/** Sign applied to rotationY so that positive Silverlight angles swing the right edge away. */
-const val TURNSTILE_SIGN = -1f
+/** Kept for code that still names it: the 8.1 angles above are already in Compose's direction. */
+const val TURNSTILE_SIGN = 1f
 
 /** Maximum number of feather steps; elements further down move together with the last step. */
-private const val MAX_FEATHER = 8
-private const val FEATHER_STEP = WpDurations.FeatherStagger * 3 / 4
+private const val MAX_FEATHER = 10
+private const val FEATHER_STEP = WpDurations.FeatherStagger
 private const val FEATHER_SPAN = MAX_FEATHER * FEATHER_STEP
+
+/** The hinge: 40 px (of a 400 px wide phone screen) left of the screen's edge. */
+const val TURNSTILE_HINGE_FRACTION = -0.1f
 
 @Stable
 class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
@@ -67,16 +74,18 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
         if (mode.entering) this.mode = TurnstileMode.None
     }
 
-    internal fun applyTo(scope: GraphicsLayerScope, featherIndex: Int, pivotX: Float) = with(scope) {
+    /** [pivotX]/[pivotY]: the hinge as a fraction of the element (it may lie outside it). */
+    internal fun applyTo(scope: GraphicsLayerScope, featherIndex: Int, pivotX: Float, pivotY: Float = 0.5f) = with(scope) {
         val m = mode
         if (m == TurnstileMode.None) return@with
         val elapsed = progress.value * (m.duration + FEATHER_SPAN)
         val delay = min(featherIndex, MAX_FEATHER) * FEATHER_STEP
         val local = ((elapsed - delay) / m.duration).coerceIn(0f, 1f)
-        val eased = if (m.entering) WpEasing.ExpOut.transform(local) else WpEasing.ExpIn.transform(local)
-        transformOrigin = TransformOrigin(pivotX, 0.5f)
-        cameraDistance = 14f * density
-        rotationY = (m.from + (m.to - m.from) * eased) * TURNSTILE_SIGN
+        val eased = if (m.entering) WpEasing.TurnstileIn.transform(local) else WpEasing.TurnstileOut.transform(local)
+        transformOrigin = TransformOrigin(pivotX, pivotY)
+        // CSS perspective in px ≈ dp; Compose's camera distance is in inches of a 72 dpi camera.
+        cameraDistance = m.perspectivePx / 72f * density
+        rotationY = m.from + (m.to - m.from) * eased
         alpha = when {
             m.entering && local <= 0f -> 0f
             !m.entering && local >= 1f -> 0f
@@ -89,7 +98,7 @@ val LocalTurnstile = staticCompositionLocalOf<TurnstileState?> { null }
 
 /** Applies the turnstile rotation to a whole page, hinged on its left edge. */
 fun Modifier.turnstile(state: TurnstileState?): Modifier =
-    if (state == null) this else this.graphicsLayer { state.applyTo(this, 0, 0f) }
+    if (state == null) this else this.graphicsLayer { state.applyTo(this, 0, TURNSTILE_HINGE_FRACTION) }
 
 /**
  * Turnstile for an individual element (tile, list row) hinged on the left edge of the
@@ -101,13 +110,28 @@ fun Modifier.turnstileItem(featherIndex: Int): Modifier = composed {
     if (state == null) {
         this
     } else {
-        val geometry = remember { FloatArray(2) }
+        // Where the element is on the screen, so all of them turn around the same hinge: 40 px left
+        // of the screen, at its vertical middle (WinJS collectTurnstileTransformOrigins).
+        val geometry = remember { FloatArray(4) }
+        val config = androidx.compose.ui.platform.LocalConfiguration.current
+        val dens = androidx.compose.ui.platform.LocalDensity.current.density
+        val screenW = config.screenWidthDp * dens
+        val screenH = config.screenHeightDp * dens
         this
             .onGloballyPositioned {
-                geometry[0] = it.positionInRoot().x
-                geometry[1] = it.size.width.toFloat()
+                val p = it.positionInRoot()
+                geometry[0] = p.x
+                geometry[1] = p.y
+                geometry[2] = it.size.width.toFloat()
+                geometry[3] = it.size.height.toFloat()
             }
-            .graphicsLayer { state.applyTo(this, featherIndex, -geometry[0] / max(1f, geometry[1])) }
+            .graphicsLayer {
+                val w = max(1f, geometry[2])
+                val h = max(1f, geometry[3])
+                val pivotX = (TURNSTILE_HINGE_FRACTION * screenW - geometry[0]) / w
+                val pivotY = (screenH / 2f - geometry[1]) / h
+                state.applyTo(this, featherIndex, pivotX, pivotY)
+            }
     }
 }
 

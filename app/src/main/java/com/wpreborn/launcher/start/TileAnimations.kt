@@ -14,6 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.graphics.graphicsLayer
+import com.wpreborn.core.motion.WpDurations
 import com.wpreborn.core.motion.WpEasing
 import kotlinx.coroutines.delay
 import kotlin.random.Random
@@ -40,9 +41,9 @@ fun FlipTile(
         val rnd = Random(seed)
         delay(2000L + rnd.nextLong(6000))
         while (true) {
-            angle.animateTo(180f, tween(800, easing = WpEasing.CubicInOut))
+            angle.animateTo(180f, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
             delay(5000L + rnd.nextLong(3000))
-            angle.animateTo(360f, tween(800, easing = WpEasing.CubicInOut))
+            angle.animateTo(360f, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
             angle.snapTo(0f)
             delay(6000L + rnd.nextLong(6000))
         }
@@ -88,7 +89,7 @@ fun <T> CycleTile(
         delay(1500L + rnd.nextLong(3000))
         while (true) {
             val target = kotlin.math.floor(pos.value) + 1f
-            pos.animateTo(target, tween(900, easing = WpEasing.CubicInOut))
+            pos.animateTo(target, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
             delay(4500L + rnd.nextLong(2500))
         }
     }

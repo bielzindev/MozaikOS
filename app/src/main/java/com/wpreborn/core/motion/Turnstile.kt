@@ -56,7 +56,6 @@ const val TURNSTILE_SIGN = 1f
 /** Maximum number of feather steps; elements further down move together with the last step. */
 private const val MAX_FEATHER = 10
 private const val FEATHER_STEP = WpDurations.FeatherStagger
-private const val FEATHER_SPAN = MAX_FEATHER * FEATHER_STEP
 
 /** The hinge: 40 px (of a 400 px wide phone screen) left of the screen's edge. */
 const val TURNSTILE_HINGE_FRACTION = -0.1f
@@ -67,10 +66,16 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
     /** Linear 0..1 progress of the current [mode], including the feather span. */
     val progress = Animatable(if (initialMode == TurnstileMode.None) 1f else 0f)
 
+    /** The highest feather index of the elements that turn one after the other (0: the page turns as one). */
+    @Volatile var maxFeather = 0
+    /** The stagger time of the running turn: only as long as the feathered elements need. */
+    private var span = 0
+
     suspend fun run(mode: TurnstileMode) {
         this.mode = mode
+        span = min(maxFeather, MAX_FEATHER) * FEATHER_STEP
         progress.snapTo(0f)
-        progress.animateTo(1f, tween(mode.duration + FEATHER_SPAN, easing = LinearEasing))
+        progress.animateTo(1f, tween(mode.duration + span, easing = LinearEasing))
         if (mode.entering) this.mode = TurnstileMode.None
     }
 
@@ -78,7 +83,7 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
     internal fun applyTo(scope: GraphicsLayerScope, featherIndex: Int, pivotX: Float, pivotY: Float = 0.5f) = with(scope) {
         val m = mode
         if (m == TurnstileMode.None) return@with
-        val elapsed = progress.value * (m.duration + FEATHER_SPAN)
+        val elapsed = progress.value * (m.duration + span)
         val delay = min(featherIndex, MAX_FEATHER) * FEATHER_STEP
         val local = ((elapsed - delay) / m.duration).coerceIn(0f, 1f)
         val eased = if (m.entering) WpEasing.TurnstileIn.transform(local) else WpEasing.TurnstileOut.transform(local)
@@ -113,6 +118,7 @@ fun Modifier.turnstileItem(featherIndex: Int): Modifier = composed {
         // Where the element is on the screen, so all of them turn around the same hinge: 40 px left
         // of the screen, at its vertical middle (WinJS collectTurnstileTransformOrigins).
         val geometry = remember { FloatArray(4) }
+        androidx.compose.runtime.SideEffect { if (featherIndex > state.maxFeather) state.maxFeather = featherIndex }
         val config = androidx.compose.ui.platform.LocalConfiguration.current
         val dens = androidx.compose.ui.platform.LocalDensity.current.density
         val screenW = config.screenWidthDp * dens

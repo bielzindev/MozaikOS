@@ -69,6 +69,8 @@ fun Modifier.tilt(enabled: Boolean = true, maxAngle: Float = 0f, depression: Flo
                             if (!ch.pressed) break
                             val p = ch.position
                             if (p.x < 0f || p.y < 0f || p.x > w || p.y > h) break
+                            // A scroll or a drag started: the tilt lets go, as on the phone.
+                            if ((p - down.position).getDistance() > viewConfiguration.touchSlop) break
                             apply(p)
                         }
                         // The toolkit's return: after 200 ms, back to rest in 100 ms.

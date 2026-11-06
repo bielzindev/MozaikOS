@@ -47,7 +47,8 @@ enum class TurnstileMode(val from: Float, val to: Float, val entering: Boolean, 
     BackwardOut(0f, 80f, false, 800f),
     None(0f, 0f, true, 600f);
 
-    val duration get() = if (entering) WpDurations.TurnstileIn else WpDurations.TurnstileOut
+    /** Classic: 350 ms in, 250 ms out (exponential). Windows Phone 8.1: 300 ms in, 128 ms out. */
+    val duration get() = if (WpMotion.classic) (if (entering) 350 else 250) else if (entering) WpDurations.TurnstileIn else WpDurations.TurnstileOut
 }
 
 /** Kept for code that still names it: the 8.1 angles above are already in Compose's direction. */
@@ -73,7 +74,7 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
 
     suspend fun run(mode: TurnstileMode) {
         this.mode = mode
-        span = min(maxFeather, MAX_FEATHER) * FEATHER_STEP
+        span = if (WpMotion.classic) min(maxFeather, 8) * 30 else min(maxFeather, MAX_FEATHER) * FEATHER_STEP
         progress.snapTo(0f)
         progress.animateTo(1f, tween(mode.duration + span, easing = LinearEasing))
         if (mode.entering) this.mode = TurnstileMode.None
@@ -84,12 +85,18 @@ class TurnstileState(initialMode: TurnstileMode = TurnstileMode.None) {
         val m = mode
         if (m == TurnstileMode.None) return@with
         val elapsed = progress.value * (m.duration + span)
-        val delay = min(featherIndex, MAX_FEATHER) * FEATHER_STEP
+        val classic = WpMotion.classic
+        val delay = if (classic) min(featherIndex, 8) * 30 else min(featherIndex, MAX_FEATHER) * FEATHER_STEP
         val local = ((elapsed - delay) / m.duration).coerceIn(0f, 1f)
-        val eased = if (m.entering) WpEasing.TurnstileIn.transform(local) else WpEasing.TurnstileOut.transform(local)
+        val eased = when {
+            classic && m.entering -> WpEasing.ExpOut.transform(local)
+            classic -> WpEasing.ExpIn.transform(local)
+            m.entering -> WpEasing.TurnstileIn.transform(local)
+            else -> WpEasing.TurnstileOut.transform(local)
+        }
         transformOrigin = TransformOrigin(pivotX, pivotY)
         // CSS perspective in px ≈ dp; Compose's camera distance is in inches of a 72 dpi camera.
-        cameraDistance = m.perspectivePx / 72f * density
+        cameraDistance = if (classic) 14f * density else m.perspectivePx / 72f * density
         rotationY = m.from + (m.to - m.from) * eased
         alpha = when {
             m.entering && local <= 0f -> 0f
@@ -103,7 +110,7 @@ val LocalTurnstile = staticCompositionLocalOf<TurnstileState?> { null }
 
 /** Applies the turnstile rotation to a whole page, hinged on its left edge. */
 fun Modifier.turnstile(state: TurnstileState?): Modifier =
-    if (state == null) this else this.graphicsLayer { state.applyTo(this, 0, TURNSTILE_HINGE_FRACTION) }
+    if (state == null) this else this.graphicsLayer { state.applyTo(this, 0, if (WpMotion.classic) 0f else TURNSTILE_HINGE_FRACTION) }
 
 /**
  * Turnstile for an individual element (tile, list row) hinged on the left edge of the
@@ -134,8 +141,9 @@ fun Modifier.turnstileItem(featherIndex: Int): Modifier = composed {
             .graphicsLayer {
                 val w = max(1f, geometry[2])
                 val h = max(1f, geometry[3])
-                val pivotX = (TURNSTILE_HINGE_FRACTION * screenW - geometry[0]) / w
-                val pivotY = (screenH / 2f - geometry[1]) / h
+                // Classic: hinged on the screen's left edge, at the element's middle.
+                val pivotX = if (WpMotion.classic) -geometry[0] / w else (TURNSTILE_HINGE_FRACTION * screenW - geometry[0]) / w
+                val pivotY = if (WpMotion.classic) 0.5f else (screenH / 2f - geometry[1]) / h
                 state.applyTo(this, featherIndex, pivotX, pivotY)
             }
     }

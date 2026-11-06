@@ -271,6 +271,10 @@ private fun StartThemePage(onAccent: () -> Unit) {
         WpToggle(stringResource(R.string.set_small_row), settings.smallTilesRow, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setSmallTilesRow(it)
         }
+        WpToggle(stringResource(R.string.set_wp_motion), settings.wpMotion, onText = stringResource(R.string.set_wp_motion_on), offText = stringResource(R.string.set_wp_motion_off)) {
+            repo.setWpMotion(it)
+        }
+        WpText(stringResource(R.string.set_wp_motion_info), style = WpType.Small, color = Wp.palette.subtle)
         WpToggle(stringResource(R.string.set_pin_new_apps), settings.pinNewApps, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setPinNewApps(it)
         }

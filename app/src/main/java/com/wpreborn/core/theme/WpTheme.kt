@@ -40,6 +40,7 @@ fun WpTheme(content: @Composable () -> Unit) {
     val fg by animateColorAsState(target.foreground, anim, label = "fg")
     val accent by animateColorAsState(settings.accent.color, anim, label = "accent")
     val palette = target.copy(background = bg, foreground = fg)
+    com.wpreborn.core.motion.WpMotion.classic = !settings.wpMotion
     CompositionLocalProvider(
         LocalPalette provides palette,
         LocalAccent provides accent,

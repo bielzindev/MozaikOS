@@ -93,6 +93,10 @@ private class OverlayMotion(private val scope: kotlinx.coroutines.CoroutineScope
         else 45f * (1f - WpEasing.ExpOut.transform(enter.value))
 
     fun alpha(): Float = if (leave.value >= 1f) 0f else 1f
+
+    /** The classic Mozaik motion: 0..1 in (exponential out), back to 0 on the way out (exponential in). */
+    fun classicProgress(): Float =
+        if (leave.value > 0f) 1f - WpEasing.ExpIn.transform(leave.value) else WpEasing.ExpOut.transform(enter.value)
 }
 
 @Composable
@@ -105,15 +109,24 @@ private fun rememberOverlayMotion(): OverlayMotion {
 
 /** The swivel on a panel: [motion] drives it, turning round its middle like a PlaneProjection. */
 private fun Modifier.swivel(motion: OverlayMotion): Modifier = this.graphicsLayer {
-    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
     cameraDistance = 10f * density
-    rotationX = motion.rotationX()
-    alpha = motion.alpha()
+    if (com.wpreborn.core.motion.WpMotion.classic) {
+        // Classic: hinged at the top, from -60°.
+        val p = motion.classicProgress()
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+        rotationX = (1f - p) * -60f
+        alpha = minOf(1f, p * 2f)
+    } else {
+        transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0.5f)
+        rotationX = motion.rotationX()
+        alpha = motion.alpha()
+    }
 }
 
 /** The dimmed page behind a popup: there at once, gone when the popup has left. */
 private fun Modifier.dimmed(max: Float, motion: OverlayMotion): Modifier = this.drawBehind {
-    drawRect(Color.Black.copy(alpha = max * (1f - motion.leave.value)))
+    val f = if (com.wpreborn.core.motion.WpMotion.classic) motion.classicProgress() else 1f - motion.leave.value
+    drawRect(Color.Black.copy(alpha = max * f.coerceIn(0f, 1f)))
 }
 
 /** Where a [WpPanelOverlay]'s panel sits: swivelling at the top or in the middle, or the bottom menu. */
@@ -141,10 +154,11 @@ fun WpPanelOverlay(
     val motion = rememberOverlayMotion()
     val scope = rememberCoroutineScope()
     // The bottom menu has its own slide (edge UI), separate from the swivel's clock.
-    val slide = remember { androidx.compose.animation.core.Animatable(if (edge == PanelEdge.Bottom) 0f else 1f) }
-    LaunchedEffect(Unit) { if (edge == PanelEdge.Bottom) slide.animateTo(1f, tween(367, easing = com.wpreborn.core.motion.WpEasing.Decelerate)) }
+    val classic = com.wpreborn.core.motion.WpMotion.classic
+    val slide = remember { androidx.compose.animation.core.Animatable(if (edge == PanelEdge.Bottom && !classic) 0f else 1f) }
+    LaunchedEffect(Unit) { if (edge == PanelEdge.Bottom && !classic) slide.animateTo(1f, tween(367, easing = com.wpreborn.core.motion.WpEasing.Decelerate)) }
     fun close(then: () -> Unit) {
-        if (edge == PanelEdge.Bottom) {
+        if (edge == PanelEdge.Bottom && !classic) {
             if (motion.closing) return
             scope.launch { slide.animateTo(0f, tween(367, easing = com.wpreborn.core.motion.WpEasing.Decelerate)) }
         }
@@ -167,7 +181,10 @@ fun WpPanelOverlay(
                 .align(align)
                 .then(
                     if (edge == PanelEdge.Bottom) {
-                        Modifier.graphicsLayer { translationY = (1f - slide.value) * size.height }
+                        Modifier.graphicsLayer {
+                            val p = if (classic) motion.classicProgress() else slide.value
+                            translationY = (1f - p) * size.height
+                        }
                     } else {
                         Modifier.swivel(motion)
                     },
@@ -272,6 +289,10 @@ data class ContextMenuItem(val label: String, val enabled: Boolean = true, val o
  */
 @Composable
 fun WpContextMenu(items: List<ContextMenuItem>, anchorY: Float, onDismiss: () -> Unit) {
+    if (com.wpreborn.core.motion.WpMotion.classic) {
+        ClassicContextMenu(items, anchorY, onDismiss)
+        return
+    }
     BackHandler(onBack = onDismiss)
     val density = LocalDensity.current
     val open = remember { androidx.compose.animation.core.Animatable(0f) }
@@ -337,6 +358,50 @@ fun WpContextMenu(items: List<ContextMenuItem>, anchorY: Float, onDismiss: () ->
             if (!below) {
                 Box(Modifier.fillMaxWidth().height(2.dp).background(panel))
                 Box(Modifier.fillMaxWidth().height(2.dp).background(border))
+            }
+        }
+    }
+}
+
+/** The classic Mozaik context menu: a chrome panel that swivels open and shut, the page dimmed. */
+@Composable
+private fun ClassicContextMenu(items: List<ContextMenuItem>, anchorY: Float, onDismiss: () -> Unit) {
+    val motion = rememberOverlayMotion()
+    BackHandler { motion.close(onDismiss) }
+    val density = LocalDensity.current
+    BoxWithConstraints(
+        Modifier
+            .fillMaxSize()
+            .dimmed(0.5f, motion)
+            .clickable(remember { MutableInteractionSource() }, null) { motion.close(onDismiss) },
+    ) {
+        val menuHeight = with(density) { (items.size * 52 + 24).dp.toPx() }
+        val maxY = with(density) { maxHeight.toPx() }
+        val y = if (anchorY + menuHeight < maxY) anchorY else (anchorY - menuHeight).coerceAtLeast(0f)
+        Column(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }
+                .fillMaxWidth()
+                .swivel(motion)
+                .background(Wp.palette.chrome)
+                .padding(vertical = 12.dp),
+        ) {
+            items.forEach { item ->
+                WpText(
+                    item.label.lowercase(),
+                    style = WpType.Large,
+                    color = if (item.enabled) Wp.palette.foreground else Wp.palette.disabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .wpClickable(enabled = item.enabled, tilt = false) {
+                            motion.close {
+                                onDismiss()
+                                item.onClick()
+                            }
+                        }
+                        .padding(start = 20.dp, top = 10.dp),
+                )
             }
         }
     }

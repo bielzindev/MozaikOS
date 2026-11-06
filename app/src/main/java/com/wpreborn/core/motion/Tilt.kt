@@ -44,6 +44,20 @@ fun Modifier.tilt(enabled: Boolean = true, maxAngle: Float = 0f, depression: Flo
                         val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
                         val w = size.width.toFloat().coerceAtLeast(1f)
                         val h = size.height.toFloat().coerceAtLeast(1f)
+                        if (WpMotion.classic) {
+                            // The classic Mozaik tilt: up to 9° (less on big elements), 2.5 % deeper, 120 ms.
+                            val nx = ((down.position.x - w / 2f) / (w / 2f)).coerceIn(-1f, 1f)
+                            val ny = ((down.position.y - h / 2f) / (h / 2f)).coerceIn(-1f, 1f)
+                            val damp = (220f * density / maxOf(w, h)).coerceIn(0.25f, 1f)
+                            launch { rx.snapTo(-ny * 9f * damp) }
+                            launch { ry.snapTo(nx * 9f * damp) }
+                            launch { sc.animateTo(0.975f, tween(120)) }
+                            waitForUpOrCancellation(PointerEventPass.Initial)
+                            launch { rx.animateTo(0f, tween(120)) }
+                            launch { ry.animateTo(0f, tween(120)) }
+                            launch { sc.animateTo(1f, tween(120)) }
+                            return@awaitEachGesture
+                        }
                         fun apply(p: Offset) {
                             val nx = (p.x / w).coerceIn(0f, 1f)
                             val ny = (p.y / h).coerceIn(0f, 1f)
@@ -86,7 +100,7 @@ fun Modifier.tilt(enabled: Boolean = true, maxAngle: Float = 0f, depression: Flo
                 rotationY = ry.value
                 scaleX = sc.value
                 scaleY = sc.value
-                cameraDistance = 8f * density
+                cameraDistance = (if (WpMotion.classic) 12f else 8f) * density
             }
     }
 

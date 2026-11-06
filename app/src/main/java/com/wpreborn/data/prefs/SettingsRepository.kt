@@ -57,6 +57,8 @@ data class WpSettings(
     val splash: Boolean = true,
     /** Newly installed apps (from the Store, Google Play...) are pinned to Start by themselves. */
     val pinNewApps: Boolean = true,
+    /** Animations from Windows Phone's own code instead of the classic Mozaik ones. */
+    val wpMotion: Boolean = false,
     val firstRunDone: Boolean = false,
 )
 
@@ -133,6 +135,7 @@ class SettingsRepository private constructor(private val context: Context) {
     }
     fun setSplash(value: Boolean) = update { it[SPLASH] = value }
     fun setPinNewApps(value: Boolean) = update { it[PIN_NEW] = value }
+    fun setWpMotion(value: Boolean) = update { it[WP_MOTION] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
     private fun Preferences.toSettings() = WpSettings(
@@ -167,6 +170,7 @@ class SettingsRepository private constructor(private val context: Context) {
         ),
         splash = this[SPLASH] ?: true,
         pinNewApps = this[PIN_NEW] ?: true,
+        wpMotion = this[WP_MOTION] ?: false,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
 
@@ -200,6 +204,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val G_BATTERY = booleanPreferencesKey("glance_battery")
         private val SPLASH = booleanPreferencesKey("splash")
         private val PIN_NEW = booleanPreferencesKey("pin_new_apps")
+        private val WP_MOTION = booleanPreferencesKey("wp_motion")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 
         @Volatile

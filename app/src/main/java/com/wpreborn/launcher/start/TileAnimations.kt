@@ -41,9 +41,9 @@ fun FlipTile(
         val rnd = Random(seed)
         delay(2000L + rnd.nextLong(6000))
         while (true) {
-            angle.animateTo(180f, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
+            angle.animateTo(180f, flipSpec())
             delay(5000L + rnd.nextLong(3000))
-            angle.animateTo(360f, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
+            angle.animateTo(360f, flipSpec())
             angle.snapTo(0f)
             delay(6000L + rnd.nextLong(6000))
         }
@@ -89,7 +89,7 @@ fun <T> CycleTile(
         delay(1500L + rnd.nextLong(3000))
         while (true) {
             val target = kotlin.math.floor(pos.value) + 1f
-            pos.animateTo(target, tween(WpDurations.Flip, easing = WpEasing.CubicOut))
+            pos.animateTo(target, if (com.wpreborn.core.motion.WpMotion.classic) tween(900, easing = WpEasing.CubicInOut) else tween(WpDurations.Flip, easing = WpEasing.CubicOut))
             delay(4500L + rnd.nextLong(2500))
         }
     }
@@ -140,3 +140,7 @@ fun <T> FlippingCell(pool: List<T>, start: Int, seed: Int, enabled: Boolean, con
             },
     ) { content(pool[index % pool.size]) }
 }
+
+/** The flip: classic 800 ms ease in-out, or the HubTile's 850 ms CubicEase out. */
+private fun flipSpec(): androidx.compose.animation.core.TweenSpec<Float> =
+    if (com.wpreborn.core.motion.WpMotion.classic) tween(800, easing = WpEasing.CubicInOut) else tween(WpDurations.Flip, easing = WpEasing.CubicOut)

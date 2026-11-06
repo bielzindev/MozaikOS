@@ -19,8 +19,24 @@ import kotlinx.coroutines.launch
  * Only the rows that are on screen when the page (or [key]) appears move: a row created later,
  * while the list scrolls, just shows up in place, as on the phone. ([distanceDp] is kept for callers.)
  */
-@Suppress("UNUSED_PARAMETER")
-fun Modifier.slideInStaggered(index: Int, key: Any? = Unit, distanceDp: Float = 80f): Modifier = composed {
+fun Modifier.slideInStaggered(index: Int, key: Any? = Unit, distanceDp: Float = 80f): Modifier =
+    if (WpMotion.classic) classicSlideIn(index, key, distanceDp) else wpSlideIn(index, key)
+
+/** The classic Mozaik entrance: from [distanceDp] to the right, 30 ms per row, 350 ms, fading in. */
+private fun Modifier.classicSlideIn(index: Int, key: Any?, distanceDp: Float): Modifier = composed {
+    val progress = remember(key) { Animatable(0f) }
+    LaunchedEffect(key) {
+        delay(minOf(index, 10) * 30L)
+        progress.animateTo(1f, tween(WpDurations.SlideIn, easing = WpEasing.ExpOut))
+    }
+    this.graphicsLayer {
+        val p = progress.value
+        translationX = (1f - p) * distanceDp * density
+        alpha = if (p <= 0f) 0f else minOf(1f, p * 2.5f)
+    }
+}
+
+private fun Modifier.wpSlideIn(index: Int, key: Any?): Modifier = composed {
     val screenWidthDp = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp
     val animate = remember(key) { EntranceWave.joins(index) }
     val progress = remember(key) { Animatable(if (animate) 0f else 1f) }

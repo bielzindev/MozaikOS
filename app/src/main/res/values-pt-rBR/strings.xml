@@ -1195,4 +1195,8 @@
     <string name="tile_size_large">grande</string>
     <string name="store_ql_featured_games">jogos em destaque</string>
     <string name="store_ql_free_games">jogos gratuitos</string>
+    <string name="set_wp_motion">Animações</string>
+    <string name="set_wp_motion_on">do código do Windows Phone</string>
+    <string name="set_wp_motion_off">clássicas do Mozaik</string>
+    <string name="set_wp_motion_info">Clássicas: as animações que o Mozaik sempre teve. Do código do Windows Phone: os tempos e curvas da biblioteca de animações do 8.1 e do Windows Phone Toolkit.</string>
 </resources>

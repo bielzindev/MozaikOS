@@ -34,6 +34,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import kotlinx.coroutines.launch
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -775,9 +776,17 @@ private fun BoxScope.WeatherTile(size: TileSize, live: Boolean) {
     }
 }
 
+/** One face of the Store's live tile: a Mozaik app, a game with its real icon, or the bag (both null). */
+private class StoreTilePage(
+    val app: com.wpreborn.data.store.CatalogApp? = null,
+    val game: com.wpreborn.data.store.GameApp? = null,
+    val icon: androidx.compose.ui.graphics.ImageBitmap? = null,
+)
+
 /**
- * Store: a live tile like the 8.1 Store's. The featured Mozaik apps slide by (one on medium,
- * three side by side on wide), and the bag with the number of updates comes back between them.
+ * Store: a live tile like the 8.1 Store's. Featured apps and games slide by, each with its icon
+ * filling the tile under a dark gradient with the tile's name (the games with their real icons,
+ * once they have been fetched), and the bag with the number of updates comes back between them.
  */
 @Composable
 private fun BoxScope.StoreTile(size: TileSize, live: Boolean, seed: Int) {
@@ -789,22 +798,67 @@ private fun BoxScope.StoreTile(size: TileSize, live: Boolean, seed: Int) {
         CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
         return
     }
-    // Today's order, so the tile doesn't show the same apps first every day.
+    // Today's order, so the tile doesn't show the same ones first every day.
+    val day = remember { java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR) }
     val featured = remember {
-        val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
         com.wpreborn.data.store.ZunexCatalog.apps.filter { it.featured }.shuffled(kotlin.random.Random(day))
     }
-    val pages: List<com.wpreborn.data.store.CatalogApp?> = featured.flatMap { listOf(it, null) }
-    CycleTile(pages, enabled = true, seed = seed) { c ->
+    // The featured games' real icons, as they arrive (the Store fetches and keeps them).
+    val games by produceState<List<Pair<com.wpreborn.data.store.GameApp, androidx.compose.ui.graphics.ImageBitmap>>>(emptyList(), day) {
+        val loaded = ArrayList<Pair<com.wpreborn.data.store.GameApp, androidx.compose.ui.graphics.ImageBitmap>>()
+        kotlinx.coroutines.coroutineScope {
+            com.wpreborn.data.store.GamesCatalog.featured().shuffled(kotlin.random.Random(day)).forEach { g ->
+                launch {
+                    com.wpreborn.data.store.GameIcons.load(context, g)?.let { b ->
+                        synchronized(loaded) {
+                            loaded += g to b.asImageBitmap()
+                            value = loaded.toList()
+                        }
+                    }
+                }
+            }
+        }
+    }
+    val pages = remember(featured, games) {
+        buildList {
+            var n = 0
+            for (i in 0 until maxOf(featured.size, games.size)) {
+                featured.getOrNull(i)?.let {
+                    add(StoreTilePage(app = it))
+                    if (++n % 3 == 0) add(StoreTilePage())
+                }
+                games.getOrNull(i)?.let { (g, icon) ->
+                    add(StoreTilePage(game = g, icon = icon))
+                    if (++n % 3 == 0) add(StoreTilePage())
+                }
+            }
+            if (isEmpty()) add(StoreTilePage())
+        }
+    }
+    CycleTile(pages, enabled = pages.size > 1, seed = seed) { p ->
+        val c = p.app
+        val game = p.game
+        val icon = p.icon
         Box(Modifier.fillMaxSize()) {
-            if (c == null) {
-                CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
-            } else {
-                // Like the 8.1 Store tile: the app's icon fills the whole tile, with a dark
-                // gradient over it for the tile's name.
+            if (game != null && icon != null) {
+                // A game: its real icon fills the tile (on wide, square at the left over its colour).
+                if (size == TileSize.Medium) {
+                    Image(icon, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                } else {
+                    Box(Modifier.fillMaxSize().background(game.color)) {
+                        Image(icon, null, Modifier.fillMaxHeight().aspectRatio(1f).align(Alignment.CenterStart))
+                    }
+                }
+            } else if (c != null) {
+                // Like the 8.1 Store tile: the app's icon fills the whole tile.
                 Box(Modifier.fillMaxSize().background(c.color), contentAlignment = if (size == TileSize.Medium) Alignment.Center else Alignment.CenterStart) {
                     BoxWithIcon(c, size)
                 }
+            } else {
+                CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
+            }
+            if (game != null || c != null) {
+                // The dark gradient over the icon, for the tile's name.
                 Box(
                     Modifier.fillMaxSize().background(
                         androidx.compose.ui.graphics.Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f)),

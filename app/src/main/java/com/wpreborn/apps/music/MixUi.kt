@@ -514,16 +514,12 @@ fun MenuOverlay(items: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
         onDismiss = onDismiss, edge = PanelEdge.Bottom, scrim = 0.45f, background = Color(0xFF1F1F1F),
         padding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
     ) { close ->
-        items.forEachIndexed { index, (label, action) ->
+        items.forEach { (label, action) ->
             WpText(
                 label,
                 style = WpType.Large.copy(fontSize = 20.sp),
                 color = Color.White,
-                modifier = Modifier
-                    .slideInStaggered(index + 1, distanceDp = 18f)
-                    .fillMaxWidth()
-                    .wpClickable { close { onDismiss(); action() } }
-                    .padding(horizontal = 20.dp, vertical = 10.dp),
+                modifier = Modifier.fillMaxWidth().wpClickable { close { onDismiss(); action() } }.padding(horizontal = 20.dp, vertical = 10.dp),
             )
         }
     }

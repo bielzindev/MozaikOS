@@ -36,6 +36,10 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.ui.draw.drawBehind
+import com.wpreborn.core.motion.turnstile
+import androidx.compose.ui.graphics.graphicsLayer
+import com.wpreborn.core.motion.swivelWith
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,43 +61,52 @@ import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
 
 /**
- * What the Windows Phone MessageBox and context menu did on the way out: the panel slides back up
- * and fades while the dimmed page clears, and only then is the action taken. [close] plays that
- * (once) and calls [then] afterwards; [scrim] is the dimming's strength, in and out.
+ * The motion of the Windows Phone popups: they swivel in (the toolkit's SwivelTransition) and
+ * leave by the same motion backwards, over the dimmed page. [progress] runs 0 to 1 on the way in
+ * and back to 0 on the way out; [close] plays that and then runs what was asked for.
  */
-private class OverlayExit(
-    private val scope: kotlinx.coroutines.CoroutineScope,
-    private val closingState: androidx.compose.runtime.MutableState<Boolean>,
-) {
-    val closing get() = closingState.value
+@androidx.compose.runtime.Stable
+private class OverlayMotion(private val scope: kotlinx.coroutines.CoroutineScope) {
+    val progress = androidx.compose.animation.core.Animatable(0f)
+    var closing by mutableStateOf(false)
+        private set
+
+    suspend fun open() {
+        progress.animateTo(1f, tween(com.wpreborn.core.motion.WpDurations.SlideIn, easing = WpEasing.ExpOut))
+    }
 
     fun close(then: () -> Unit) {
-        if (closingState.value) return
-        closingState.value = true
+        if (closing) return
+        closing = true
         scope.launch {
-            delay(190)
+            progress.animateTo(0f, tween(com.wpreborn.core.motion.WpDurations.TurnstileOut, easing = WpEasing.ExpIn))
             then()
         }
     }
 }
 
 @Composable
-private fun rememberOverlayExit(): OverlayExit {
+private fun rememberOverlayMotion(): OverlayMotion {
     val scope = rememberCoroutineScope()
-    val closing = remember { mutableStateOf(false) }
-    return remember { OverlayExit(scope, closing) }
+    val motion = remember { OverlayMotion(scope) }
+    LaunchedEffect(Unit) { motion.open() }
+    return motion
 }
 
-/** Where a [WpPanelOverlay]'s panel sits (and so which way it moves). */
+/** The dimmed page behind a popup, as strong as the popup is in. */
+private fun Modifier.dimmed(max: Float, motion: OverlayMotion): Modifier = this.drawBehind {
+    drawRect(Color.Black.copy(alpha = max * motion.progress.value.coerceIn(0f, 1f)))
+}
+
+/** Where a [WpPanelOverlay]'s panel sits: dropping from the top or the middle, or the bottom menu. */
 enum class PanelEdge { Top, Center, Bottom }
 
 /**
- * A panel over a dimmed screen that comes in and goes out with the Windows Phone motion: the dimming
- * fades; a panel at the [PanelEdge.Top] drops in (like the message box), one at the
- * [PanelEdge.Bottom] rises from the bottom (menus), one in the [PanelEdge.Center] opens from
- * slightly smaller. Back, a tap outside and the panel's own buttons all play the way out before
- * anything happens: [content] gets `close { … }`, which animates out and then runs the block.
- * Used by every menu, submenu and small dialog that isn't a context menu or a message box.
+ * A panel over a dimmed page for the menus and small dialogs that aren't a message box or a context
+ * menu. A top or middle panel swivels like those (and leaves the same way backwards); a bottom menu
+ * rises from the bottom edge like the application bar's menu, and goes back down. Back, a tap
+ * outside and the panel's own buttons all play the way out before anything happens: [content] gets
+ * `close { … }`, which animates out and then runs the block.
  */
 @Composable
 fun WpPanelOverlay(
@@ -107,11 +120,8 @@ fun WpPanelOverlay(
     insetTop: Boolean = false,
     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
 ) {
-    val exit = rememberOverlayExit()
-    BackHandler { exit.close(onDismiss) }
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val dim by animateFloatAsState(if (shown && !exit.closing) scrim else 0f, tween(200), label = "dim")
+    val motion = rememberOverlayMotion()
+    BackHandler { motion.close(onDismiss) }
     val align = when (edge) {
         PanelEdge.Top -> Alignment.TopCenter
         PanelEdge.Center -> Alignment.Center
@@ -120,40 +130,34 @@ fun WpPanelOverlay(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = dim))
-            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
+            .dimmed(scrim, motion)
+            .clickable(remember { MutableInteractionSource() }, null) { motion.close(onDismiss) },
     ) {
-        AnimatedVisibility(
-            visible = shown && !exit.closing,
-            modifier = Modifier.align(align),
-            enter = when (edge) {
-                PanelEdge.Bottom -> slideInVertically(tween(300, easing = WpEasing.ExpOut)) { it } + fadeIn(tween(160))
-                PanelEdge.Top -> slideInVertically(tween(300, easing = WpEasing.ExpOut)) { -it / 2 } + fadeIn(tween(200))
-                PanelEdge.Center -> scaleIn(tween(260, easing = WpEasing.ExpOut), initialScale = 0.92f) + fadeIn(tween(200))
-            },
-            exit = when (edge) {
-                PanelEdge.Bottom -> slideOutVertically(tween(200, easing = WpEasing.ExpIn)) { it } + fadeOut(tween(160))
-                PanelEdge.Top -> slideOutVertically(tween(190, easing = WpEasing.ExpIn)) { -it / 4 } + fadeOut(tween(160))
-                PanelEdge.Center -> scaleOut(tween(180, easing = WpEasing.ExpIn), targetScale = 0.94f) + fadeOut(tween(150))
-            },
-        ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .then(if (maxHeight != Dp.Unspecified) Modifier.heightIn(max = maxHeight) else Modifier)
-                    .background(background)
-                    .clickable(remember { MutableInteractionSource() }, null) {}
-                    .then(if (insetTop) Modifier.statusBarsPadding() else Modifier)
-                    .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
-                    .padding(padding),
-            ) { content { action -> exit.close(action) } }
-        }
+        Column(
+            Modifier
+                .align(align)
+                .then(
+                    if (edge == PanelEdge.Bottom) {
+                        Modifier.graphicsLayer { translationY = (1f - motion.progress.value) * size.height }
+                    } else {
+                        Modifier.swivelWith { motion.progress.value }
+                    },
+                )
+                .fillMaxWidth()
+                .then(if (maxHeight != Dp.Unspecified) Modifier.heightIn(max = maxHeight) else Modifier)
+                .background(background)
+                .clickable(remember { MutableInteractionSource() }, null) {}
+                .then(if (insetTop) Modifier.statusBarsPadding() else Modifier)
+                .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                .padding(padding),
+        ) { content { action -> motion.close(action) } }
     }
 }
 
 /**
- * A full-screen layer over the page (the music queue, say) that slides up from the bottom and
- * fades in, and slides back down when it closes. [content] gets `close { … }` like [WpPanelOverlay].
+ * A full page over the one below (the music queue): it comes in with the turnstile, as a page
+ * does in Windows Phone, and leaves with the backward turnstile. [content] gets `close { … }`
+ * like [WpPanelOverlay].
  */
 @Composable
 fun WpFullScreenOverlay(
@@ -161,27 +165,32 @@ fun WpFullScreenOverlay(
     background: Color = Wp.palette.background,
     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
 ) {
-    val exit = rememberOverlayExit()
-    BackHandler { exit.close(onDismiss) }
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    AnimatedVisibility(
-        visible = shown && !exit.closing,
-        enter = slideInVertically(tween(320, easing = WpEasing.ExpOut)) { it / 3 } + fadeIn(tween(220)),
-        exit = slideOutVertically(tween(210, easing = WpEasing.ExpIn)) { it / 3 } + fadeOut(tween(170)),
-    ) {
-        Column(
-            Modifier
-                .fillMaxSize()
-                .background(background)
-                .clickable(remember { MutableInteractionSource() }, null) {},
-        ) { content { action -> exit.close(action) } }
+    val scope = rememberCoroutineScope()
+    val turn = remember { com.wpreborn.core.motion.TurnstileState(com.wpreborn.core.motion.TurnstileMode.ForwardIn) }
+    var closing by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { turn.run(com.wpreborn.core.motion.TurnstileMode.ForwardIn) }
+    fun close(then: () -> Unit) {
+        if (closing) return
+        closing = true
+        scope.launch {
+            turn.run(com.wpreborn.core.motion.TurnstileMode.BackwardOut)
+            then()
+        }
     }
+    BackHandler { close(onDismiss) }
+    Column(
+        Modifier
+            .fillMaxSize()
+            .turnstile(turn)
+            .background(background)
+            .clickable(remember { MutableInteractionSource() }, null) {},
+    ) { content { action -> close(action) } }
 }
 
 /**
  * The Windows Phone MessageBox: a chrome panel anchored to the top of the screen with a
- * semibold title, a message and up to two buttons, over a dimmed page. It swivels in.
+ * semibold title, a message and up to two buttons, over a dimmed page. It swivels in and,
+ * when closed, swivels out the same way.
  */
 @Composable
 fun WpMessageBox(
@@ -192,39 +201,30 @@ fun WpMessageBox(
     dismiss: String? = null,
     onDismiss: () -> Unit,
 ) {
-    val exit = rememberOverlayExit()
-    BackHandler { exit.close(onDismiss) }
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val scrim by animateFloatAsState(if (shown && !exit.closing) 0.6f else 0f, tween(200), label = "scrim")
+    val motion = rememberOverlayMotion()
+    BackHandler { motion.close(onDismiss) }
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = scrim))
-            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
+            .dimmed(0.6f, motion)
+            .clickable(remember { MutableInteractionSource() }, null) { motion.close(onDismiss) },
     ) {
-        AnimatedVisibility(
-            visible = !exit.closing,
-            enter = EnterTransition.None,
-            exit = fadeOut(tween(160)) + slideOutVertically(tween(190, easing = WpEasing.ExpIn)) { -it / 4 },
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .swivelWith { motion.progress.value }
+                .background(Wp.palette.chrome)
+                .clickable(remember { MutableInteractionSource() }, null) {}
+                .statusBarsPadding()
+                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .swivelIn()
-                    .background(Wp.palette.chrome)
-                    .clickable(remember { MutableInteractionSource() }, null) {}
-                    .statusBarsPadding()
-                    .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
-            ) {
-                WpText(title, style = WpType.Large.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
-                Spacer(Modifier.height(12.dp))
-                WpText(message, style = WpType.Normal)
-                Spacer(Modifier.height(24.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                    WpButton(confirm, Modifier.weight(1f), onClick = { exit.close(onConfirm) })
-                    if (dismiss != null) WpButton(dismiss, Modifier.weight(1f), onClick = { exit.close(onDismiss) })
-                }
+            WpText(title, style = WpType.Large.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+            Spacer(Modifier.height(12.dp))
+            WpText(message, style = WpType.Normal)
+            Spacer(Modifier.height(24.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                WpButton(confirm, Modifier.weight(1f), onClick = { motion.close(onConfirm) })
+                if (dismiss != null) WpButton(dismiss, Modifier.weight(1f), onClick = { motion.close(onDismiss) })
             }
         }
     }
@@ -234,59 +234,48 @@ data class ContextMenuItem(val label: String, val enabled: Boolean = true, val o
 
 /**
  * The 8.1 context menu: a full-width chrome panel that swivels open next to the element
- * that was long-pressed, everything else dimmed.
+ * that was long-pressed (and swivels shut the same way), everything else dimmed.
  *
  * @param anchorY window Y (px) of the long-pressed element's bottom edge.
  */
 @Composable
 fun WpContextMenu(items: List<ContextMenuItem>, anchorY: Float, onDismiss: () -> Unit) {
-    val exit = rememberOverlayExit()
-    BackHandler { exit.close(onDismiss) }
+    val motion = rememberOverlayMotion()
+    BackHandler { motion.close(onDismiss) }
     val density = LocalDensity.current
-    var shown by remember { mutableStateOf(false) }
-    LaunchedEffect(Unit) { shown = true }
-    val scrim by animateFloatAsState(if (shown && !exit.closing) 0.5f else 0f, tween(200), label = "scrim")
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = scrim))
-            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
+            .dimmed(0.5f, motion)
+            .clickable(remember { MutableInteractionSource() }, null) { motion.close(onDismiss) },
     ) {
         val menuHeight = with(density) { (items.size * 52 + 24).dp.toPx() }
         val maxY = with(density) { maxHeight.toPx() }
         val y = if (anchorY + menuHeight < maxY) anchorY else (anchorY - menuHeight).coerceAtLeast(0f)
-        AnimatedVisibility(
-            visible = !exit.closing,
-            enter = EnterTransition.None,
-            exit = fadeOut(tween(150)) + slideOutVertically(tween(180, easing = WpEasing.ExpIn)) { -it / 5 },
-            modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) },
+        Column(
+            Modifier
+                .offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }
+                .fillMaxWidth()
+                .swivelWith { motion.progress.value }
+                .background(Wp.palette.chrome)
+                .padding(vertical = 12.dp),
         ) {
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .swivelIn()
-                    .background(Wp.palette.chrome)
-                    .padding(vertical = 12.dp),
-            ) {
-                items.forEachIndexed { index, item ->
-                    WpText(
-                        item.label.lowercase(),
-                        style = WpType.Large,
-                        color = if (item.enabled) Wp.palette.foreground else Wp.palette.disabled,
-                        modifier = Modifier
-                            // The entries come in one after the other, a little behind the panel.
-                            .slideInStaggered(index + 1, distanceDp = 18f)
-                            .fillMaxWidth()
-                            .height(52.dp)
-                            .wpClickable(enabled = item.enabled, tilt = false) {
-                                exit.close {
-                                    onDismiss()
-                                    item.onClick()
-                                }
+            items.forEach { item ->
+                WpText(
+                    item.label.lowercase(),
+                    style = WpType.Large,
+                    color = if (item.enabled) Wp.palette.foreground else Wp.palette.disabled,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(52.dp)
+                        .wpClickable(enabled = item.enabled, tilt = false) {
+                            motion.close {
+                                onDismiss()
+                                item.onClick()
                             }
-                            .padding(start = 20.dp, top = 10.dp),
-                    )
-                }
+                        }
+                        .padding(start = 20.dp, top = 10.dp),
+                )
             }
         }
     }

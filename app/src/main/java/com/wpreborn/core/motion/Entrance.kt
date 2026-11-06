@@ -56,3 +56,15 @@ fun Modifier.swivelIn(key: Any? = Unit): Modifier = composed {
  * (like the Windows Phone toolkit's feather), rows that appear later while scrolling don't.
  */
 fun Modifier.listEntrance(index: Int): Modifier = if (index < 8) slideInStaggered(index, distanceDp = 60f) else this
+
+/**
+ * The swivel of [swivelIn] driven by [progress] (0 = turned away, 1 = in place), so the same
+ * motion plays backwards when something leaves: the Windows Phone toolkit's swivel in and out.
+ */
+fun Modifier.swivelWith(progress: () -> Float): Modifier = this.graphicsLayer {
+    val p = progress()
+    transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0.5f, 0f)
+    cameraDistance = 10f * density
+    rotationX = (1f - p) * -60f
+    alpha = minOf(1f, p * 2f)
+}

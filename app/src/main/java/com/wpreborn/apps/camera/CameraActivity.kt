@@ -1,5 +1,6 @@
 package com.wpreborn.apps.camera
 
+import com.wpreborn.core.motion.turnstile
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.ContentValues
@@ -1063,14 +1064,24 @@ private fun CameraScreen(activity: CameraActivity) {
             }
         }
 
-        androidx.compose.animation.AnimatedVisibility(
-            visible = showSettings,
-            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, easing = com.wpreborn.core.motion.WpEasing.ExpOut)) { it / 4 } +
-                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
-            exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(210, easing = com.wpreborn.core.motion.WpEasing.ExpIn)) { it / 4 } +
-                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(170)),
-        ) {
-            CameraSettingsPage(settings, soundForced, ::update) { showSettings = false }
+        // The settings page comes in with the turnstile and leaves with the backward turnstile.
+        val settingsTurn = remember { com.wpreborn.core.motion.TurnstileState(com.wpreborn.core.motion.TurnstileMode.None) }
+        var settingsShown by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(showSettings) {
+            if (showSettings) {
+                settingsTurn.mode = com.wpreborn.core.motion.TurnstileMode.ForwardIn
+                settingsTurn.progress.snapTo(0f)
+                settingsShown = true
+                settingsTurn.run(com.wpreborn.core.motion.TurnstileMode.ForwardIn)
+            } else if (settingsShown) {
+                settingsTurn.run(com.wpreborn.core.motion.TurnstileMode.BackwardOut)
+                settingsShown = false
+            }
+        }
+        if (settingsShown) {
+            Box(Modifier.fillMaxSize().turnstile(settingsTurn)) {
+                CameraSettingsPage(settings, soundForced, ::update) { showSettings = false }
+            }
         }
     }
 }

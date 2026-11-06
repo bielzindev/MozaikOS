@@ -1,5 +1,6 @@
 package com.wpreborn.apps.browser
 
+import com.wpreborn.core.motion.turnstile
 import com.wpreborn.core.ui.PanelEdge
 import com.wpreborn.core.ui.WpPanelOverlay
 import android.annotation.SuppressLint
@@ -653,25 +654,34 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
             }
         }
 
-        // The full pages (tabs, hub, settings, reader, downloads) slide up and fade in, and go back
-        // down when closed; the last one stays drawn while it leaves.
+        // The full pages (tabs, hub, settings, reader, downloads) come in with the turnstile, as a
+        // page does in Windows Phone, and leave with the backward turnstile.
         val fullPage = panel == Panel.Tabs || panel == Panel.Hub || panel == Panel.Settings || panel == Panel.Reader || panel == Panel.Downloads
         var lastPage by remember { mutableStateOf(Panel.Tabs) }
         if (fullPage && lastPage != panel) androidx.compose.runtime.SideEffect { lastPage = panel }
-        androidx.compose.animation.AnimatedVisibility(
-            visible = fullPage,
-            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, easing = com.wpreborn.core.motion.WpEasing.ExpOut)) { it / 4 } +
-                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
-            exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(210, easing = com.wpreborn.core.motion.WpEasing.ExpIn)) { it / 4 } +
-                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(170)),
-        ) {
-            when (if (fullPage) panel else lastPage) {
-                Panel.Tabs -> TabsPage(a, onClose = { panel = Panel.None })
-                Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
-                Panel.Settings -> SettingsPage(a, store)
-                Panel.Reader -> reader?.let { ReaderView(it, store) }
-                Panel.Downloads -> DownloadsPage(a, store)
-                else -> {}
+        val pageTurn = remember { com.wpreborn.core.motion.TurnstileState(com.wpreborn.core.motion.TurnstileMode.None) }
+        var pageShown by remember { mutableStateOf(false) }
+        androidx.compose.runtime.LaunchedEffect(fullPage) {
+            if (fullPage) {
+                pageTurn.mode = com.wpreborn.core.motion.TurnstileMode.ForwardIn
+                pageTurn.progress.snapTo(0f)
+                pageShown = true
+                pageTurn.run(com.wpreborn.core.motion.TurnstileMode.ForwardIn)
+            } else if (pageShown) {
+                pageTurn.run(com.wpreborn.core.motion.TurnstileMode.BackwardOut)
+                pageShown = false
+            }
+        }
+        if (pageShown) {
+            Box(Modifier.fillMaxSize().turnstile(pageTurn)) {
+                when (if (fullPage) panel else lastPage) {
+                    Panel.Tabs -> TabsPage(a, onClose = { panel = Panel.None })
+                    Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
+                    Panel.Settings -> SettingsPage(a, store)
+                    Panel.Reader -> reader?.let { ReaderView(it, store) }
+                    Panel.Downloads -> DownloadsPage(a, store)
+                    else -> {}
+                }
             }
         }
         if (panel == Panel.Menu) {

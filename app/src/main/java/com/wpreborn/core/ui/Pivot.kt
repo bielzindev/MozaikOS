@@ -69,7 +69,7 @@ fun WpPivot(
     Column(modifier.fillMaxSize()) {
         if (title != null) {
             Row(Modifier.fillMaxWidth().padding(start = 20.dp, top = 14.dp, end = 20.dp), verticalAlignment = Alignment.CenterVertically) {
-                WpText(title.uppercase(), style = WpType.AppTitle, modifier = Modifier.weight(1f))
+                WpText(title.uppercase(), style = WpType.AppTitle, maxLines = 1, softWrap = false, fit = true, modifier = Modifier.weight(1f))
                 titleAccessory?.invoke()
             }
         }

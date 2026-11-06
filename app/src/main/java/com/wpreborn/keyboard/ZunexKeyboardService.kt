@@ -291,7 +291,7 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         v.emojiMode = page == Page.Emoji
         v.shiftState = shift
         v.spaceLabel = if (prefs.languages.size > 1) language.name.lowercase() else ""
-        v.enterLabel = enterLabel()
+        v.enterGlyph = enterGlyph()
         val multi = prefs.languages.size > 1
         v.rows = when (page) {
             Page.Letters -> KeyboardLayouts.letters(language, shift > 0, prefs.numberRow, multi, email)
@@ -306,15 +306,16 @@ class ZunexKeyboardService : InputMethodService(), KeyboardListener {
         updateSuggestions()
     }
 
-    private fun enterLabel(): String? {
+    /** The Metro glyph of the action key for this field: search, go, send, next or done. */
+    private fun enterGlyph(): String? {
         val i = info ?: return null
         if (i.imeOptions and EditorInfo.IME_FLAG_NO_ENTER_ACTION != 0) return null
         return when (i.imeOptions and EditorInfo.IME_MASK_ACTION) {
-            EditorInfo.IME_ACTION_GO -> getString(R.string.kb_go)
-            EditorInfo.IME_ACTION_SEARCH -> getString(R.string.search)
-            EditorInfo.IME_ACTION_SEND -> getString(R.string.messages_send)
-            EditorInfo.IME_ACTION_NEXT -> getString(R.string.kb_next)
-            EditorInfo.IME_ACTION_DONE -> getString(R.string.kb_done)
+            EditorInfo.IME_ACTION_GO -> "go"
+            EditorInfo.IME_ACTION_SEARCH -> "search"
+            EditorInfo.IME_ACTION_SEND -> "send"
+            EditorInfo.IME_ACTION_NEXT -> "end"
+            EditorInfo.IME_ACTION_DONE -> "check"
             else -> null
         }
     }

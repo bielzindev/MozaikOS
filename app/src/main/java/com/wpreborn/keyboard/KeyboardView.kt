@@ -74,7 +74,8 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
         set(v) { field = v; invalidate() }
     var spaceLabel = ""
         set(v) { field = v; invalidate() }
-    var enterLabel: String? = null
+    /** The glyph of the action key (search, go, next, done, send); null: the plain "enter" arrow. */
+    var enterGlyph: String? = null
         set(v) { field = v; invalidate() }
     /** Tools shown in the strip when there are no suggestions: (glyph, id). */
     var toolbar: List<Pair<String, String>> = emptyList()
@@ -345,8 +346,13 @@ class KeyboardView(context: Context, private val listener: KeyboardListener) : V
             KeyType.Backspace -> drawBackspace(canvas, p.rect, color)
             KeyType.Shift -> drawShift(canvas, p.rect, color, shiftState)
             KeyType.Enter -> {
-                val label = enterLabel
-                if (label != null) text(canvas, label, cx, cy, 15f, color) else drawEnter(canvas, p.rect, color)
+                val glyph = enterGlyph
+                if (glyph != null) {
+                    glyphPaint.color = color
+                    KeyGlyphs.draw(canvas, glyph, cx, cy, 24f * density, glyphPaint)
+                } else {
+                    drawEnter(canvas, p.rect, color)
+                }
             }
             KeyType.Space -> {
                 textPaint.typeface = fontLight
@@ -711,6 +717,11 @@ internal object KeyGlyphs {
         "left" to "M15,6l-6,6 6,6",
         "right" to "M9,6l6,6 -6,6",
         "end" to "M7,6l6,6 -6,6 M17,5v14",
+        // The action key: search (a ring and its handle), go (an arrow), done (a tick), send (a paper plane).
+        "search" to "M10.5,4a6.5,6.5 0 1,0 0.01,0z M15.4,15.4L20.5,20.5",
+        "go" to "M4,12h15 M13,6l6,6 -6,6",
+        "check" to "M4.5,12.5l5,5 10,-11",
+        "send" to "M3,11.5L21,3l-6.5,18 -3.5,-7.5z M11,13.5L21,3",
     )
     private val cache = HashMap<String, android.graphics.Path>()
 

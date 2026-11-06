@@ -2,6 +2,9 @@
 
 package com.wpreborn.core.ui
 
+import androidx.compose.ui.unit.isSpecified
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -51,15 +54,46 @@ fun WpText(
     overflow: TextOverflow = TextOverflow.Clip,
     textAlign: TextAlign? = null,
     softWrap: Boolean = true,
+    /** One line that shrinks (down to 55%) until it fits the width, instead of wrapping or running off. */
+    fit: Boolean = false,
 ) {
     val c = if (color == Color.Unspecified) Wp.palette.foreground else color
+    val styled = if (textAlign != null) style.copy(color = c, textAlign = textAlign) else style.copy(color = c)
+    // Big single-line titles (headers) always fit: a long name makes them smaller, never cut or broken.
+    val big = style.fontSize.isSpecified && style.fontSize.value >= 28f && (maxLines == 1 || !softWrap)
+    if (fit || big) {
+        FitText(text, modifier, styled)
+        return
+    }
     BasicText(
         text = text,
         modifier = modifier,
-        style = if (textAlign != null) style.copy(color = c, textAlign = textAlign) else style.copy(color = c),
+        style = styled,
         maxLines = maxLines,
         overflow = overflow,
         softWrap = softWrap,
+    )
+}
+
+@Composable
+private fun FitText(text: String, modifier: Modifier, style: TextStyle) {
+    var scale by remember(text, style.fontSize) { mutableFloatStateOf(1f) }
+    val sized = if (scale < 1f && style.fontSize.isSpecified) {
+        style.copy(
+            fontSize = style.fontSize * scale,
+            lineHeight = if (style.lineHeight.isSpecified) style.lineHeight * scale else style.lineHeight,
+        )
+    } else {
+        style
+    }
+    BasicText(
+        text = text,
+        modifier = modifier,
+        style = sized,
+        maxLines = 1,
+        softWrap = false,
+        overflow = TextOverflow.Clip,
+        onTextLayout = { r -> if (r.didOverflowWidth && scale > 0.55f) scale = (scale * 0.92f).coerceAtLeast(0.55f) },
     )
 }
 
@@ -168,7 +202,7 @@ fun WpButton(
             .padding(horizontal = 18.dp, vertical = 9.dp),
         contentAlignment = Alignment.Center,
     ) {
-        WpText(text.lowercase(), style = WpType.Normal.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = textColor)
+        WpText(text.lowercase(), style = WpType.Normal.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold), color = textColor, maxLines = 1, softWrap = false, fit = true)
     }
 }
 

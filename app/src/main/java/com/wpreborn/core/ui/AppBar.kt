@@ -95,6 +95,8 @@ fun WpAppBar(
                                     style = WpType.Small,
                                     textAlign = TextAlign.Center,
                                     maxLines = 1,
+                                    softWrap = false,
+                                    fit = true,
                                     modifier = Modifier.padding(top = 4.dp),
                                 )
                             }

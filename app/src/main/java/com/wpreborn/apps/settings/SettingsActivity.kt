@@ -317,7 +317,7 @@ private fun ChoiceBox(label: String, selected: Boolean, onClick: () -> Unit) {
             .wpClickable(onClick = onClick),
         contentAlignment = Alignment.CenterStart,
     ) {
-        WpText(label, style = WpType.Normal, color = if (selected) Color.White else Wp.palette.foreground, modifier = Modifier.padding(start = 12.dp))
+        WpText(label, style = WpType.Normal, color = if (selected) Color.White else Wp.palette.foreground, maxLines = 1, softWrap = false, fit = true, modifier = Modifier.padding(horizontal = 12.dp))
     }
 }
 

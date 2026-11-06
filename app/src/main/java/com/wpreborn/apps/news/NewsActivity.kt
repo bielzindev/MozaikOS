@@ -1,5 +1,7 @@
 package com.wpreborn.apps.news
 
+import com.wpreborn.core.motion.listEntrance
+import androidx.compose.foundation.lazy.itemsIndexed
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -149,7 +151,7 @@ private fun Stories(list: List<Article>, onOpen: (Article) -> Unit) {
     val rest = list.filter { it !== lead }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 20.dp)) {
         item(key = "lead" + lead.link) {
-            Column(Modifier.fillMaxWidth().wpClickable { onOpen(lead) }.padding(bottom = 18.dp)) {
+            Column(Modifier.listEntrance(0).fillMaxWidth().wpClickable { onOpen(lead) }.padding(bottom = 18.dp)) {
                 if (lead.image != null) {
                     WebImage(lead.image, Modifier.fillMaxWidth().aspectRatio(16f / 9f).background(Wp.palette.raised), 1080)
                     Spacer(Modifier.height(8.dp))
@@ -158,7 +160,8 @@ private fun Stories(list: List<Article>, onOpen: (Article) -> Unit) {
                 WpText(byline(lead), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 4.dp))
             }
         }
-        items(rest, key = { it.link }) { a ->
+        itemsIndexed(rest, key = { _, a -> a.link }) { i, a ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem().listEntrance(i + 1)) {
             Row(Modifier.fillMaxWidth().wpClickable { onOpen(a) }.padding(vertical = 8.dp)) {
                 if (a.image != null) {
                     WebImage(a.image, Modifier.size(96.dp).background(Wp.palette.raised), 288)
@@ -169,7 +172,9 @@ private fun Stories(list: List<Article>, onOpen: (Article) -> Unit) {
                     WpText(byline(a), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 2.dp))
                 }
             }
+        
         }
+    }
     }
 }
 

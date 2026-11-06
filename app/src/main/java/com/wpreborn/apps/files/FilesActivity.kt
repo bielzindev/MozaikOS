@@ -326,6 +326,7 @@ private fun FilesScreen() {
                 else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
                     if (listed.isEmpty()) item { WpText(stringResource(R.string.files_empty), style = WpType.Large, color = Wp.palette.subtle) }
                     items(listed, key = { it.absolutePath }) { f ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                         if (picking != null) {
                             // Choosing where to move / copy: only the folders, as plain names.
                             WpText(
@@ -366,7 +367,9 @@ private fun FilesScreen() {
                                 if (!f.isDirectory) WpText(Formatter.formatShortFileSize(context, f.length()), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
                             }
                         }
-                    }
+                    
+        }
+    }
                 }
             }
         }
@@ -468,6 +471,7 @@ private fun Places(volumes: List<Pair<String, File>>, onOpen: (File) -> Unit) {
     val context = LocalContext.current
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 10.dp, bottom = 16.dp)) {
         items(volumes, key = { it.second.absolutePath }) { (name, dir) ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
             Column(Modifier.fillMaxWidth().wpClickable { onOpen(dir) }.padding(vertical = 10.dp)) {
                 WpText(name, style = WpType.ExtraLarge.copy(fontSize = 28.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 val stat = remember(dir) { runCatching { StatFs(dir.path) }.getOrNull() }
@@ -483,7 +487,9 @@ private fun Places(volumes: List<Pair<String, File>>, onOpen: (File) -> Unit) {
                     }
                 }
             }
+        
         }
+    }
     }
 }
 
@@ -520,6 +526,7 @@ private fun SearchResults(base: File, query: String, hidden: Boolean, reload: In
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
         if (list != null && list.isEmpty()) item { WpText(stringResource(R.string.files_no_results), style = WpType.Large, color = Wp.palette.subtle) }
         items(list.orEmpty(), key = { it.absolutePath }) { f ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
             Row(Modifier.fillMaxWidth().wpClickable { onOpen(f) }.padding(vertical = 5.dp), verticalAlignment = Alignment.CenterVertically) {
                 FileSquare(f, reload)
                 Spacer(Modifier.width(14.dp))
@@ -530,7 +537,9 @@ private fun SearchResults(base: File, query: String, hidden: Boolean, reload: In
                     WpText(where(f), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
+        
         }
+    }
     }
 }
 

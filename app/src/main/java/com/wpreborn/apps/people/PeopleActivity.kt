@@ -158,10 +158,16 @@ private fun ContactList(contacts: List<Contact>, grouped: Boolean = true, onOpen
                     item(key = "h$letter") {
                         LetterTile(letter, size = 52.dp, filled = true, modifier = Modifier.padding(vertical = 8.dp).wpClickable { jump = true })
                     }
-                    items(list, key = { it.id }) { c -> ContactRow(c, onOpen) }
+                    items(list, key = { it.id }) { c ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) { ContactRow(c, onOpen) 
+        }
+    }
                 }
             } else {
-                items(contacts, key = { it.id }) { c -> ContactRow(c, onOpen) }
+                items(contacts, key = { it.id }) { c ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) { ContactRow(c, onOpen) 
+        }
+    }
             }
         }
         if (jump) {
@@ -204,7 +210,10 @@ private fun SearchPage(contacts: List<Contact>, onOpen: (Contact) -> Unit) {
         WpText(stringResource(R.string.people_search).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, bottom = 10.dp))
         WpTextBox(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp), focusRequester = focus)
         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 12.dp, top = 12.dp)) {
-            items(results, key = { it.id }) { ContactRow(it, onOpen) }
+            items(results, key = { it.id }) {
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) { ContactRow(it, onOpen) 
+        }
+    }
         }
     }
 }
@@ -266,12 +275,15 @@ private fun ProfilePage(contact: Contact, onEdit: () -> Unit, onChanged: () -> U
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp)) {
                         items(history, key = { it.id }) { c ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                             WpListItem(
                                 WpFormat.dayLabel(context, c.date),
                                 subtitle = WpFormat.time(context, c.date) + " · " + c.number,
                                 titleStyle = WpType.Large,
                             )
-                        }
+                        
+        }
+    }
                     }
                 }
             }

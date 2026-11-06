@@ -1,5 +1,7 @@
 package com.wpreborn.apps.mail
 
+import com.wpreborn.core.motion.listEntrance
+import androidx.compose.foundation.lazy.itemsIndexed
 import android.content.Intent
 import android.net.Uri
 import android.text.format.DateUtils
@@ -282,7 +284,8 @@ private fun Inbox(
                     WpText(stringResource(R.string.mail_empty), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(20.dp))
                 }
                 LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
-                    items(shown, key = { it.uid }) { h ->
+                    itemsIndexed(shown, key = { _, m -> m.uid }) { i, h ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem().listEntrance(i)) {
                         var y by remember { mutableFloatStateOf(0f) }
                         Row(
                             Modifier.fillMaxWidth()
@@ -304,7 +307,9 @@ private fun Inbox(
                                 }
                             }
                         }
-                    }
+                    
+        }
+    }
                 }
             }
         }
@@ -426,12 +431,15 @@ private fun FoldersPage(account: MailAccount, pwd: String, onPick: (MailFolder) 
         if (folders == null) LoadingDots(Modifier.padding(top = 16.dp))
         error?.let { WpText(it, style = WpType.Small, color = Wp.accent) }
         LazyColumn(Modifier.fillMaxSize().padding(top = 8.dp)) {
-            items(folders.orEmpty(), key = { it.fullName }) { f ->
+            itemsIndexed(folders.orEmpty(), key = { _, f -> f.fullName }) { i, f ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem().listEntrance(i)) {
                 Row(Modifier.fillMaxWidth().wpClickable { onPick(f) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                     WpText(folderLabel(context, f).lowercase(), style = WpType.ExtraLarge.copy(fontSize = 26.sp), modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     if (f.unread > 0) WpText(f.unread.toString(), style = WpType.Large, color = Wp.accent)
                 }
-            }
+            
+        }
+    }
         }
     }
 }

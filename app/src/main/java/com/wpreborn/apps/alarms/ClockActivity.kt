@@ -100,6 +100,7 @@ private fun WorldClock() {
                 Spacer(Modifier.height(16.dp))
             }
             itemsIndexed(zones, key = { _, z -> z }) { i, z ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                 val tz = TimeZone.getTimeZone(z)
                 val fmt = remember(z) { (DateFormat.getTimeFormat(context).clone() as java.text.DateFormat).apply { timeZone = tz } }
                 val diffH = (tz.getOffset(now) - TimeZone.getDefault().getOffset(now)) / 3_600_000f
@@ -113,7 +114,9 @@ private fun WorldClock() {
                     }
                     WpText(fmt.format(Date(now)), style = WpType.ExtraLarge)
                 }
-            }
+            
+        }
+    }
             item {
                 if (adding) {
                     WpTextBox(query, { query = it }, Modifier.fillMaxWidth().padding(top = 8.dp), placeholder = stringResource(R.string.clock_city_hint))

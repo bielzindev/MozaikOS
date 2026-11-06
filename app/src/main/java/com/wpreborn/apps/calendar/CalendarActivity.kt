@@ -179,7 +179,10 @@ private fun Agenda(events: List<CalendarEvent>, onOpen: (CalendarEvent) -> Unit)
             item(key = "d$day") {
                 WpText(WpFormat.dayLabel(context, day), style = WpType.GroupHeader, color = Wp.accent, modifier = Modifier.padding(top = 12.dp, bottom = 4.dp))
             }
-            items(list, key = { "${it.eventId}-${it.begin}" }) { e -> EventRow(e, onOpen) }
+            items(list, key = { "${it.eventId}-${it.begin}" }) { e ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) { EventRow(e, onOpen) 
+        }
+    }
         }
     }
 }

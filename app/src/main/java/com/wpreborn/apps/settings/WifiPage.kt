@@ -150,6 +150,7 @@ fun WifiPage() {
         LazyColumn(Modifier.weight(1f), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, bottom = 16.dp)) {
             if (enabled && perm.granted && nets.isEmpty()) item { WpText(stringResource(R.string.wifi_searching), style = WpType.Large, color = Wp.palette.subtle) }
             items(nets, key = { it.ssid }) { n ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                 val connected = n.ssid == current
                 Row(
                     Modifier.fillMaxWidth().wpClickable { if (!connected) joining = n }.padding(vertical = 8.dp),
@@ -170,7 +171,9 @@ fun WifiPage() {
                     }
                     if (n.secure) WpIcon(WpIcons.Lock, tint = Wp.palette.subtle, size = 16.dp)
                 }
-            }
+            
+        }
+    }
         }
         WpAppBar(
             buttons = listOf(

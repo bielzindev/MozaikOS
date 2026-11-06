@@ -132,6 +132,7 @@ private fun NotesList(notes: List<Note>?, onOpen: (String) -> Unit, onNew: () ->
                         } else {
                             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
                                 itemsIndexed(list, key = { _, n -> n.id }) { i, n ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                                     var bottom by remember { mutableFloatStateOf(0f) }
                                     NoteRow(
                                         n,
@@ -140,7 +141,9 @@ private fun NotesList(notes: List<Note>?, onOpen: (String) -> Unit, onNew: () ->
                                             .onGloballyPositioned { bottom = it.boundsInWindow().bottom }
                                             .wpCombinedClickable(onLongClick = { menuY = bottom; menu = n }) { onOpen(n.id) },
                                     )
-                                }
+                                
+        }
+    }
                             }
                         }
                     }

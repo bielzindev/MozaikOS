@@ -20,8 +20,22 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import com.wpreborn.core.motion.WpEasing
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -31,6 +45,34 @@ import com.wpreborn.core.motion.slideInStaggered
 import com.wpreborn.core.motion.swivelIn
 import com.wpreborn.core.theme.Wp
 import com.wpreborn.core.theme.WpType
+
+/**
+ * What the Windows Phone MessageBox and context menu did on the way out: the panel slides back up
+ * and fades while the dimmed page clears, and only then is the action taken. [close] plays that
+ * (once) and calls [then] afterwards; [scrim] is the dimming's strength, in and out.
+ */
+private class OverlayExit(
+    private val scope: kotlinx.coroutines.CoroutineScope,
+    private val closingState: androidx.compose.runtime.MutableState<Boolean>,
+) {
+    val closing get() = closingState.value
+
+    fun close(then: () -> Unit) {
+        if (closingState.value) return
+        closingState.value = true
+        scope.launch {
+            delay(190)
+            then()
+        }
+    }
+}
+
+@Composable
+private fun rememberOverlayExit(): OverlayExit {
+    val scope = rememberCoroutineScope()
+    val closing = remember { mutableStateOf(false) }
+    return remember { OverlayExit(scope, closing) }
+}
 
 /**
  * The Windows Phone MessageBox: a chrome panel anchored to the top of the screen with a
@@ -45,29 +87,39 @@ fun WpMessageBox(
     dismiss: String? = null,
     onDismiss: () -> Unit,
 ) {
-    BackHandler(onBack = onDismiss)
+    val exit = rememberOverlayExit()
+    BackHandler { exit.close(onDismiss) }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scrim by animateFloatAsState(if (shown && !exit.closing) 0.6f else 0f, tween(200), label = "scrim")
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.6f))
-            .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),
+            .background(Color.Black.copy(alpha = scrim))
+            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
     ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .swivelIn()
-                .background(Wp.palette.chrome)
-                .clickable(remember { MutableInteractionSource() }, null) {}
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
+        AnimatedVisibility(
+            visible = !exit.closing,
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(160)) + slideOutVertically(tween(190, easing = WpEasing.ExpIn)) { -it / 4 },
         ) {
-            WpText(title, style = WpType.Large.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
-            Spacer(Modifier.height(12.dp))
-            WpText(message, style = WpType.Normal)
-            Spacer(Modifier.height(24.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                WpButton(confirm, Modifier.weight(1f), onClick = onConfirm)
-                if (dismiss != null) WpButton(dismiss, Modifier.weight(1f), onClick = onDismiss)
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .swivelIn()
+                    .background(Wp.palette.chrome)
+                    .clickable(remember { MutableInteractionSource() }, null) {}
+                    .statusBarsPadding()
+                    .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
+            ) {
+                WpText(title, style = WpType.Large.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold))
+                Spacer(Modifier.height(12.dp))
+                WpText(message, style = WpType.Normal)
+                Spacer(Modifier.height(24.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    WpButton(confirm, Modifier.weight(1f), onClick = { exit.close(onConfirm) })
+                    if (dismiss != null) WpButton(dismiss, Modifier.weight(1f), onClick = { exit.close(onDismiss) })
+                }
             }
         }
     }
@@ -83,39 +135,53 @@ data class ContextMenuItem(val label: String, val enabled: Boolean = true, val o
  */
 @Composable
 fun WpContextMenu(items: List<ContextMenuItem>, anchorY: Float, onDismiss: () -> Unit) {
-    BackHandler(onBack = onDismiss)
+    val exit = rememberOverlayExit()
+    BackHandler { exit.close(onDismiss) }
     val density = LocalDensity.current
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val scrim by animateFloatAsState(if (shown && !exit.closing) 0.5f else 0f, tween(200), label = "scrim")
     BoxWithConstraints(
         Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.5f))
-            .clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),
+            .background(Color.Black.copy(alpha = scrim))
+            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
     ) {
         val menuHeight = with(density) { (items.size * 52 + 24).dp.toPx() }
         val maxY = with(density) { maxHeight.toPx() }
         val y = if (anchorY + menuHeight < maxY) anchorY else (anchorY - menuHeight).coerceAtLeast(0f)
-        Column(
-            Modifier
-                .offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) }
-                .fillMaxWidth()
-                .swivelIn()
-                .background(Wp.palette.chrome)
-                .padding(vertical = 12.dp),
+        AnimatedVisibility(
+            visible = !exit.closing,
+            enter = EnterTransition.None,
+            exit = fadeOut(tween(150)) + slideOutVertically(tween(180, easing = WpEasing.ExpIn)) { -it / 5 },
+            modifier = Modifier.offset { androidx.compose.ui.unit.IntOffset(0, y.toInt()) },
         ) {
-            items.forEach { item ->
-                WpText(
-                    item.label.lowercase(),
-                    style = WpType.Large,
-                    color = if (item.enabled) Wp.palette.foreground else Wp.palette.disabled,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .wpClickable(enabled = item.enabled, tilt = false) {
-                            onDismiss()
-                            item.onClick()
-                        }
-                        .padding(start = 20.dp, top = 10.dp),
-                )
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .swivelIn()
+                    .background(Wp.palette.chrome)
+                    .padding(vertical = 12.dp),
+            ) {
+                items.forEachIndexed { index, item ->
+                    WpText(
+                        item.label.lowercase(),
+                        style = WpType.Large,
+                        color = if (item.enabled) Wp.palette.foreground else Wp.palette.disabled,
+                        modifier = Modifier
+                            // The entries come in one after the other, a little behind the panel.
+                            .slideInStaggered(index + 1, distanceDp = 18f)
+                            .fillMaxWidth()
+                            .height(52.dp)
+                            .wpClickable(enabled = item.enabled, tilt = false) {
+                                exit.close {
+                                    onDismiss()
+                                    item.onClick()
+                                }
+                            }
+                            .padding(start = 20.dp, top = 10.dp),
+                    )
+                }
             }
         }
     }

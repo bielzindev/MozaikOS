@@ -1,5 +1,7 @@
 package com.wpreborn.apps.translator
 
+import com.wpreborn.core.motion.listEntrance
+import androidx.compose.foundation.lazy.itemsIndexed
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -254,8 +256,8 @@ class TranslatorActivity : WpActivity() {
                 } else {
                     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
                         if (history.isEmpty()) item { WpText(stringResource(R.string.tr_no_history), style = WpType.Large, color = Wp.palette.subtle) }
-                        items(history) { e ->
-                            Column(Modifier.fillMaxWidth().wpClickable { from = e.from; to = e.to; input = e.text }.padding(vertical = 8.dp)) {
+                        itemsIndexed(history) { i, e ->
+                            Column(Modifier.listEntrance(i).fillMaxWidth().wpClickable { from = e.from; to = e.to; input = e.text }.padding(vertical = 8.dp)) {
                                 WpText(e.text, style = WpType.Large, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 WpText(e.result, style = WpType.Normal, color = Wp.accent, maxLines = 2, overflow = TextOverflow.Ellipsis)
                                 WpText(languageName(e.from, context) + " → " + languageName(e.to, context), style = WpType.Small, color = Wp.palette.subtle)

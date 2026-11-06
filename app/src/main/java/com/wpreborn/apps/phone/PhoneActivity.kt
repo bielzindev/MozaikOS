@@ -183,8 +183,11 @@ private fun PhoneHome(onKeypad: () -> Unit, onDetail: (String, String?) -> Unit)
                     } else {
                         LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(start = 12.dp, end = 12.dp, bottom = 16.dp)) {
                             itemsIndexed(list.orEmpty(), key = { _, c -> c.id }) { i, c ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                                 CallRow(c, Modifier.slideInStaggered(i)) { onDetail(c.number, c.name) }
-                            }
+                            
+        }
+    }
                         }
                     }
                 }
@@ -488,6 +491,7 @@ private fun CallDetailPage(number: String, name: String?) {
                 WpText(stringResource(R.string.phone_history), style = WpType.GroupHeader, color = Wp.palette.subtle)
             }
             itemsIndexed(calls, key = { _, c -> c.id }) { i, c ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                 val label = when (c.type) {
                     CallType.Missed -> stringResource(R.string.call_missed)
                     CallType.Outgoing -> stringResource(R.string.call_outgoing)
@@ -503,7 +507,9 @@ private fun CallDetailPage(number: String, name: String?) {
                         color = Wp.palette.subtle,
                     )
                 }
-            }
+            
+        }
+    }
         }
     }
 }

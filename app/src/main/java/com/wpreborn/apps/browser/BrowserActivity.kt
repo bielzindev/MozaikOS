@@ -909,9 +909,12 @@ private fun HubPage(store: BrowserStore, onOpen: (String) -> Unit) {
             } else {
                 LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
                     items(list, key = { it.url + it.time }) { e ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                         // Press and hold removes it.
                         EntryRow(e, onLongClick = { if (index == 0) store.removeFavorite(e) else store.removeHistory(e) }) { onOpen(e.url) }
-                    }
+                    
+        }
+    }
                 }
             }
             }
@@ -1102,6 +1105,7 @@ private fun DownloadsPage(a: BrowserActivity, store: BrowserStore) {
             }
             LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 16.dp)) {
                 items(list.orEmpty(), key = { it.id }) { d ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                     val done = d.status == DownloadManager.STATUS_SUCCESSFUL
                     val context = a
                     Row(
@@ -1138,7 +1142,9 @@ private fun DownloadsPage(a: BrowserActivity, store: BrowserStore) {
                             contentAlignment = Alignment.Center,
                         ) { WpIcon(if (done) WpIcons.Delete else WpIcons.Close, tint = Wp.palette.foreground, size = 20.dp) }
                     }
-                }
+                
+        }
+    }
             }
         }
         WpAppBar(

@@ -197,6 +197,7 @@ private fun ThreadsPage(onOpen: (SmsThread) -> Unit, onNew: () -> Unit) {
                             list.isEmpty() -> CenteredMessage(stringResource(R.string.messages_empty), Modifier.padding(start = 20.dp))
                             else -> LazyColumn(Modifier.fillMaxSize(), contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 16.dp)) {
                                 itemsIndexed(list, key = { _, t -> t.threadId }) { i, t ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                                     var bottom by remember { mutableFloatStateOf(0f) }
                                     ThreadRow(
                                         t,
@@ -209,7 +210,9 @@ private fun ThreadsPage(onOpen: (SmsThread) -> Unit, onNew: () -> Unit) {
                                             menuFor = t
                                         },
                                     )
-                                }
+                                
+        }
+    }
                             }
                         }
                     }
@@ -305,8 +308,11 @@ private fun ConversationPage(threadId: Long, address: String) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 itemsIndexed(messages, key = { _, m -> m.id }) { _, m ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                     Bubble(m)
-                }
+                
+        }
+    }
             }
         }
         if (perm.granted) {

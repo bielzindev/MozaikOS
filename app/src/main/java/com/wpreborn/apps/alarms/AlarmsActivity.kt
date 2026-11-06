@@ -99,6 +99,7 @@ private fun AlarmList(store: AlarmStore, onEdit: (Int) -> Unit) {
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
             if (list.isEmpty()) item { WpText(stringResource(R.string.alarm_empty), style = WpType.Large, color = Wp.palette.subtle) }
             itemsIndexed(list, key = { _, a -> a.id }) { i, a ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                 Row(
                     Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { onEdit(a.id) }.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -115,7 +116,9 @@ private fun AlarmList(store: AlarmStore, onEdit: (Int) -> Unit) {
                     }
                     Switch(a.enabled) { store.setEnabled(a.id, it) }
                 }
-            }
+            
+        }
+    }
         }
         WpAppBar(buttons = listOf(AppBarButton(WpIcons.Add, stringResource(R.string.alarm_new)) { onEdit(0) }))
     }

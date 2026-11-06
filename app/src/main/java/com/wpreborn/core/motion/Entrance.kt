@@ -50,3 +50,9 @@ fun Modifier.swivelIn(key: Any? = Unit): Modifier = composed {
         alpha = minOf(1f, p * 2f)
     }
 }
+
+/**
+ * The entrance of a list's first rows: the first screenful slides in one row after another
+ * (like the Windows Phone toolkit's feather), rows that appear later while scrolling don't.
+ */
+fun Modifier.listEntrance(index: Int): Modifier = if (index < 8) slideInStaggered(index, distanceDp = 60f) else this

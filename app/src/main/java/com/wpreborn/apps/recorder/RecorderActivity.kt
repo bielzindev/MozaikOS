@@ -235,6 +235,7 @@ private fun RecordingsPage(refresh: Int) {
         LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
             if (list.isEmpty()) item { WpText(stringResource(R.string.rec_empty), style = WpType.Large, color = Wp.palette.subtle) }
             itemsIndexed(list, key = { _, r -> r.uri.toString() }) { i, r ->
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.animateItem()) {
                 var bottom by remember { mutableFloatStateOf(0f) }
                 Row(
                     Modifier
@@ -252,7 +253,9 @@ private fun RecordingsPage(refresh: Int) {
                         WpText(WpFormat.shortStamp(context, r.date) + "  ·  " + WpFormat.duration(r.durationMs), style = WpType.Subtle, color = Wp.palette.subtle)
                     }
                 }
-            }
+            
+        }
+    }
         }
         menu?.let { r ->
             val asSong = com.wpreborn.data.media.Song(ContentUris.parseId(r.uri), r.name, "", "", 0, r.durationMs, 0)

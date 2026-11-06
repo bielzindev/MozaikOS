@@ -199,9 +199,6 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun resize(id: String, allowLarge: Boolean) =
         update(_tiles.value.map { if (it.id == id) it.copy(size = it.size.next(allowLarge)) else it })
 
-    fun setSize(id: String, size: TileSize) =
-        update(_tiles.value.map { if (it.id == id) it.copy(size = size) else it })
-
     fun setColor(id: String, color: AccentColor?) =
         update(_tiles.value.map { if (it.id == id) it.copy(color = color, customColor = null) else it })
 
@@ -212,12 +209,14 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun move(id: String, toIndex: Int, persist: Boolean) {
         val list = _tiles.value.toMutableList()
         val from = list.indexOfFirst { it.id == id }
-        if (from < 0) return
-        val target = toIndex.coerceIn(0, list.lastIndex)
-        if (from == target) return
-        val t = list.removeAt(from)
-        list.add(target, t)
-        if (persist) update(list) else _tiles.value = list
+        if (from >= 0) {
+            val target = toIndex.coerceIn(0, list.lastIndex)
+            if (from != target) list.add(target, list.removeAt(from))
+        }
+        // Letting go saves the order even when the tile already sits in its place (the moves while
+        // dragging only change it on screen): returning early here left the new order unsaved,
+        // so after a restart the tiles were back where they started.
+        if (persist) update(list) else if (list != _tiles.value) _tiles.value = list
     }
 
     fun persist() = tileRepo.save(_tiles.value)

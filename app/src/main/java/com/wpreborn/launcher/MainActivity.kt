@@ -176,8 +176,6 @@ class MainActivity : ComponentActivity() {
                         onResize = { vm.resize(it.id, allowLarge = !settings.moreTiles) },
                         onColor = { t, c -> vm.setColor(t.id, c) },
                         onCustomColor = { t, c -> vm.setCustomColor(t.id, c) },
-                        onSetSize = { t, size -> vm.setSize(t.id, size) },
-                        allowLargeTiles = !settings.moreTiles,
                         onMove = { id, index, persist -> vm.move(id, index, persist) },
                         onPersonalize = ::openPersonalize,
                         folderContents = { t -> foldersMap[t.folderId]?.let { f -> f.apps.mapNotNull { k -> appsByKey[k]?.let { it to f.sizeOf(k) } } }.orEmpty() },

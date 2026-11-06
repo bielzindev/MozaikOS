@@ -3,6 +3,7 @@ package com.wpreborn.launcher.start
 import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.VectorConverter
 import androidx.compose.animation.core.animateIntOffsetAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ScrollState
@@ -111,9 +112,10 @@ fun startGeometry(width: Dp, moreTiles: Boolean): StartGeometry {
 class StartScreenState {
     var editId by mutableStateOf<String?>(null)
 
-    /** Tile being edited in the tile editor (size, colour and icon style on one page). */
-    var editorFor by mutableStateOf<String?>(null)
+    /** Tile whose app icon is being customised (pack and colour). */
+    var iconEditorFor by mutableStateOf<String?>(null)
     var dragId by mutableStateOf<String?>(null)
+    var colorPickerFor by mutableStateOf<String?>(null)
     /** The folder open in place (its contents shown under it, the tiles below pushed down). */
     var openFolderId by mutableStateOf<String?>(null)
     /** The open folder's name is being edited (right after creating it, or after a tap on it). */
@@ -143,8 +145,6 @@ fun StartScreen(
     onResize: (TileSpec) -> Unit,
     onColor: (TileSpec, AccentColor?) -> Unit,
     onCustomColor: (TileSpec, Int) -> Unit,
-    onSetSize: (TileSpec, TileSize) -> Unit = { _, _ -> },
-    allowLargeTiles: Boolean = false,
     onMove: (String, Int, Boolean) -> Unit,
     onPersonalize: () -> Unit = {},
     /** The apps of a folder tile, with the size of their tiles. */
@@ -245,6 +245,19 @@ fun StartScreen(
             return Rect(Offset(marginPx + pl.x * unitPx, top), androidx.compose.ui.geometry.Size(w * unitPx - gapPx, t.size.h * unitPx - gapPx))
         }
 
+        /** A press on one of the selected tile's round buttons (they stick out of the tile): theirs, not a tile's. */
+        fun onEditButton(p: Offset): Boolean {
+            val id = state.editId ?: return false
+            if (state.dragId != null) return false
+            val r = currentTiles.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { rectOf(it) } ?: return false
+            val b = with(density) { 36.dp.toPx() }
+            val o = with(density) { 12.dp.toPx() }
+            return Rect(r.right - b + o, r.top - o, r.right + o, r.top - o + b).contains(p) ||
+                Rect(r.left - o, r.top - o, r.left - o + b, r.top - o + b).contains(p) ||
+                Rect(r.right - b + o, r.bottom + o - b, r.right + o, r.bottom + o).contains(p) ||
+                Rect(r.left - o, r.bottom + o - b, r.left - o + b, r.bottom + o).contains(p)
+        }
+
         fun tileAt(p: Offset): Int {
             for (i in currentTiles.indices) if (rectOf(i)?.contains(p) == true) return i
             return -1
@@ -295,6 +308,7 @@ fun StartScreen(
                         .pointerInput(geo) {
                             awaitEachGesture {
                                 val down = awaitFirstDown(requireUnconsumed = false)
+                                if (onEditButton(down.position)) return@awaitEachGesture
                                 // Inside the open folder: tap opens the app, press and hold
                                 // takes it out of the folder (back to Start, after the folder).
                                 val item = if (state.editId == null) itemAt(down.position) else -1
@@ -353,16 +367,52 @@ fun StartScreen(
                                         val id = hoverId ?: return
                                         if (inCenter) {
                                             if (now - hoverSince > 600) state.mergeTargetId = id
-                                        } else if (!movedHere && edgeSince > 0 && now - edgeSince > 180) {
+                                        } else if (!movedHere && edgeSince > 0 && now - edgeSince > 120) {
                                             val over = currentTiles.indexOfFirst { it.id == id }
                                             if (over >= 0) currentOnMove(tile.id, over, false)
                                             movedHere = true
                                         }
                                     }
+                                    /** Which tile is under [p] (content pixels), and for how long: folder, or the tiles move. */
+                                    fun track(p: Offset) {
+                                        val now = System.currentTimeMillis()
+                                        val over = tileAt(p)
+                                        val r = if (over >= 0 && currentTiles[over].id != tile.id) rectOf(over) else null
+                                        if (r == null) {
+                                            hoverId = null
+                                            inCenter = false
+                                            state.mergeTargetId = null
+                                            return
+                                        }
+                                        val id = currentTiles[over].id
+                                        if (hoverId != id) {
+                                            hoverId = id
+                                            hoverSince = now
+                                            edgeSince = 0L
+                                            movedHere = false
+                                            state.mergeTargetId = null
+                                        }
+                                        val mx = r.width * 0.2f
+                                        val my = r.height * 0.2f
+                                        val center = !tile.isFolder && Rect(r.left + mx, r.top + my, r.right - mx, r.bottom - my).contains(p)
+                                        if (center != inCenter) {
+                                            inCenter = center
+                                            if (center) {
+                                                hoverSince = now
+                                            } else {
+                                                edgeSince = now
+                                                state.mergeTargetId = null
+                                            }
+                                        }
+                                        if (!center && edgeSince == 0L) edgeSince = now
+                                        settle(now)
+                                    }
                                     while (true) {
                                         val ev = withTimeoutOrNull(60) { awaitPointerEvent() }
                                         if (ev == null) {
-                                            if (dragging) settle(System.currentTimeMillis())
+                                            // No movement: the time still counts, and while the screen scrolls
+                                            // under a still finger the tile under it changes.
+                                            if (dragging) track(dragPointerViewport + Offset(0f, state.scroll.value.toFloat()))
                                             continue
                                         }
                                         val ch: PointerInputChange = ev.changes.firstOrNull { it.id == down.id } ?: break
@@ -379,37 +429,7 @@ fun StartScreen(
                                         if (dragging) {
                                             ch.consume()
                                             dragPointerViewport = Offset(ch.position.x, ch.position.y - state.scroll.value)
-                                            val now = System.currentTimeMillis()
-                                            val over = tileAt(ch.position)
-                                            val r = if (over >= 0 && currentTiles[over].id != tile.id) rectOf(over) else null
-                                            if (r == null) {
-                                                hoverId = null
-                                                inCenter = false
-                                                state.mergeTargetId = null
-                                            } else {
-                                                val id = currentTiles[over].id
-                                                if (hoverId != id) {
-                                                    hoverId = id
-                                                    hoverSince = now
-                                                    edgeSince = 0L
-                                                    movedHere = false
-                                                    state.mergeTargetId = null
-                                                }
-                                                val mx = r.width * 0.2f
-                                                val my = r.height * 0.2f
-                                                val center = !tile.isFolder && Rect(r.left + mx, r.top + my, r.right - mx, r.bottom - my).contains(ch.position)
-                                                if (center != inCenter) {
-                                                    inCenter = center
-                                                    if (center) {
-                                                        hoverSince = now
-                                                    } else {
-                                                        edgeSince = now
-                                                        state.mergeTargetId = null
-                                                    }
-                                                }
-                                                if (!center && edgeSince == 0L) edgeSince = now
-                                                settle(now)
-                                            }
+                                            track(ch.position)
                                         }
                                     }
                                     if (dragging) {
@@ -464,14 +484,22 @@ fun StartScreen(
                         val target = with(density) {
                             IntOffset(geo.x(pl.x).roundToPx(), rowTop(pl.y).roundToPx())
                         }
-                        val animated by animateIntOffsetAsState(target, tween(250), label = "tilePos")
-                        val pos = if (dragging) {
+                        fun dragPosition(): IntOffset {
                             val pointerContent = dragPointerViewport + Offset(0f, state.scroll.value.toFloat())
                             val o = dragStartTopLeft + (pointerContent - dragDown)
-                            IntOffset(o.x.roundToInt(), o.y.roundToInt())
-                        } else {
-                            animated
+                            return IntOffset(o.x.roundToInt(), o.y.roundToInt())
                         }
+                        // While dragged the tile follows the finger; the animation is kept on that
+                        // spot, so on letting go it slides from there into its place (it used to jump).
+                        val slide = remember { androidx.compose.animation.core.Animatable(target, IntOffset.VectorConverter) }
+                        LaunchedEffect(dragging, target) {
+                            if (dragging) {
+                                androidx.compose.runtime.snapshotFlow { dragPosition() }.collect { slide.snapTo(it) }
+                            } else {
+                                slide.animateTo(target, tween(250))
+                            }
+                        }
+                        val pos = if (dragging) dragPosition() else slide.value
                         val editing = state.editId != null
                         val selected = state.editId == tile.id
                         val mergeTarget = state.mergeTargetId == tile.id
@@ -538,8 +566,13 @@ fun StartScreen(
                                 EditButton(WpIcons.Resize, Modifier.align(Alignment.BottomEnd).offset(12.dp, 12.dp)) {
                                     onResize(tile)
                                 }
-                                EditButton(WpIcons.Edit, Modifier.align(Alignment.TopStart).offset((-12).dp, (-12).dp)) {
-                                    state.editorFor = tile.id
+                                EditButton(WpIcons.Palette, Modifier.align(Alignment.TopStart).offset((-12).dp, (-12).dp)) {
+                                    state.colorPickerFor = tile.id
+                                }
+                                if (app != null) {
+                                    EditButton(WpIcons.Edit, Modifier.align(Alignment.BottomStart).offset((-12).dp, 12.dp)) {
+                                        state.iconEditorFor = tile.id
+                                    }
                                 }
                             }
                         }
@@ -611,23 +644,26 @@ fun StartScreen(
             }
         }
 
-        state.editorFor?.let { id ->
-            val tile = tiles.firstOrNull { it.id == id }
-            if (tile == null) {
-                state.editorFor = null
-            } else {
-                val editedApp = appFor(tile)
-                TileEditor(
-                    tile = tile,
-                    app = editedApp,
-                    title = if (tile.isFolder) folderName(tile) else editedApp?.label.orEmpty(),
-                    allowLarge = allowLargeTiles,
-                    onColor = { onColor(tile, it) },
-                    onCustomColor = { onCustomColor(tile, it) },
-                    onSize = { onSetSize(tile, it) },
-                    onDismiss = { state.editorFor = null },
-                )
-            }
+        state.iconEditorFor?.let { id ->
+            tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
+                IconCustomizer(app, tileColor = tiles.first { it.id == id }.fixedColor, onDismiss = { state.iconEditorFor = null })
+            } ?: run { state.iconEditorFor = null }
+        }
+
+        state.colorPickerFor?.let { id ->
+            val current = tiles.firstOrNull { it.id == id }
+            TileColorPicker(
+                initial = current?.fixedColor ?: Wp.accent,
+                onPick = { color ->
+                    current?.let { onColor(it, color) }
+                    state.colorPickerFor = null
+                },
+                onCustom = { argb ->
+                    current?.let { onCustomColor(it, argb) }
+                    state.colorPickerFor = null
+                },
+                onDismiss = { state.colorPickerFor = null },
+            )
         }
     }
 }

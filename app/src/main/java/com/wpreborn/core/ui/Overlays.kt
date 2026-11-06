@@ -326,14 +326,13 @@ fun JumpList(
 @Composable
 fun WpPageHeader(appTitle: String?, header: String?, modifier: Modifier = Modifier) {
     Column(modifier.padding(start = 20.dp, top = 14.dp, end = 20.dp)) {
-        if (appTitle != null) WpText(appTitle.uppercase(), style = WpType.AppTitle, maxLines = 1, softWrap = false, fit = true)
+        if (appTitle != null) WpText(appTitle.uppercase(), style = WpType.AppTitle, maxLines = 1, softWrap = false)
         if (header != null) {
             WpText(
                 header.lowercase(),
                 style = WpType.Header,
                 maxLines = 1,
                 softWrap = false,
-                fit = true,
                 modifier = Modifier.padding(top = 2.dp, bottom = 8.dp).slideInStaggered(0, distanceDp = 40f),
             )
         }

@@ -59,9 +59,7 @@ fun WpText(
 ) {
     val c = if (color == Color.Unspecified) Wp.palette.foreground else color
     val styled = if (textAlign != null) style.copy(color = c, textAlign = textAlign) else style.copy(color = c)
-    // Big single-line titles (headers) always fit: a long name makes them smaller, never cut or broken.
-    val big = style.fontSize.isSpecified && style.fontSize.value >= 28f && (maxLines == 1 || !softWrap)
-    if (fit || big) {
+    if (fit) {
         FitText(text, modifier, styled)
         return
     }

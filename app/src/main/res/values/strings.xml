@@ -1143,7 +1143,7 @@
     <string name="store_installing">installing…</string>
     <string name="store_no_updates">Your apps are up to date.</string>
     <string name="store_search_title">Store search</string>
-    <string name="store_apps_header">apps</string>
+    <string name="store_apps_header">apps + games</string>
     <string name="store_overview">overview</string>
     <string name="store_reviews">reviews</string>
     <string name="store_share_text">%1$s for Mozaik: %2$s</string>
@@ -1170,8 +1170,8 @@
         <item quantity="other">%d ratings</item>
     </plurals>
     <string name="about_welcome">see the welcome screen</string>
-    <string name="store_ql_featured">featured</string>
-    <string name="store_ql_new">new</string>
+    <string name="store_ql_featured">featured apps</string>
+    <string name="store_ql_new">new + updated</string>
     <string name="store_games">games</string>
     <string name="store_games_all">all games</string>
     <string name="store_genre_farm">farm + simulation</string>
@@ -1186,4 +1186,12 @@
     <string name="store_game_no_play">Google Play isn\'t available on this phone.</string>
     <string name="set_pin_new_apps">Pin new apps to Start</string>
     <string name="set_pin_new_apps_info">Apps you install (from the Store, Google Play...) get a tile on Start by themselves.</string>
+    <string name="tile_editor_title">edit tile</string>
+    <string name="tile_size">Size</string>
+    <string name="tile_size_small">small</string>
+    <string name="tile_size_medium">medium</string>
+    <string name="tile_size_wide">wide</string>
+    <string name="tile_size_large">large</string>
+    <string name="store_ql_featured_games">featured games</string>
+    <string name="store_ql_free_games">free games</string>
 </resources>

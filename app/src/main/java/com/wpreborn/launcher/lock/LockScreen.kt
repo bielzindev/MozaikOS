@@ -301,14 +301,20 @@ fun LockScreen(session: Int, onUnlock: () -> Unit) {
                 val playback = com.wpreborn.data.media.rememberPlayback()
                 // A paused or stopped player leaves the lock screen after a short while.
                 val shown = com.wpreborn.data.media.rememberPlaybackVisible(playback)
-                val last = remember { arrayOfNulls<com.wpreborn.data.media.Playback>(1) }
-                if (playback != null) last[0] = playback
+                // The last playback is kept (as state) so the strip can still draw it while it
+                // slides away. It must be state: a plain holder left the strip showing the old
+                // song and the old play / pause button, because nothing told it to redraw.
+                var lastPlayback by remember { androidx.compose.runtime.mutableStateOf<com.wpreborn.data.media.Playback?>(null) }
+                if (playback != null && playback != lastPlayback) {
+                    androidx.compose.runtime.SideEffect { lastPlayback = playback }
+                }
+                val display = playback ?: lastPlayback
                 androidx.compose.animation.AnimatedVisibility(
                     visible = shown != null,
                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut(),
                 ) {
-                    last[0]?.let { LockMedia(it) }
+                    display?.let { LockMedia(it) }
                 }
                 Spacer(Modifier.weight(1f))
                 Column(Modifier.padding(start = 24.dp, end = 24.dp)) {

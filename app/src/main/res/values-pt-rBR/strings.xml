@@ -1144,7 +1144,7 @@
     <string name="store_installing">instalando…</string>
     <string name="store_no_updates">Seus apps estão atualizados.</string>
     <string name="store_search_title">Busca na loja</string>
-    <string name="store_apps_header">aplicativos</string>
+    <string name="store_apps_header">apps + jogos</string>
     <string name="store_overview">visão geral</string>
     <string name="store_reviews">avaliações</string>
     <string name="store_share_text">%1$s para o Mozaik: %2$s</string>
@@ -1171,8 +1171,8 @@
         <item quantity="other">%d avaliações</item>
     </plurals>
     <string name="about_welcome">ver tela de boas-vindas</string>
-    <string name="store_ql_featured">em destaque</string>
-    <string name="store_ql_new">novidades</string>
+    <string name="store_ql_featured">apps em destaque</string>
+    <string name="store_ql_new">novos + atualizados</string>
     <string name="store_games">jogos</string>
     <string name="store_games_all">todos os jogos</string>
     <string name="store_genre_farm">fazenda + simulação</string>
@@ -1187,4 +1187,12 @@
     <string name="store_game_no_play">O Google Play não está disponível neste celular.</string>
     <string name="set_pin_new_apps">Fixar apps novos na tela inicial</string>
     <string name="set_pin_new_apps_info">Os apps que você instalar (pela Loja, Google Play...) ganham um bloco na tela inicial sozinhos.</string>
+    <string name="tile_editor_title">editar bloco</string>
+    <string name="tile_size">Tamanho</string>
+    <string name="tile_size_small">pequeno</string>
+    <string name="tile_size_medium">médio</string>
+    <string name="tile_size_wide">largo</string>
+    <string name="tile_size_large">grande</string>
+    <string name="store_ql_featured_games">jogos em destaque</string>
+    <string name="store_ql_free_games">jogos gratuitos</string>
 </resources>

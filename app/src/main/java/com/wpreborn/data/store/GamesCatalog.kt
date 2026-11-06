@@ -147,5 +147,14 @@ object GamesCatalog {
             "Battle royale de dez minutos: sobreviva numa ilha contra outros 49 jogadores."),
     )
 
+    /** The games of "featured games" and of the Store's spotlight. */
+    val featuredIds = setOf(
+        "com.supercell.hayday", "com.king.candycrushsaga", "com.zynga.words3", "com.kiloo.subwaysurf",
+        "com.supercell.clashofclans", "com.playrix.township", "com.halfbrick.fruitninja", "com.imangi.templerun2",
+        "com.rovio.baba", "com.mojang.minecraftpe", "com.supercell.brawlstars", "com.king.farmheroessaga",
+    )
+
+    fun featured() = games.filter { it.id in featuredIds }
+
     fun byId(id: String) = games.firstOrNull { it.id == id }
 }

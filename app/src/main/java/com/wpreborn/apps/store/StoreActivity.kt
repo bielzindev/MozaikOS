@@ -84,6 +84,9 @@ import com.wpreborn.navigation.rememberNavigator
 import java.util.Calendar
 
 /** The quick links of the 8.1 Store, for the Mozaik family. */
+/** Which games the Games page lists. */
+private enum class GameMode { All, Featured, Free }
+
 private enum class StoreFilter { Featured, New, Updates, Installed, Available, Disabled }
 
 private sealed interface StorePage {
@@ -94,7 +97,7 @@ private sealed interface StorePage {
     data class Details(val id: String) : StorePage
     data class Review(val id: String) : StorePage
     /** The Games section; null: all of them. */
-    data class Games(val genre: GameGenre?) : StorePage
+    data class Games(val genre: GameGenre?, val mode: GameMode = GameMode.All) : StorePage
     data class Game(val id: String) : StorePage
     data object Search : StorePage
     data object Settings : StorePage
@@ -127,7 +130,7 @@ class StoreActivity : WpActivity() {
                 is StorePage.Category -> AppListPage(page.category?.let { stringResource(it.label) } ?: stringResource(R.string.store_collection), nav, category = page.category)
                 is StorePage.Details -> ZunexCatalog.byId(page.id)?.let { DetailsPage(it, nav) }
                 is StorePage.Review -> ZunexCatalog.byId(page.id)?.let { ReviewPage(it) { nav.pop() } }
-                is StorePage.Games -> GamesPage(nav, page.genre)
+                is StorePage.Games -> GamesPage(nav, page.genre, page.mode)
                 is StorePage.Game -> GamesCatalog.byId(page.id)?.let { GameDetailsPage(it, nav) }
                 StorePage.Search -> SearchPage(nav)
                 StorePage.Settings -> StoreSettingsPage()
@@ -181,8 +184,19 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
     fun stateOf(c: CatalogApp) = states[c.id] ?: manager.state(c.app)
     val updates = ZunexCatalog.apps.count { manager.hasUpdate(it) }
     val featured = ZunexCatalog.apps.filter { it.featured }
-    // A different hero every day, like the Store's spotlight.
-    val hero = featured[Calendar.getInstance().get(Calendar.DAY_OF_YEAR) % featured.size]
+    val installedGames = rememberInstalledGames()
+    // The spotlight: featured apps and featured games, side by side, like the 8.1 Store's grid.
+    val spotlight: List<Any> = remember {
+        val day = Calendar.getInstance().get(Calendar.DAY_OF_YEAR)
+        val apps = featured.shuffled(kotlin.random.Random(day))
+        val games = GamesCatalog.featured().shuffled(kotlin.random.Random(day))
+        buildList {
+            for (i in 0 until maxOf(apps.size, games.size)) {
+                apps.getOrNull(i)?.let(::add)
+                games.getOrNull(i)?.let(::add)
+            }
+        }
+    }
     Column(Modifier.fillMaxSize()) {
         Box(Modifier.weight(1f)) {
             WpPanorama(
@@ -190,29 +204,23 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                 sections = listOf(
                     PanoramaSection(null) {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 8.dp, bottom = 16.dp)) {
-                            // The spotlight app: wide, with its description.
-                            Column(Modifier.slideInStaggered(0).wpClickable { nav.navigate(StorePage.Details(hero.id)) }.padding(bottom = 16.dp)) {
-                                Row(verticalAlignment = Alignment.Top) {
-                                    AppTile(hero, Modifier.size(100.dp), 56.dp)
-                                    Spacer(Modifier.width(12.dp))
-                                    Column(Modifier.weight(1f)) {
-                                        WpText(stringResource(hero.app.label), style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                        Stars(reviews[hero.id]?.stars ?: 0, 16.dp)
-                                        WpText(priceLabel(hero, stateOf(hero), manager), style = WpType.Small, color = Wp.palette.subtle)
-                                    }
-                                }
-                                WpText(stringResource(hero.description), style = WpType.Normal, maxLines = 3, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 8.dp))
-                            }
-                            // The featured apps, two by two: big icon, NAME, price and stars.
-                            featured.filter { it != hero }.chunked(2).forEachIndexed { row, pair ->
-                                Row(Modifier.fillMaxWidth().slideInStaggered(row + 1).padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                                    pair.forEach { c ->
-                                        Column(Modifier.weight(1f).wpClickable { nav.navigate(StorePage.Details(c.id)) }) {
-                                            AppTile(c, Modifier.fillMaxWidth().aspectRatio(1f), 64.dp, progress[c.id])
-                                            WpText(stringResource(c.app.label).uppercase(), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                WpText(priceLabel(c, stateOf(c), manager), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, modifier = Modifier.weight(1f))
-                                                Stars(reviews[c.id]?.stars ?: 0, 10.dp)
+                            // Two by two: the big icon, NAME, price and stars.
+                            spotlight.chunked(2).forEachIndexed { row, pair ->
+                                Row(Modifier.fillMaxWidth().slideInStaggered(row).padding(bottom = 14.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                    pair.forEach { item ->
+                                        when (item) {
+                                            is CatalogApp -> Column(Modifier.weight(1f).wpClickable { nav.navigate(StorePage.Details(item.id)) }) {
+                                                AppTile(item, Modifier.fillMaxWidth().aspectRatio(1f), 64.dp, progress[item.id])
+                                                WpText(stringResource(item.app.label).uppercase(), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    WpText(priceLabel(item, stateOf(item), manager), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1, modifier = Modifier.weight(1f))
+                                                    Stars(reviews[item.id]?.stars ?: 0, 10.dp)
+                                                }
+                                            }
+                                            is GameApp -> Column(Modifier.weight(1f).wpClickable { nav.navigate(StorePage.Game(item.id)) }) {
+                                                GameTile(item, item.id in installedGames, Modifier.fillMaxWidth().aspectRatio(1f), 44.sp)
+                                                WpText(item.name.uppercase(), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
+                                                WpText(gameStateLabel(item, item.id in installedGames), style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
                                             }
                                         }
                                     }
@@ -223,22 +231,30 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                     },
                     PanoramaSection(stringResource(R.string.store_quick_links)) {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 8.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                            StoreFilter.entries.chunked(2).forEachIndexed { row, pair ->
+                            // Like the 8.1 Store: featured apps and games, new, free games, and what is yours.
+                            val links: List<Triple<Int, Int?, StorePage>> = listOf(
+                                Triple(R.string.store_ql_featured, null, StorePage.Filtered(StoreFilter.Featured)),
+                                Triple(R.string.store_ql_featured_games, null, StorePage.Games(null, GameMode.Featured)),
+                                Triple(R.string.store_ql_new, null, StorePage.Filtered(StoreFilter.New)),
+                                Triple(R.string.store_ql_free_games, null, StorePage.Games(null, GameMode.Free)),
+                                Triple(R.string.store_updates, filtered(StoreFilter.Updates, manager, states).size, StorePage.Filtered(StoreFilter.Updates)),
+                                Triple(R.string.store_installed, filtered(StoreFilter.Installed, manager, states).size, StorePage.Filtered(StoreFilter.Installed)),
+                            )
+                            links.chunked(2).forEachIndexed { row, pair ->
                                 Row(Modifier.fillMaxWidth().slideInStaggered(row), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                    pair.forEach { f ->
-                                        val count = filtered(f, manager, states).size
+                                    pair.forEach { (label, count, target) ->
                                         Box(
-                                            Modifier.weight(1f).aspectRatio(1.15f).background(Wp.accent).wpClickable { nav.navigate(StorePage.Filtered(f)) }.padding(10.dp),
+                                            Modifier.weight(1f).aspectRatio(1.15f).background(Wp.accent).wpClickable { nav.navigate(target) }.padding(10.dp),
                                         ) {
-                                            // A smaller type and short names, so no word breaks in the middle.
+                                            // A smaller type, so no word breaks in the middle.
                                             WpText(
-                                                quickLinkTitle(f).replaceFirstChar { it.uppercase() },
+                                                stringResource(label).replaceFirstChar { it.uppercase() },
                                                 style = WpType.Normal,
                                                 color = Color.White,
                                                 maxLines = 3,
                                                 modifier = Modifier.align(Alignment.TopStart),
                                             )
-                                            if (f != StoreFilter.Featured && f != StoreFilter.New) {
+                                            if (count != null) {
                                                 WpText(count.toString(), style = WpType.TileCount, color = Color.White, modifier = Modifier.align(Alignment.BottomEnd))
                                             }
                                         }
@@ -252,26 +268,25 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                     },
                     PanoramaSection(stringResource(R.string.store_categories)) {
                         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp)) {
-                            (listOf<StoreCategory?>(null) + StoreCategory.entries).forEachIndexed { i, cat ->
+                            WpText(
+                                stringResource(R.string.store_collection),
+                                style = WpType.ExtraLarge,
+                                maxLines = 1,
+                                modifier = Modifier.fillMaxWidth().wpClickable { nav.navigate(StorePage.Category(null)) }.padding(vertical = 6.dp),
+                            )
+                            WpText(
+                                stringResource(R.string.store_games),
+                                style = WpType.ExtraLarge,
+                                maxLines = 1,
+                                modifier = Modifier.fillMaxWidth().slideInStaggered(1).wpClickable { nav.navigate(StorePage.Games(null)) }.padding(vertical = 6.dp),
+                            )
+                            StoreCategory.entries.forEachIndexed { i, cat ->
                                 WpText(
-                                    cat?.let { stringResource(it.label).lowercase() } ?: stringResource(R.string.store_collection),
+                                    stringResource(cat.label).lowercase(),
                                     style = WpType.ExtraLarge,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Category(cat)) }.padding(vertical = 6.dp),
-                                )
-                            }
-                        }
-                    },
-                    PanoramaSection(stringResource(R.string.store_games)) {
-                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp)) {
-                            (listOf<GameGenre?>(null) + GameGenre.entries).forEachIndexed { i, genre ->
-                                WpText(
-                                    genre?.let { stringResource(it.label).lowercase() } ?: stringResource(R.string.store_games_all),
-                                    style = WpType.ExtraLarge,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Games(genre)) }.padding(vertical = 6.dp),
+                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i + 2).wpClickable { nav.navigate(StorePage.Category(cat)) }.padding(vertical = 6.dp),
                                 )
                             }
                         }
@@ -291,7 +306,8 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
             buttons = listOf(AppBarButton(WpIcons.Search, stringResource(R.string.search)) { nav.navigate(StorePage.Search) }),
             menuItems = listOf(
                 AppBarMenuItem(stringResource(R.string.store_my_apps)) { nav.navigate(StorePage.Filtered(StoreFilter.Installed)) },
-                AppBarMenuItem(stringResource(R.string.store_updates)) { nav.navigate(StorePage.Filtered(StoreFilter.Updates)) },
+                AppBarMenuItem(stringResource(R.string.store_available)) { nav.navigate(StorePage.Filtered(StoreFilter.Available)) },
+                AppBarMenuItem(stringResource(R.string.store_disabled)) { nav.navigate(StorePage.Filtered(StoreFilter.Disabled)) },
                 AppBarMenuItem(stringResource(R.string.settings_lower)) { nav.navigate(StorePage.Settings) },
             ),
         )
@@ -800,13 +816,13 @@ private fun GameRow(g: GameApp, installed: Boolean, modifier: Modifier, onClick:
 }
 
 @Composable
-private fun GamesPage(nav: WpNavigator<StorePage>, genre: GameGenre?) {
+private fun GamesPage(nav: WpNavigator<StorePage>, genre: GameGenre?, mode: GameMode) {
     val installed = rememberInstalledGames()
-    val list = GamesCatalog.games.filter { genre == null || it.genre == genre }.sortedWith(compareBy({ it.genre.ordinal }, { it.name }))
+    val list = GamesCatalog.games.filter { (genre == null || it.genre == genre) && (mode != GameMode.Featured || it.id in GamesCatalog.featuredIds) && (mode != GameMode.Free || !it.paid) }.sortedWith(compareBy({ it.genre.ordinal }, { it.name }))
     Column(Modifier.fillMaxSize()) {
         WpText(stringResource(R.string.app_store).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
         WpText(
-            (genre?.let { stringResource(it.label) } ?: stringResource(R.string.store_games_all)).lowercase(),
+            (genre?.let { stringResource(it.label) } ?: stringResource(when (mode) { GameMode.Featured -> R.string.store_ql_featured_games; GameMode.Free -> R.string.store_ql_free_games; GameMode.All -> R.string.store_games_all })).lowercase(),
             style = WpType.Header,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,

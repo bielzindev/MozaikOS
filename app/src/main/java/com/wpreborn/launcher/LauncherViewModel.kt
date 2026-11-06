@@ -199,6 +199,9 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
     fun resize(id: String, allowLarge: Boolean) =
         update(_tiles.value.map { if (it.id == id) it.copy(size = it.size.next(allowLarge)) else it })
 
+    fun setSize(id: String, size: TileSize) =
+        update(_tiles.value.map { if (it.id == id) it.copy(size = size) else it })
+
     fun setColor(id: String, color: AccentColor?) =
         update(_tiles.value.map { if (it.id == id) it.copy(color = color, customColor = null) else it })
 

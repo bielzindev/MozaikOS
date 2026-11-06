@@ -111,10 +111,9 @@ fun startGeometry(width: Dp, moreTiles: Boolean): StartGeometry {
 class StartScreenState {
     var editId by mutableStateOf<String?>(null)
 
-    /** Tile whose app icon is being customised (pack and colour). */
-    var iconEditorFor by mutableStateOf<String?>(null)
+    /** Tile being edited in the tile editor (size, colour and icon style on one page). */
+    var editorFor by mutableStateOf<String?>(null)
     var dragId by mutableStateOf<String?>(null)
-    var colorPickerFor by mutableStateOf<String?>(null)
     /** The folder open in place (its contents shown under it, the tiles below pushed down). */
     var openFolderId by mutableStateOf<String?>(null)
     /** The open folder's name is being edited (right after creating it, or after a tap on it). */
@@ -144,6 +143,8 @@ fun StartScreen(
     onResize: (TileSpec) -> Unit,
     onColor: (TileSpec, AccentColor?) -> Unit,
     onCustomColor: (TileSpec, Int) -> Unit,
+    onSetSize: (TileSpec, TileSize) -> Unit = { _, _ -> },
+    allowLargeTiles: Boolean = false,
     onMove: (String, Int, Boolean) -> Unit,
     onPersonalize: () -> Unit = {},
     /** The apps of a folder tile, with the size of their tiles. */
@@ -537,13 +538,8 @@ fun StartScreen(
                                 EditButton(WpIcons.Resize, Modifier.align(Alignment.BottomEnd).offset(12.dp, 12.dp)) {
                                     onResize(tile)
                                 }
-                                EditButton(WpIcons.Palette, Modifier.align(Alignment.TopStart).offset((-12).dp, (-12).dp)) {
-                                    state.colorPickerFor = tile.id
-                                }
-                                if (app != null) {
-                                    EditButton(WpIcons.Edit, Modifier.align(Alignment.BottomStart).offset((-12).dp, 12.dp)) {
-                                        state.iconEditorFor = tile.id
-                                    }
+                                EditButton(WpIcons.Edit, Modifier.align(Alignment.TopStart).offset((-12).dp, (-12).dp)) {
+                                    state.editorFor = tile.id
                                 }
                             }
                         }
@@ -615,26 +611,23 @@ fun StartScreen(
             }
         }
 
-        state.iconEditorFor?.let { id ->
-            tiles.firstOrNull { it.id == id }?.let(appFor)?.let { app ->
-                IconCustomizer(app, tileColor = tiles.first { it.id == id }.fixedColor, onDismiss = { state.iconEditorFor = null })
-            } ?: run { state.iconEditorFor = null }
-        }
-
-        state.colorPickerFor?.let { id ->
-            val current = tiles.firstOrNull { it.id == id }
-            TileColorPicker(
-                initial = current?.fixedColor ?: Wp.accent,
-                onPick = { color ->
-                    current?.let { onColor(it, color) }
-                    state.colorPickerFor = null
-                },
-                onCustom = { argb ->
-                    current?.let { onCustomColor(it, argb) }
-                    state.colorPickerFor = null
-                },
-                onDismiss = { state.colorPickerFor = null },
-            )
+        state.editorFor?.let { id ->
+            val tile = tiles.firstOrNull { it.id == id }
+            if (tile == null) {
+                state.editorFor = null
+            } else {
+                val editedApp = appFor(tile)
+                TileEditor(
+                    tile = tile,
+                    app = editedApp,
+                    title = if (tile.isFolder) folderName(tile) else editedApp?.label.orEmpty(),
+                    allowLarge = allowLargeTiles,
+                    onColor = { onColor(tile, it) },
+                    onCustomColor = { onCustomColor(tile, it) },
+                    onSize = { onSetSize(tile, it) },
+                    onDismiss = { state.editorFor = null },
+                )
+            }
         }
     }
 }

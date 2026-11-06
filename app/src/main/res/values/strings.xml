@@ -1172,4 +1172,18 @@
     <string name="about_welcome">see the welcome screen</string>
     <string name="store_ql_featured">featured</string>
     <string name="store_ql_new">new</string>
+    <string name="store_games">games</string>
+    <string name="store_games_all">all games</string>
+    <string name="store_genre_farm">farm + simulation</string>
+    <string name="store_genre_puzzle">puzzle + casual</string>
+    <string name="store_genre_cards">cards + words + board</string>
+    <string name="store_genre_arcade">arcade + action</string>
+    <string name="store_genre_racing">racing</string>
+    <string name="store_genre_online">online + strategy</string>
+    <string name="store_on_play">Google Play</string>
+    <string name="store_on_play_paid">paid · Google Play</string>
+    <string name="store_game_note">These are other companies\' games: the Store gets them from the official Google Play page. Once installed they come to Start and the app list with their own icon.</string>
+    <string name="store_game_no_play">Google Play isn\'t available on this phone.</string>
+    <string name="set_pin_new_apps">Pin new apps to Start</string>
+    <string name="set_pin_new_apps_info">Apps you install (from the Store, Google Play...) get a tile on Start by themselves.</string>
 </resources>

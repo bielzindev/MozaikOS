@@ -271,6 +271,10 @@ private fun StartThemePage(onAccent: () -> Unit) {
         WpToggle(stringResource(R.string.set_small_row), settings.smallTilesRow, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setSmallTilesRow(it)
         }
+        WpToggle(stringResource(R.string.set_pin_new_apps), settings.pinNewApps, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
+            repo.setPinNewApps(it)
+        }
+        WpText(stringResource(R.string.set_pin_new_apps_info), style = WpType.Small, color = Wp.palette.subtle)
         WpToggle(stringResource(R.string.set_show_duplicates), settings.showDuplicates, onText = stringResource(R.string.on), offText = stringResource(R.string.off)) {
             repo.setShowDuplicates(it)
         }

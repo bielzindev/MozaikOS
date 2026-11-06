@@ -794,25 +794,38 @@ private fun BoxScope.StoreTile(size: TileSize, live: Boolean, seed: Int) {
         val day = java.util.Calendar.getInstance().get(java.util.Calendar.DAY_OF_YEAR)
         com.wpreborn.data.store.ZunexCatalog.apps.filter { it.featured }.shuffled(kotlin.random.Random(day))
     }
-    val per = if (size == TileSize.Medium) 1 else 3
-    val pages: List<List<com.wpreborn.data.store.CatalogApp>?> = featured.chunked(per).filter { it.size == per }.flatMap { listOf(it, null) }
-    CycleTile(pages, enabled = true, seed = seed) { page ->
+    val pages: List<com.wpreborn.data.store.CatalogApp?> = featured.flatMap { listOf(it, null) }
+    CycleTile(pages, enabled = true, seed = seed) { c ->
         Box(Modifier.fillMaxSize()) {
-            if (page == null) {
+            if (c == null) {
                 CountTile(com.wpreborn.core.icons.Glyphs.Bag, updates, size)
             } else {
-                Row(
-                    Modifier.align(Alignment.Center).padding(bottom = 18.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    page.forEach { c ->
-                        Box(Modifier.size(if (per == 1) 76.dp else 64.dp).background(c.color), contentAlignment = Alignment.Center) {
-                            WpIcon(c.app.icon, tint = Color.White, size = if (per == 1) 40.dp else 34.dp)
-                        }
-                    }
+                // Like the 8.1 Store tile: the app's icon fills the whole tile, with a dark
+                // gradient over it for the tile's name.
+                Box(Modifier.fillMaxSize().background(c.color), contentAlignment = if (size == TileSize.Medium) Alignment.Center else Alignment.CenterStart) {
+                    BoxWithIcon(c, size)
                 }
+                Box(
+                    Modifier.fillMaxSize().background(
+                        androidx.compose.ui.graphics.Brush.verticalGradient(0.4f to Color.Transparent, 1f to Color.Black.copy(alpha = 0.75f)),
+                    ),
+                )
             }
         }
+    }
+}
+
+/** The app's glyph, as big as the tile lets it be (in the middle on medium, at the left on wide). */
+@Composable
+private fun BoxWithIcon(c: com.wpreborn.data.store.CatalogApp, size: TileSize) {
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val glyph = minOf(maxWidth, maxHeight) * 0.62f
+        WpIcon(
+            c.app.icon,
+            Modifier.align(if (size == TileSize.Medium) Alignment.Center else Alignment.CenterStart).padding(start = if (size == TileSize.Medium) 0.dp else maxHeight * 0.19f, bottom = 8.dp),
+            tint = Color.White,
+            size = glyph,
+        )
     }
 }
 

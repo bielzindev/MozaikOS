@@ -55,6 +55,8 @@ data class WpSettings(
     val glanceOptions: GlanceOptions = GlanceOptions(),
     /** Mozaik apps open with their splash screen (colour and glyph), as on Windows Phone. */
     val splash: Boolean = true,
+    /** Newly installed apps (from the Store, Google Play...) are pinned to Start by themselves. */
+    val pinNewApps: Boolean = true,
     val firstRunDone: Boolean = false,
 )
 
@@ -130,6 +132,7 @@ class SettingsRepository private constructor(private val context: Context) {
         it[G_BATTERY] = o.battery
     }
     fun setSplash(value: Boolean) = update { it[SPLASH] = value }
+    fun setPinNewApps(value: Boolean) = update { it[PIN_NEW] = value }
     fun setFirstRunDone() = update { it[FIRST_RUN] = true }
 
     private fun Preferences.toSettings() = WpSettings(
@@ -163,6 +166,7 @@ class SettingsRepository private constructor(private val context: Context) {
             battery = this[G_BATTERY] ?: false,
         ),
         splash = this[SPLASH] ?: true,
+        pinNewApps = this[PIN_NEW] ?: true,
         firstRunDone = this[FIRST_RUN] ?: false,
     )
 
@@ -195,6 +199,7 @@ class SettingsRepository private constructor(private val context: Context) {
         private val G_ICONS = booleanPreferencesKey("glance_icons")
         private val G_BATTERY = booleanPreferencesKey("glance_battery")
         private val SPLASH = booleanPreferencesKey("splash")
+        private val PIN_NEW = booleanPreferencesKey("pin_new_apps")
         private val FIRST_RUN = booleanPreferencesKey("first_run_done")
 
         @Volatile

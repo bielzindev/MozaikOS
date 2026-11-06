@@ -1173,4 +1173,18 @@
     <string name="about_welcome">ver tela de boas-vindas</string>
     <string name="store_ql_featured">em destaque</string>
     <string name="store_ql_new">novidades</string>
+    <string name="store_games">jogos</string>
+    <string name="store_games_all">todos os jogos</string>
+    <string name="store_genre_farm">fazenda + simulação</string>
+    <string name="store_genre_puzzle">quebra-cabeça + casual</string>
+    <string name="store_genre_cards">cartas + palavras + tabuleiro</string>
+    <string name="store_genre_arcade">arcade + ação</string>
+    <string name="store_genre_racing">corrida</string>
+    <string name="store_genre_online">online + estratégia</string>
+    <string name="store_on_play">Google Play</string>
+    <string name="store_on_play_paid">pago · Google Play</string>
+    <string name="store_game_note">São jogos de outras empresas: a Loja leva você à página oficial no Google Play. Depois de instalado, o jogo vem para a tela inicial e a lista de apps com o ícone dele.</string>
+    <string name="store_game_no_play">O Google Play não está disponível neste celular.</string>
+    <string name="set_pin_new_apps">Fixar apps novos na tela inicial</string>
+    <string name="set_pin_new_apps_info">Os apps que você instalar (pela Loja, Google Play...) ganham um bloco na tela inicial sozinhos.</string>
 </resources>

@@ -10,6 +10,7 @@ import com.wpreborn.data.apps.AppRepository
 import com.wpreborn.data.calendar.CalendarEvent
 import com.wpreborn.data.calendar.CalendarRepository
 import com.wpreborn.data.calls.CallLogRepository
+import com.wpreborn.data.prefs.SettingsRepository
 import com.wpreborn.data.contacts.ContactsRepository
 import com.wpreborn.data.media.PhotoLibrary
 import com.wpreborn.data.sms.SmsRepository
@@ -105,7 +106,24 @@ class LauncherViewModel(app: Application) : AndroidViewModel(app) {
                 // Tiles of ZUNEX apps that were only turned off are kept aside, not lost.
                 current.filter { it.appKey !in keys && it.appKey.startsWith("builtin:") }.groupBy { it.appKey.removePrefix("builtin:") }
                     .forEach { (id, specs) -> parkedTiles[id] = parkedTiles[id].orEmpty() + specs }
-                if ((filtered.size != _tiles.value.size || restored.isNotEmpty()) && current.isNotEmpty()) update(filtered)
+                var result = filtered
+                if (current.isNotEmpty()) {
+                    // Apps that appeared since last time (installed from the Store, Google Play...)
+                    // go to Start, unless that's turned off. The first run only learns what exists.
+                    val migr = app.getSharedPreferences("launcher_migrations", android.content.Context.MODE_PRIVATE)
+                    val known = migr.getStringSet("known_apps", null)
+                    migr.edit().putStringSet("known_apps", HashSet(keys)).apply()
+                    if (known != null && SettingsRepository.get(app).cached.pinNewApps) {
+                        list.filter { it.key !in known }.forEach { e ->
+                            val onStart = result.any { it.appKey == e.key } || folderStore.folders.value.values.any { e.key in it.apps }
+                            if (!onStart) {
+                                val size = e.builtIn?.defaultSize?.let { if (it == TileSize.Wide) TileSize.Medium else it } ?: TileSize.Medium
+                                result = result + TileSpec(appKey = e.key, size = size)
+                            }
+                        }
+                    }
+                }
+                if ((result != _tiles.value || restored.isNotEmpty()) && current.isNotEmpty()) update(result)
             }
         }
         refreshLive()

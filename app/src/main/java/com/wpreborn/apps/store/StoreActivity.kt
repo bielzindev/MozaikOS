@@ -44,6 +44,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.asImageBitmap
 import com.wpreborn.R
 import com.wpreborn.apps.common.WpActivity
 import com.wpreborn.core.icons.WpIcons
@@ -67,6 +69,10 @@ import com.wpreborn.data.apps.BuiltInApp
 import com.wpreborn.data.store.AppManager
 import com.wpreborn.data.store.AppState
 import com.wpreborn.data.store.CatalogApp
+import com.wpreborn.data.store.GameApp
+import com.wpreborn.data.store.GameGenre
+import com.wpreborn.data.store.GamesCatalog
+import com.wpreborn.data.apps.AppRepository
 import com.wpreborn.data.store.StoreCategory
 import com.wpreborn.data.store.StoreReview
 import com.wpreborn.data.store.StoreReviews
@@ -87,6 +93,9 @@ private sealed interface StorePage {
     data class Category(val category: StoreCategory?) : StorePage
     data class Details(val id: String) : StorePage
     data class Review(val id: String) : StorePage
+    /** The Games section; null: all of them. */
+    data class Games(val genre: GameGenre?) : StorePage
+    data class Game(val id: String) : StorePage
     data object Search : StorePage
     data object Settings : StorePage
 }
@@ -118,6 +127,8 @@ class StoreActivity : WpActivity() {
                 is StorePage.Category -> AppListPage(page.category?.let { stringResource(it.label) } ?: stringResource(R.string.store_collection), nav, category = page.category)
                 is StorePage.Details -> ZunexCatalog.byId(page.id)?.let { DetailsPage(it, nav) }
                 is StorePage.Review -> ZunexCatalog.byId(page.id)?.let { ReviewPage(it) { nav.pop() } }
+                is StorePage.Games -> GamesPage(nav, page.genre)
+                is StorePage.Game -> GamesCatalog.byId(page.id)?.let { GameDetailsPage(it, nav) }
                 StorePage.Search -> SearchPage(nav)
                 StorePage.Settings -> StoreSettingsPage()
             }
@@ -248,6 +259,19 @@ private fun StoreHub(nav: WpNavigator<StorePage>) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Category(cat)) }.padding(vertical = 6.dp),
+                                )
+                            }
+                        }
+                    },
+                    PanoramaSection(stringResource(R.string.store_games)) {
+                        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp)) {
+                            (listOf<GameGenre?>(null) + GameGenre.entries).forEachIndexed { i, genre ->
+                                WpText(
+                                    genre?.let { stringResource(it.label).lowercase() } ?: stringResource(R.string.store_games_all),
+                                    style = WpType.ExtraLarge,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.fillMaxWidth().slideInStaggered(i).wpClickable { nav.navigate(StorePage.Games(genre)) }.padding(vertical = 6.dp),
                                 )
                             }
                         }
@@ -387,18 +411,23 @@ private fun SearchPage(nav: WpNavigator<StorePage>) {
     val results = if (q.isEmpty()) emptyList() else ZunexCatalog.apps.filter { c ->
         context.getString(c.app.label).contains(q, true) || context.getString(c.description).contains(q, true) || context.getString(c.category.label).contains(q, true)
     }
+    val installedGames = rememberInstalledGames()
+    val gameResults = if (q.isEmpty()) emptyList() else GamesCatalog.games.filter { it.name.contains(q, true) || it.developer.contains(q, true) }
     Column(Modifier.fillMaxSize()) {
         WpText(stringResource(R.string.store_search_title).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp, bottom = 10.dp))
         WpTextBox(query, { query = it }, Modifier.fillMaxWidth().padding(horizontal = 20.dp), placeholder = stringResource(R.string.store_search_hint), focusRequester = focus)
         if (q.isNotEmpty()) {
             WpText(stringResource(R.string.store_apps_header), style = WpType.Header, modifier = Modifier.padding(start = 20.dp, top = 8.dp))
         }
-        if (q.isNotEmpty() && results.isEmpty()) {
+        if (q.isNotEmpty() && results.isEmpty() && gameResults.isEmpty()) {
             WpText(stringResource(R.string.store_no_results), style = WpType.Large, color = Wp.palette.subtle, modifier = Modifier.padding(20.dp))
         }
         LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
             itemsIndexed(results, key = { _, c -> c.id }) { i, c ->
                 AppRow(c, states[c.id] ?: manager.state(c.app), manager, reviews[c.id], Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Details(c.id)) }
+            }
+            itemsIndexed(gameResults, key = { _, g -> "game:" + g.id }) { i, g ->
+                GameRow(g, g.id in installedGames, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Game(g.id)) }
             }
         }
     }
@@ -715,5 +744,176 @@ private fun InfoLine(label: String, value: String) {
     Row(Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
         WpText("$label: ", style = WpType.Normal, color = Wp.palette.subtle)
         WpText(value, style = WpType.Normal)
+    }
+}
+
+
+/** The packages of the Games section that are installed on the phone right now. */
+@Composable
+private fun rememberInstalledGames(): Set<String> {
+    val context = LocalContext.current
+    val apps by remember { AppRepository.get(context) }.apps.collectAsState()
+    return remember(apps) {
+        val packages = apps.mapTo(HashSet()) { it.packageName }
+        GamesCatalog.games.mapNotNullTo(HashSet()) { g -> g.id.takeIf { it in packages } }
+    }
+}
+
+/** The game's tile: its real icon once it is installed, before that its colour and initials. */
+@Composable
+private fun GameTile(g: GameApp, installed: Boolean, modifier: Modifier, textSize: androidx.compose.ui.unit.TextUnit) {
+    val context = LocalContext.current
+    val icon = remember(g.id, installed) {
+        if (!installed) null else runCatching {
+            androidx.core.graphics.drawable.toBitmap(context.packageManager.getApplicationIcon(g.id), 192, 192).asImageBitmap()
+        }.getOrNull()
+    }
+    Box(modifier.background(g.color), contentAlignment = Alignment.Center) {
+        if (icon != null) {
+            androidx.compose.foundation.Image(icon, null, Modifier.fillMaxSize())
+        } else {
+            WpText(g.initials, style = WpType.Header.copy(fontSize = textSize, lineHeight = textSize * 1.1f, fontWeight = FontWeight.Light), color = Color.White)
+        }
+    }
+}
+
+@Composable
+private fun gameStateLabel(g: GameApp, installed: Boolean) = stringResource(
+    when {
+        installed -> R.string.store_state_installed
+        g.paid -> R.string.store_on_play_paid
+        else -> R.string.store_on_play
+    },
+)
+
+@Composable
+private fun GameRow(g: GameApp, installed: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Row(modifier.fillMaxWidth().wpClickable(onClick = onClick).padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+        GameTile(g, installed, Modifier.size(62.dp), 24.sp)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f)) {
+            WpText(g.name, style = WpType.ExtraLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            WpText(g.developer, style = WpType.Small, color = Wp.palette.subtle, maxLines = 1)
+            WpText(gameStateLabel(g, installed), style = WpType.Small, color = if (installed) Wp.accent else Wp.palette.foreground, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun GamesPage(nav: WpNavigator<StorePage>, genre: GameGenre?) {
+    val installed = rememberInstalledGames()
+    val list = GamesCatalog.games.filter { genre == null || it.genre == genre }.sortedWith(compareBy({ it.genre.ordinal }, { it.name }))
+    Column(Modifier.fillMaxSize()) {
+        WpText(stringResource(R.string.app_store).uppercase(), style = WpType.AppTitle, modifier = Modifier.padding(start = 20.dp, top = 14.dp))
+        WpText(
+            (genre?.let { stringResource(it.label) } ?: stringResource(R.string.store_games_all)).lowercase(),
+            style = WpType.Header,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(start = 20.dp, bottom = 8.dp),
+        )
+        LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(start = 20.dp, end = 16.dp, bottom = 16.dp)) {
+            var last: GameGenre? = null
+            list.forEachIndexed { i, g ->
+                if (genre == null && g.genre != last) {
+                    last = g.genre
+                    item(key = "h_" + g.genre.name) {
+                        WpText(stringResource(g.genre.label).lowercase(), style = WpType.Large, color = Wp.accent, modifier = Modifier.padding(top = 14.dp, bottom = 2.dp))
+                    }
+                }
+                item(key = g.id) { GameRow(g, g.id in installed, Modifier.slideInStaggered(i)) { nav.navigate(StorePage.Game(g.id)) } }
+            }
+        }
+    }
+}
+
+/** A game's page: overview and details, with install (Google Play), open, share and uninstall. */
+@Composable
+private fun GameDetailsPage(g: GameApp, nav: WpNavigator<StorePage>) {
+    val context = LocalContext.current
+    val apps by remember { AppRepository.get(context) }.apps.collectAsState()
+    val entry = apps.firstOrNull { it.packageName == g.id }
+    val installed = entry != null
+    var menu by remember { mutableStateOf(false) }
+    var notice by remember { mutableStateOf<String?>(null) }
+    val portuguese = remember { java.util.Locale.getDefault().language == "pt" }
+    fun openPlay() {
+        val ok = runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("market://details?id=" + g.id)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess || runCatching {
+            context.startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse("https://play.google.com/store/apps/details?id=" + g.id)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.isSuccess
+        if (!ok) notice = context.getString(R.string.store_game_no_play)
+    }
+    Box(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize()) {
+            Box(Modifier.weight(1f)) {
+                WpPivot(
+                    title = g.name.uppercase(),
+                    headers = listOf(stringResource(R.string.store_overview), stringResource(R.string.store_details)),
+                ) { index ->
+                    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 20.dp, end = 20.dp, bottom = 24.dp)) {
+                        if (index == 0) {
+                            Row(Modifier.slideInStaggered(0)) {
+                                GameTile(g, installed, Modifier.size(130.dp), 52.sp)
+                                Spacer(Modifier.width(16.dp))
+                                Column {
+                                    WpText(g.name, style = WpType.ExtraLarge, maxLines = 2)
+                                    WpText(g.developer, style = WpType.Normal, color = Wp.palette.subtle)
+                                    WpText(gameStateLabel(g, installed), style = WpType.Normal.copy(fontWeight = FontWeight.SemiBold), color = if (installed) Wp.accent else Wp.palette.foreground, modifier = Modifier.padding(top = 4.dp))
+                                }
+                            }
+                            WpText(g.description(portuguese), style = WpType.Normal, modifier = Modifier.padding(top = 16.dp).slideInStaggered(1))
+                            WpText(stringResource(R.string.store_game_note), style = WpType.Small, color = Wp.palette.subtle, modifier = Modifier.padding(top = 14.dp))
+                        } else {
+                            Section(stringResource(R.string.store_information))
+                            InfoLine(stringResource(R.string.store_name), g.name)
+                            InfoLine(stringResource(R.string.store_category), stringResource(g.genre.label).lowercase())
+                            InfoLine(stringResource(R.string.store_games), "Google Play")
+                            Section(stringResource(R.string.store_publisher))
+                            InfoLine(stringResource(R.string.store_name), g.developer)
+                        }
+                    }
+                }
+            }
+            Column(Modifier.fillMaxWidth().background(Wp.palette.chrome).navigationBarsPadding()) {
+                Row(Modifier.fillMaxWidth().padding(start = 16.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    WpButton(stringResource(if (installed) R.string.store_open else R.string.store_install), Modifier.weight(1f)) {
+                        if (entry != null) AppRepository.get(context).launch(entry) else openPlay()
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    WpButton(stringResource(R.string.share), Modifier.weight(1f)) {
+                        val text = context.getString(R.string.store_share_text, g.name, "https://play.google.com/store/apps/details?id=" + g.id)
+                        runCatching {
+                            context.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text), null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        }
+                    }
+                    if (installed) WpText("•••", style = WpType.Large, modifier = Modifier.wpClickable { menu = !menu }.padding(horizontal = 16.dp, vertical = 6.dp))
+                }
+                if (menu && entry != null) {
+                    BackHandler { menu = false }
+                    listOf<Pair<String, () -> Unit>>(
+                        stringResource(R.string.pin_to_start) to { PinRequests.pin(entry.key) },
+                        stringResource(R.string.store_uninstall) to {
+                            runCatching { context.startActivity(Intent(Intent.ACTION_DELETE, android.net.Uri.parse("package:" + g.id)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                            Unit
+                        },
+                    ).forEach { (label, action) ->
+                        WpText(
+                            label.lowercase(),
+                            style = WpType.Large,
+                            modifier = Modifier.fillMaxWidth().wpClickable {
+                                menu = false
+                                action()
+                            }.padding(horizontal = 20.dp, vertical = 10.dp),
+                        )
+                    }
+                    Spacer(Modifier.height(8.dp))
+                }
+            }
+        }
+        notice?.let {
+            WpMessageBox(title = stringResource(R.string.store_install), message = it, confirm = stringResource(R.string.ok), onConfirm = { notice = null }, onDismiss = { notice = null })
+        }
     }
 }

@@ -1,5 +1,7 @@
 package com.wpreborn.apps.music
 
+import com.wpreborn.core.ui.PanelEdge
+import com.wpreborn.core.ui.WpPanelOverlay
 import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -930,16 +932,16 @@ private fun GoneBack(loaded: Boolean, back: () -> Unit) {
 @Composable
 private fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, onSave: (String) -> Unit) {
     var name by remember { mutableStateOf(initial) }
-    androidx.activity.compose.BackHandler(onBack = onDismiss)
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).wpClickable(onClick = onDismiss)) {
-        Column(Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome).wpClickable { }.padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp)) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Top,
+        padding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
+    ) { close ->
             WpText(title, style = WpType.Large)
             WpTextBox(name, { name = it }, Modifier.fillMaxWidth().padding(top = 12.dp))
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WpButton(stringResource(R.string.save), Modifier.weight(1f)) { if (name.isNotBlank()) onSave(name.trim()) }
-                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = { close(onDismiss) })
             }
-        }
     }
 }
 

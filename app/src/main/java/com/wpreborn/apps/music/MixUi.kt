@@ -1,5 +1,7 @@
 package com.wpreborn.apps.music
 
+import com.wpreborn.core.ui.PanelEdge
+import com.wpreborn.core.ui.WpPanelOverlay
 import android.content.Context
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -507,17 +509,22 @@ fun MixNowPlaying(onEqualizer: () -> Unit, onChanged: () -> Unit = {}, onAlbum: 
 /** A Windows Phone menu: text items rising from the bottom over a dimmed screen. */
 @Composable
 fun MenuOverlay(items: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
-    androidx.activity.compose.BackHandler(onBack = onDismiss)
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)).wpClickable(onClick = onDismiss)) {
-        Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Color(0xFF1F1F1F)).padding(vertical = 10.dp)) {
-            items.forEach { (label, action) ->
-                WpText(
-                    label,
-                    style = WpType.Large.copy(fontSize = 20.sp),
-                    color = Color.White,
-                    modifier = Modifier.fillMaxWidth().wpClickable { onDismiss(); action() }.padding(horizontal = 20.dp, vertical = 10.dp),
-                )
-            }
+    // Rises from the bottom and leaves the same way; an entry's action (a submenu, say) comes after.
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Bottom, scrim = 0.45f, background = Color(0xFF1F1F1F),
+        padding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp),
+    ) { close ->
+        items.forEachIndexed { index, (label, action) ->
+            WpText(
+                label,
+                style = WpType.Large.copy(fontSize = 20.sp),
+                color = Color.White,
+                modifier = Modifier
+                    .slideInStaggered(index + 1, distanceDp = 18f)
+                    .fillMaxWidth()
+                    .wpClickable { close { onDismiss(); action() } }
+                    .padding(horizontal = 20.dp, vertical = 10.dp),
+            )
         }
     }
 }
@@ -530,12 +537,12 @@ fun MenuOverlay(items: List<Pair<String, () -> Unit>>, onDismiss: () -> Unit) {
 fun QueueEditor(playback: Playback, accent: Color, onDismiss: () -> Unit) {
     val context = LocalContext.current
     val controller = remember { MusicController.get(context) }
-    androidx.activity.compose.BackHandler(onBack = onDismiss)
     // Re-read the queue whenever it changes (the player publishes its state).
     val ui by controller.ui.collectAsState()
     var version by remember { mutableStateOf(0) }
     val entries = remember(ui.queueSize, ui.index, ui.shuffle, version) { controller.upNext() }
-    Column(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.92f)).padding(start = 20.dp, top = 14.dp, end = 8.dp)) {
+    com.wpreborn.core.ui.WpFullScreenOverlay(onDismiss = onDismiss, background = Color.Black.copy(alpha = 0.92f)) { close ->
+      Column(Modifier.fillMaxSize().padding(start = 20.dp, top = 14.dp, end = 8.dp)) {
         WpText(stringResource(R.string.music_title).uppercase(), style = WpType.AppTitle, color = Color.White)
         WpText(stringResource(R.string.music_up_next), style = WpType.Header, color = Color.White, maxLines = 1, softWrap = false)
         WpText(playback.title, style = WpType.Large, color = accent, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(top = 6.dp))
@@ -545,7 +552,7 @@ fun QueueEditor(playback: Playback, accent: Color, onDismiss: () -> Unit) {
             items(entries.size, key = { entries[it].index.toString() + entries[it].mediaId }) { i ->
                 val e = entries[i]
                 Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f).wpClickable { controller.playAt(e.index); onDismiss() }) {
+                    Column(Modifier.weight(1f).wpClickable { controller.playAt(e.index); close(onDismiss) }) {
                         WpText(e.title, style = WpType.Large.copy(fontSize = 20.sp), color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         WpText(e.artist, style = WpType.Small, color = Color.White.copy(alpha = 0.65f), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
@@ -559,8 +566,9 @@ fun QueueEditor(playback: Playback, accent: Color, onDismiss: () -> Unit) {
         }
         Row(Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceEvenly) {
             WpText(stringResource(R.string.music_clear_queue), style = WpType.Normal, color = Color.White, modifier = Modifier.wpClickable { controller.clearUpNext(); version++ }.padding(10.dp))
-            WpText(stringResource(R.string.ok), style = WpType.Normal, color = Color.White, modifier = Modifier.wpClickable(onClick = onDismiss).padding(10.dp))
+            WpText(stringResource(R.string.ok), style = WpType.Normal, color = Color.White, modifier = Modifier.wpClickable { close(onDismiss) }.padding(10.dp))
         }
+      }
     }
 }
 
@@ -612,12 +620,10 @@ fun PlaylistPicker(songIds: List<Long>, startWithNew: Boolean = false, onDone: (
     val playlists = remember { library.userPlaylists() }
     var naming by remember { mutableStateOf(startWithNew || playlists.isEmpty()) }
     var name by remember { mutableStateOf("") }
-    androidx.activity.compose.BackHandler(onBack = onDismiss)
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).wpClickable(onClick = onDismiss)) {
-        Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome).wpClickable { }
-                .padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
-        ) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Top,
+        padding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
+    ) { close ->
             if (naming) {
                 WpText(stringResource(R.string.music_new_playlist), style = WpType.Large.copy(fontWeight = FontWeight.SemiBold))
                 WpText(stringResource(R.string.music_playlist_name), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp))
@@ -631,7 +637,7 @@ fun PlaylistPicker(songIds: List<Long>, startWithNew: Boolean = false, onDone: (
                             onDone()
                         }
                     }
-                    com.wpreborn.core.ui.WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                    com.wpreborn.core.ui.WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = { close(onDismiss) })
                 }
             } else {
                 WpText(stringResource(R.string.music_add_to_playlist), style = WpType.Large.copy(fontWeight = FontWeight.SemiBold), modifier = Modifier.padding(bottom = 8.dp))
@@ -656,7 +662,6 @@ fun PlaylistPicker(songIds: List<Long>, startWithNew: Boolean = false, onDone: (
                     )
                 }
             }
-        }
     }
 }
 

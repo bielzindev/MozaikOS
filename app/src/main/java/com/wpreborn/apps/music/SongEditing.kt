@@ -1,5 +1,7 @@
 package com.wpreborn.apps.music
 
+import com.wpreborn.core.ui.PanelEdge
+import com.wpreborn.core.ui.WpPanelOverlay
 import android.app.Activity
 import android.app.RecoverableSecurityException
 import android.content.ContentValues
@@ -197,27 +199,18 @@ private fun RenameDialog(song: Song, onDismiss: () -> Unit, onRename: (String) -
     var text by remember { mutableStateOf(song.title) }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
-    BackHandler(onBack = onDismiss)
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(Wp.palette.chrome)
-                .clickable(remember { MutableInteractionSource() }, null) {}
-                .statusBarsPadding()
-                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
-        ) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Top, insetTop = true,
+        padding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
+    ) { close ->
             WpText(stringResource(R.string.music_rename_title), style = WpType.Large.copy(fontWeight = FontWeight.SemiBold))
             Spacer(Modifier.height(12.dp))
             WpTextBox(text, { text = it }, Modifier.fillMaxWidth(), focusRequester = focus, onImeAction = { if (text.isNotBlank()) onRename(text.trim()) })
             Spacer(Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WpButton(stringResource(R.string.save), Modifier.weight(1f)) { if (text.isNotBlank()) onRename(text.trim()) }
-                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = { close(onDismiss) })
             }
-        }
     }
 }
 
@@ -235,19 +228,10 @@ private fun TagsDialog(songs: List<Song>, onDismiss: () -> Unit, onSave: (com.wp
     var genre by remember { mutableStateOf(common { it.genre.orEmpty() }) }
     var year by remember { mutableStateOf(common { if (it.year > 0) it.year.toString() else "" }) }
     var track by remember { mutableStateOf(one?.track?.takeIf { it > 0 }?.toString().orEmpty()) }
-    BackHandler(onBack = onDismiss)
-    Box(
-        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss),
-    ) {
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .background(Wp.palette.chrome)
-                .clickable(remember { MutableInteractionSource() }, null) {}
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
-        ) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Top, insetTop = true, scroll = true,
+        padding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 20.dp),
+    ) { close ->
             WpText(
                 if (one != null) stringResource(R.string.music_tags_title) else context().resources.getQuantityString(R.plurals.music_tags_many, songs.size, songs.size),
                 style = WpType.Large.copy(fontWeight = FontWeight.SemiBold),
@@ -279,9 +263,8 @@ private fun TagsDialog(songs: List<Song>, onDismiss: () -> Unit, onSave: (com.wp
                         ),
                     )
                 }
-                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = { close(onDismiss) })
             }
-        }
     }
 }
 

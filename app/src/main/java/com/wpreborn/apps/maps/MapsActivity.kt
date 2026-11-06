@@ -463,7 +463,13 @@ class MapsActivity : WpActivity() {
                                     color = Wp.accent,
                                     modifier = Modifier.wpClickable { showSteps = !showSteps }.padding(vertical = 6.dp),
                                 )
-                                if (showSteps) {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = showSteps,
+                                    enter = androidx.compose.animation.expandVertically(androidx.compose.animation.core.tween(300, easing = com.wpreborn.core.motion.WpEasing.ExpOut)) +
+                                        androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
+                                    exit = androidx.compose.animation.shrinkVertically(androidx.compose.animation.core.tween(220, easing = com.wpreborn.core.motion.WpEasing.ExpIn)) +
+                                        androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(170)),
+                                ) {
                                     LazyColumn(Modifier.heightIn(max = 300.dp)) {
                                         items(r.steps) { st ->
                                             Row(Modifier.fillMaxWidth().padding(vertical = 5.dp)) {

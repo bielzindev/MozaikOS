@@ -1,5 +1,7 @@
 package com.wpreborn.apps.settings
 
+import com.wpreborn.core.ui.PanelEdge
+import com.wpreborn.core.ui.WpPanelOverlay
 import android.Manifest
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -196,13 +198,11 @@ private fun SignalBars(level: Int) {
 
 @Composable
 private fun JoinNetwork(n: WifiNet, onDismiss: () -> Unit, onJoin: (String?) -> Unit) {
-    BackHandler(onBack = onDismiss)
     var pwd by remember { mutableStateOf("") }
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.6f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss)) {
-        Column(
-            Modifier.align(Alignment.TopCenter).fillMaxWidth().background(Wp.palette.chrome)
-                .clickable(remember { MutableInteractionSource() }, null) {}.padding(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
-        ) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Top,
+        padding = androidx.compose.foundation.layout.PaddingValues(start = 20.dp, end = 20.dp, top = 40.dp, bottom = 20.dp),
+    ) { close ->
             WpText(n.ssid, style = WpType.Large)
             if (n.secure) {
                 WpText(stringResource(R.string.wifi_password), style = WpType.Subtle, color = Wp.palette.subtle, modifier = Modifier.padding(top = 12.dp))
@@ -210,9 +210,8 @@ private fun JoinNetwork(n: WifiNet, onDismiss: () -> Unit, onJoin: (String?) -> 
             }
             Row(Modifier.padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 WpButton(stringResource(R.string.wifi_connect), Modifier.weight(1f), enabled = !n.secure || pwd.length >= 8 || n.security == "WEP") { onJoin(if (n.secure) pwd else null) }
-                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = onDismiss)
+                WpButton(stringResource(R.string.cancel), Modifier.weight(1f), onClick = { close(onDismiss) })
             }
-        }
     }
 }
 

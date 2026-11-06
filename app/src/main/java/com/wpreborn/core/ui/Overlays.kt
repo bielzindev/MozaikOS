@@ -21,6 +21,16 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.ui.unit.Dp
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.fadeIn
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -72,6 +82,101 @@ private fun rememberOverlayExit(): OverlayExit {
     val scope = rememberCoroutineScope()
     val closing = remember { mutableStateOf(false) }
     return remember { OverlayExit(scope, closing) }
+}
+
+/** Where a [WpPanelOverlay]'s panel sits (and so which way it moves). */
+enum class PanelEdge { Top, Center, Bottom }
+
+/**
+ * A panel over a dimmed screen that comes in and goes out with the Windows Phone motion: the dimming
+ * fades; a panel at the [PanelEdge.Top] drops in (like the message box), one at the
+ * [PanelEdge.Bottom] rises from the bottom (menus), one in the [PanelEdge.Center] opens from
+ * slightly smaller. Back, a tap outside and the panel's own buttons all play the way out before
+ * anything happens: [content] gets `close { … }`, which animates out and then runs the block.
+ * Used by every menu, submenu and small dialog that isn't a context menu or a message box.
+ */
+@Composable
+fun WpPanelOverlay(
+    onDismiss: () -> Unit,
+    edge: PanelEdge = PanelEdge.Top,
+    scrim: Float = 0.6f,
+    background: Color = Wp.palette.chrome,
+    padding: PaddingValues = PaddingValues(),
+    maxHeight: Dp = Dp.Unspecified,
+    scroll: Boolean = false,
+    insetTop: Boolean = false,
+    content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+) {
+    val exit = rememberOverlayExit()
+    BackHandler { exit.close(onDismiss) }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    val dim by animateFloatAsState(if (shown && !exit.closing) scrim else 0f, tween(200), label = "dim")
+    val align = when (edge) {
+        PanelEdge.Top -> Alignment.TopCenter
+        PanelEdge.Center -> Alignment.Center
+        PanelEdge.Bottom -> Alignment.BottomCenter
+    }
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(Color.Black.copy(alpha = dim))
+            .clickable(remember { MutableInteractionSource() }, null) { exit.close(onDismiss) },
+    ) {
+        AnimatedVisibility(
+            visible = shown && !exit.closing,
+            modifier = Modifier.align(align),
+            enter = when (edge) {
+                PanelEdge.Bottom -> slideInVertically(tween(300, easing = WpEasing.ExpOut)) { it } + fadeIn(tween(160))
+                PanelEdge.Top -> slideInVertically(tween(300, easing = WpEasing.ExpOut)) { -it / 2 } + fadeIn(tween(200))
+                PanelEdge.Center -> scaleIn(tween(260, easing = WpEasing.ExpOut), initialScale = 0.92f) + fadeIn(tween(200))
+            },
+            exit = when (edge) {
+                PanelEdge.Bottom -> slideOutVertically(tween(200, easing = WpEasing.ExpIn)) { it } + fadeOut(tween(160))
+                PanelEdge.Top -> slideOutVertically(tween(190, easing = WpEasing.ExpIn)) { -it / 4 } + fadeOut(tween(160))
+                PanelEdge.Center -> scaleOut(tween(180, easing = WpEasing.ExpIn), targetScale = 0.94f) + fadeOut(tween(150))
+            },
+        ) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .then(if (maxHeight != Dp.Unspecified) Modifier.heightIn(max = maxHeight) else Modifier)
+                    .background(background)
+                    .clickable(remember { MutableInteractionSource() }, null) {}
+                    .then(if (insetTop) Modifier.statusBarsPadding() else Modifier)
+                    .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
+                    .padding(padding),
+            ) { content { action -> exit.close(action) } }
+        }
+    }
+}
+
+/**
+ * A full-screen layer over the page (the music queue, say) that slides up from the bottom and
+ * fades in, and slides back down when it closes. [content] gets `close { … }` like [WpPanelOverlay].
+ */
+@Composable
+fun WpFullScreenOverlay(
+    onDismiss: () -> Unit,
+    background: Color = Wp.palette.background,
+    content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+) {
+    val exit = rememberOverlayExit()
+    BackHandler { exit.close(onDismiss) }
+    var shown by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) { shown = true }
+    AnimatedVisibility(
+        visible = shown && !exit.closing,
+        enter = slideInVertically(tween(320, easing = WpEasing.ExpOut)) { it / 3 } + fadeIn(tween(220)),
+        exit = slideOutVertically(tween(210, easing = WpEasing.ExpIn)) { it / 3 } + fadeOut(tween(170)),
+    ) {
+        Column(
+            Modifier
+                .fillMaxSize()
+                .background(background)
+                .clickable(remember { MutableInteractionSource() }, null) {},
+        ) { content { action -> exit.close(action) } }
+    }
 }
 
 /**

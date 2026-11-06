@@ -1,5 +1,7 @@
 package com.wpreborn.apps.browser
 
+import com.wpreborn.core.ui.PanelEdge
+import com.wpreborn.core.ui.WpPanelOverlay
 import android.annotation.SuppressLint
 import android.app.DownloadManager
 import android.content.Context
@@ -651,9 +653,29 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
             }
         }
 
-        when (panel) {
-            Panel.Tabs -> TabsPage(a, onClose = { panel = Panel.None })
-            Panel.Menu -> MenuPanel(a, store, t, onDismiss = { panel = Panel.None }) { p ->
+        // The full pages (tabs, hub, settings, reader, downloads) slide up and fade in, and go back
+        // down when closed; the last one stays drawn while it leaves.
+        val fullPage = panel == Panel.Tabs || panel == Panel.Hub || panel == Panel.Settings || panel == Panel.Reader || panel == Panel.Downloads
+        var lastPage by remember { mutableStateOf(Panel.Tabs) }
+        if (fullPage && lastPage != panel) androidx.compose.runtime.SideEffect { lastPage = panel }
+        androidx.compose.animation.AnimatedVisibility(
+            visible = fullPage,
+            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, easing = com.wpreborn.core.motion.WpEasing.ExpOut)) { it / 4 } +
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
+            exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(210, easing = com.wpreborn.core.motion.WpEasing.ExpIn)) { it / 4 } +
+                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(170)),
+        ) {
+            when (if (fullPage) panel else lastPage) {
+                Panel.Tabs -> TabsPage(a, onClose = { panel = Panel.None })
+                Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
+                Panel.Settings -> SettingsPage(a, store)
+                Panel.Reader -> reader?.let { ReaderView(it, store) }
+                Panel.Downloads -> DownloadsPage(a, store)
+                else -> {}
+            }
+        }
+        if (panel == Panel.Menu) {
+            MenuPanel(a, store, t, onDismiss = { panel = Panel.None }) { p ->
                 if (p == Panel.Reader) {
                     a.readPage(t) { page ->
                         if (page == null) Toast.makeText(a, a.getString(R.string.browser_reader_empty), Toast.LENGTH_SHORT).show()
@@ -661,11 +683,6 @@ private fun BrowserScreen(a: BrowserActivity, store: BrowserStore) {
                     }
                 } else panel = p
             }
-            Panel.Hub -> HubPage(store, onOpen = { a.load(t, it); panel = Panel.None })
-            Panel.Settings -> SettingsPage(a, store)
-            Panel.Reader -> reader?.let { ReaderView(it, store) }
-            Panel.Downloads -> DownloadsPage(a, store)
-            else -> {}
         }
         a.linkMenu?.let { m -> LinkMenuPanel(a, m, t.private) { a.linkMenu = null } }
         a.customView?.let { v ->
@@ -787,20 +804,17 @@ private fun FindBar(text: String, onText: (String) -> Unit, onNext: () -> Unit, 
 /** The "..." menu: a list of text items rising above the bar, as on Windows Phone. */
 @Composable
 private fun MenuPanel(a: BrowserActivity, store: BrowserStore, t: BrowserTab, onDismiss: () -> Unit, open: (Panel) -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.3f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss)) {
-        Column(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().background(Wp.palette.chrome).clickable(remember { MutableInteractionSource() }, null) {}
-                .padding(bottom = 62.dp, top = 8.dp)
-                .heightIn(max = 560.dp)
-                .verticalScroll(rememberScrollState()),
-        ) {
+    WpPanelOverlay(
+        onDismiss = onDismiss, edge = PanelEdge.Bottom, scrim = 0.3f,
+        padding = androidx.compose.foundation.layout.PaddingValues(bottom = 62.dp, top = 8.dp), maxHeight = 560.dp, scroll = true,
+    ) { close ->
             @Composable
             fun Item(label: String, enabled: Boolean = true, onClick: () -> Unit) {
                 WpText(
                     label,
                     style = WpType.Large.copy(fontSize = 20.sp),
                     color = if (enabled) Wp.palette.foreground else Wp.palette.disabled,
-                    modifier = Modifier.fillMaxWidth().then(if (enabled) Modifier.wpClickable { onDismiss(); onClick() } else Modifier).padding(horizontal = 20.dp, vertical = 9.dp),
+                    modifier = Modifier.fillMaxWidth().then(if (enabled) Modifier.wpClickable { close { onDismiss(); onClick() } } else Modifier).padding(horizontal = 20.dp, vertical = 9.dp),
                 )
             }
             Item(stringResource(R.string.browser_forward), enabled = t.web?.canGoForward() == true) { t.web?.goForward() }
@@ -825,7 +839,6 @@ private fun MenuPanel(a: BrowserActivity, store: BrowserStore, t: BrowserTab, on
                     modifier = Modifier.padding(horizontal = 20.dp, vertical = 8.dp),
                 )
             }
-        }
     }
 }
 
@@ -971,11 +984,7 @@ private fun pluralSafe(format: String, n: Int): String = runCatching { String.fo
 /** Press and hold on a link or picture: what to do with it, as a Windows Phone context menu. */
 @Composable
 private fun LinkMenuPanel(a: BrowserActivity, m: LinkMenu, private: Boolean, onDismiss: () -> Unit) {
-    Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable(remember { MutableInteractionSource() }, null, onClick = onDismiss)) {
-        Column(
-            Modifier.align(Alignment.Center).fillMaxWidth().background(Wp.palette.chrome).clickable(remember { MutableInteractionSource() }, null) {}
-                .padding(vertical = 10.dp),
-        ) {
+    WpPanelOverlay(onDismiss = onDismiss, edge = PanelEdge.Center, scrim = 0.5f, padding = androidx.compose.foundation.layout.PaddingValues(vertical = 10.dp)) { close ->
             WpText(
                 m.link ?: m.image.orEmpty(), style = WpType.Small, color = Wp.palette.subtle, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 20.dp, vertical = 6.dp),
@@ -984,7 +993,7 @@ private fun LinkMenuPanel(a: BrowserActivity, m: LinkMenu, private: Boolean, onD
             fun Item(label: String, onClick: () -> Unit) {
                 WpText(
                     label, style = WpType.Large.copy(fontSize = 20.sp),
-                    modifier = Modifier.fillMaxWidth().wpClickable { onDismiss(); onClick() }.padding(horizontal = 20.dp, vertical = 10.dp),
+                    modifier = Modifier.fillMaxWidth().wpClickable { close { onDismiss(); onClick() } }.padding(horizontal = 20.dp, vertical = 10.dp),
                 )
             }
             m.link?.let { link ->
@@ -997,7 +1006,6 @@ private fun LinkMenuPanel(a: BrowserActivity, m: LinkMenu, private: Boolean, onD
                 if (img.startsWith("http")) Item(stringResource(R.string.browser_save_image)) { a.download(img, null, null, null) }
                 Item(stringResource(R.string.browser_open_image)) { a.newTab(img, private = private) }
             }
-        }
     }
 }
 

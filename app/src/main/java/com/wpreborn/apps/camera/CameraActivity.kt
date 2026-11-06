@@ -1063,7 +1063,13 @@ private fun CameraScreen(activity: CameraActivity) {
             }
         }
 
-        if (showSettings) {
+        androidx.compose.animation.AnimatedVisibility(
+            visible = showSettings,
+            enter = androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(320, easing = com.wpreborn.core.motion.WpEasing.ExpOut)) { it / 4 } +
+                androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(220)),
+            exit = androidx.compose.animation.slideOutVertically(androidx.compose.animation.core.tween(210, easing = com.wpreborn.core.motion.WpEasing.ExpIn)) { it / 4 } +
+                androidx.compose.animation.fadeOut(androidx.compose.animation.core.tween(170)),
+        ) {
             CameraSettingsPage(settings, soundForced, ::update) { showSettings = false }
         }
     }

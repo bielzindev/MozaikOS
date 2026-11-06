@@ -770,11 +770,16 @@ private fun rememberInstalledGames(): Set<String> {
 @Composable
 private fun GameTile(g: GameApp, installed: Boolean, modifier: Modifier, textSize: androidx.compose.ui.unit.TextUnit) {
     val context = LocalContext.current
-    val icon = remember(g.id, installed) {
+    // Installed: the icon the game has on the phone; otherwise its real icon, fetched once and kept.
+    val installedIcon = remember(g.id, installed) {
         if (!installed) null else runCatching {
             context.packageManager.getApplicationIcon(g.id).toBitmap(192, 192).asImageBitmap()
         }.getOrNull()
     }
+    val fetched by androidx.compose.runtime.produceState<androidx.compose.ui.graphics.ImageBitmap?>(null, g.id, installed) {
+        if (!installed) value = com.wpreborn.data.store.GameIcons.load(context, g)?.asImageBitmap()
+    }
+    val icon = installedIcon ?: fetched
     Box(modifier.background(g.color), contentAlignment = Alignment.Center) {
         if (icon != null) {
             androidx.compose.foundation.Image(icon, null, Modifier.fillMaxSize())
